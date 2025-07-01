@@ -41,7 +41,7 @@ public class TaskFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         rvTasks = view.findViewById(R.id.rv_tasks);
-        rvTasks.setLayoutManager(new GridLayoutManager(requireContext(), 2));
+        rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new TaskAdapter();
         rvTasks.setAdapter(adapter);
         fetchTasks();

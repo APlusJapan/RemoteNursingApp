@@ -2,7 +2,8 @@ package com.aplus.remotenursing.views;
 
 import android.content.Context;
 import android.util.AttributeSet;
-
+import android.view.View;
+import android.view.View.MeasureSpec;
 import androidx.cardview.widget.CardView;
 
 public class SquareCardView extends CardView {
@@ -16,8 +17,8 @@ public class SquareCardView extends CardView {
         super(context, attrs, defStyleAttr);
     }
 
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, widthMeasureSpec);
-    }
+//    @Override
+//    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+//        //super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//    }
 }
