@@ -17,8 +17,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_BLE_PERMISSIONS = 100;
-    private Fragment videoFragment;
-    private Fragment dataFragment;
+    private Fragment taskFragment;
     private Fragment meFragment;
 
     @Override
@@ -29,14 +28,12 @@ public class MainActivity extends AppCompatActivity {
         // 1. 申请 BLE 相关权限
         requestBlePermissionsIfNeeded();
 
-        // 2. 实例化并 add 三个 Fragment
-        videoFragment = new VideoListFragment();
-        dataFragment  = new DataFragment();
-        meFragment    = new MeFragment();
+        // 2. 实例化并 add 两个 Fragment
+        taskFragment = new TaskFragment();
+        meFragment   = new MeFragment();
 
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        ft.add(R.id.fragment_container, videoFragment, "video");
-        ft.add(R.id.fragment_container, dataFragment, "data").hide(dataFragment);
+        ft.add(R.id.fragment_container, taskFragment, "task");
         ft.add(R.id.fragment_container, meFragment, "me").hide(meFragment);
         ft.commit();
 
@@ -44,15 +41,12 @@ public class MainActivity extends AppCompatActivity {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
             FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-            tx.hide(videoFragment)
-                    .hide(dataFragment)
+            tx.hide(taskFragment)
                     .hide(meFragment);
 
             int id = item.getItemId();
-            if (id == R.id.navigation_video) {
-                tx.show(videoFragment);
-            } else if (id == R.id.navigation_data) {
-                tx.show(dataFragment);
+            if (id == R.id.navigation_task) {
+                tx.show(taskFragment);
             } else if (id == R.id.navigation_me) {
                 tx.show(meFragment);
             }
@@ -78,24 +72,5 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         // Android 12 以下无需额外动态申请
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_BLE_PERMISSIONS) {
-            boolean grantedAll = true;
-            for (int r : grantResults) {
-                if (r != PackageManager.PERMISSION_GRANTED) {
-                    grantedAll = false;
-                    break;
-                }
-            }
-            if (!grantedAll) {
-                // 可弹窗提示：没有权限将无法扫描或连接 BLE 设备
-            }
-        }
     }
 }

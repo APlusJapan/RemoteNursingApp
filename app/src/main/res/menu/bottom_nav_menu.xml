@@ -1,22 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 视频 -->
     <item
-        android:id="@+id/navigation_video"
-        android:icon="@drawable/ic_video"
-        android:title="@string/bottom_menu_video" />
-
-    <!-- 数据 -->
-    <item
-        android:id="@+id/navigation_data"
+        android:id="@+id/navigation_task"
         android:icon="@drawable/ic_data"
-        android:title="@string/bottom_menu_data" />
+        android:title="@string/bottom_menu_task" />
 
-    <!-- 我的 -->
     <item
         android:id="@+id/navigation_me"
         android:icon="@drawable/ic_me"
         android:title="@string/bottom_menu_me" />
-
 </menu>

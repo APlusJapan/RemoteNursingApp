@@ -10,9 +10,8 @@
     <string name="heart_rate">心率数据</string>
     <string name="heart_rate_value">实时心率：%1$d bpm</string>
     <string name="bluetooth_devices_list">可用蓝牙设备列表</string>
-    <string name="bottom_menu_video">视频</string>
-    <string name="bottom_menu_data">数据</string>
-    <string name="bottom_menu_me">打卡</string>
+    <string name="bottom_menu_task">每日任务</string>
+    <string name="bottom_menu_me">我的信息</string>
     <string name="status_default">状态信息会在这里显示</string>
     <string name="series_other_videos">本系列其他视频</string>
     <string name="series_list_desc">系列列表</string>
