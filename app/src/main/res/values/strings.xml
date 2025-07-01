@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">RemoteNursing</string>
+    <string name="scan_button_text">扫描蓝牙设备</string>
+    <string name="device_item">%1$s&#10;%2$s</string>
+    <string name="permission_denied">权限不足，无法执行此操作</string>
+    <string name="connected_to">已连接：%1$s</string>
+    <string name="disconnected_from">已断开：%1$s</string>
+    <string name="watch_battery">手表电量</string>
+    <string name="battery_level">当前电量：%1$d%%</string>
+    <string name="heart_rate">心率数据</string>
+    <string name="heart_rate_value">实时心率：%1$d bpm</string>
+    <string name="bluetooth_devices_list">可用蓝牙设备列表</string>
+    <string name="bottom_menu_video">视频</string>
+    <string name="bottom_menu_data">数据</string>
+    <string name="bottom_menu_me">打卡</string>
+    <string name="status_default">状态信息会在这里显示</string>
+    <string name="series_other_videos">本系列其他视频</string>
+    <string name="series_list_desc">系列列表</string>
+    <string name="desc_other_videos_list">其他可选视频列表</string>
+    <string name="desc_enter_fullscreen">进入全屏</string>
+    <string name="desc_exit_fullscreen">退出全屏</string>
+    <string name="desc_back">返回</string>
+</resources>

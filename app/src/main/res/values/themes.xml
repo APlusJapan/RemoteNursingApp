@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 基础 App 主题 -->
+    <style name="Base.Theme.RemoteNursing" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 这里写你的 colorPrimary / colorSecondary 等 -->
+    </style>
+
+    <!-- 让 Activity/Fragment 使用上面那个 Base 主题 -->
+    <style name="Theme.RemoteNursing" parent="Base.Theme.RemoteNursing" />
+</resources>

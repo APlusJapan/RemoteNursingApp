@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/fs_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <com.google.android.exoplayer2.ui.PlayerView
+        android:id="@+id/fs_player_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        app:use_controller="true"
+        app:resize_mode="zoom"
+        app:show_timeout="5000" />
+    <TextView
+        android:id="@+id/btn_exit_fullscreen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:minWidth="40dp"
+        android:minHeight="48dp"
+        android:paddingVertical="8dp"
+        android:paddingHorizontal="12dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="24dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="9dp"
+        android:background="@drawable/bg_text_border"
+        android:clickable="true"
+        android:focusable="true"
+        android:text="退出全屏"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"/>
+</FrameLayout>

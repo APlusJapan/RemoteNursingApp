@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <Button
+        android:id="@+id/btn_sync"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="同步生理数据" />
+
+    <!-- 心率 -->
+    <TextView
+        android:id="@+id/tv_heart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="心率：-"
+        android:textSize="16sp"
+        android:paddingTop="8dp" />
+
+    <!-- 步数 -->
+    <TextView
+        android:id="@+id/tv_steps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="步数：-"
+        android:textSize="16sp"
+        android:paddingTop="4dp" />
+
+    <!-- 血氧  -->
+    <TextView
+        android:id="@+id/tv_spo2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="血氧：-"
+        android:textSize="16sp"
+        android:paddingTop="4dp" />
+
+    <!-- 血压-->
+    <TextView
+        android:id="@+id/tv_bp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="血压：-"
+        android:textSize="16sp"
+        android:paddingTop="4dp" />
+
+    <!-- 血糖-->
+    <TextView
+        android:id="@+id/tv_bloodGlucose"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="血糖：-"
+        android:textSize="16sp"
+        android:paddingTop="4dp" />
+
+    <!-- 睡眠 -->
+    <TextView
+        android:id="@+id/tv_sleep"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="睡眠：-"
+        android:textSize="16sp"
+        android:paddingTop="4dp" />
+
+    <!-- 通用状态/日志 -->
+    <TextView
+        android:id="@+id/tv_data"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/status_default"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:paddingTop="8dp" />
+</LinearLayout>

@@ -1,0 +1,28 @@
+pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    // 注意要 PREFER_SETTINGS，这样才能让 settings.gradle 里声明的 flatDir 生效
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+        // 把 app/libs 作为一个本地仓库
+        flatDir {
+            dirs "$rootDir/app/libs"
+        }
+    }
+}
+rootProject.name = "RemoteNursing"
+include ':app'

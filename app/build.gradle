@@ -1,0 +1,70 @@
+plugins {
+    alias(libs.plugins.android.application)
+    // 如果你用了 Kotlin，也要加：
+    // alias(libs.plugins.kotlin.android)
+}
+
+android {
+    namespace 'com.aplus.remotenursing'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.aplus.remotenursing"
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.activity
+    implementation libs.constraintlayout
+
+    // BLE SDK AAR/JAR
+    implementation fileTree(dir: 'libs', include: ['*.jar','*.aar'])
+    implementation files('libs/vpbluetooth-1.14.aar')
+    implementation files('libs/vpprotocol-2.3.08.15.aar')
+
+    // JiaoZiVideoPlayer 主库 + Exo 插件（记得版本号要配对）
+    implementation "cn.jzvd:jiaozivideoplayer:7.4.2"
+    implementation "com.google.android.exoplayer:exoplayer:2.18.5"
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.18.5'
+    implementation "androidx.appcompat:appcompat:1.6.1"
+
+
+    implementation "androidx.fragment:fragment-ktx:1.5.7"
+    implementation "androidx.recyclerview:recyclerview:1.4.0"
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+
+
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 局部全屏时用的主题 -->
+    <style name="Theme.RemoteNursing.Fullscreen" parent="Theme.RemoteNursing">
+        <!-- 真正全屏 -->
+        <item name="android:windowFullscreen">true</item>
+        <!-- 可选：状态栏透明，导航栏黑色 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+</resources>
