@@ -10,7 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
+import androidx.recyclerview.widget.GridLayoutManager;
 import com.aplus.remotenursing.adapters.TaskAdapter;
 import com.aplus.remotenursing.models.UserTask;
 import com.google.gson.Gson;
@@ -41,7 +41,7 @@ public class TaskFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         rvTasks = view.findViewById(R.id.rv_tasks);
-        rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvTasks.setLayoutManager(new GridLayoutManager(requireContext(), 2));
         adapter = new TaskAdapter();
         rvTasks.setAdapter(adapter);
         fetchTasks();
@@ -59,6 +59,8 @@ public class TaskFragment extends Fragment {
                     String json = response.body().string();
                     Gson gson = new Gson();
                     List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
+                    java.util.Collections.sort(list,
+                            (a, b) -> Integer.compare(a.getTask_order(), b.getTask_order()));
                     getActivity().runOnUiThread(() -> {
                         adapter.setTasks(list);
                         adapter.notifyDataSetChanged();

@@ -32,7 +32,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskVH> {
     @Override
     public void onBindViewHolder(@NonNull TaskVH holder, int position) {
         UserTask t = tasks.get(position);
-        holder.tvName.setText(t.getTask_type());
+        holder.tvName.setText(t.getTask_name());
     }
 
     @Override
