@@ -23,7 +23,7 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
     }
     @NonNull @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.videotask_detaili_videoitem, parent, false);
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_videotask_detaili_video, parent, false);
         return new VH(v);
     }
     @Override

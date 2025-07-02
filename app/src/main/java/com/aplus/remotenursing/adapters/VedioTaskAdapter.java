@@ -36,7 +36,7 @@ public class VedioTaskAdapter extends RecyclerView.Adapter<VedioTaskAdapter.Seri
     @Override
     public SeriesViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.vediotask_vedioseries, parent, false);
+                .inflate(R.layout.item_vediotask_vedioseries, parent, false);
         return new SeriesViewHolder(view);
     }
 

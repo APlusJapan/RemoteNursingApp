@@ -30,7 +30,7 @@ public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH
     @Override
     public TaskVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.videotask_textitem, parent, false);
+                .inflate(R.layout.item_videotask_text, parent, false);
         return new TaskVH(v);
     }
 
