@@ -156,6 +156,8 @@ public class DataFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inf, ViewGroup container, Bundle saved) {
         View root = inf.inflate(R.layout.fragment_data, container, false);
+        root.findViewById(R.id.DataPage_btn_back)
+                .setOnClickListener(v -> requireActivity().onBackPressed());
         tvHeart         = root.findViewById(R.id.tv_heart);
         tvSteps         = root.findViewById(R.id.tv_steps);
         tvSpo2          = root.findViewById(R.id.tv_spo2);

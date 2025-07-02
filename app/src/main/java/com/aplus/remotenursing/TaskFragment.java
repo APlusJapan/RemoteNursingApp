@@ -15,7 +15,8 @@ import com.aplus.remotenursing.adapters.TaskAdapter;
 import com.aplus.remotenursing.models.UserTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
+import com.aplus.remotenursing.VideoListFragment;
+import com.aplus.remotenursing.DataFragment;
 import java.io.IOException;
 import java.util.List;
 
@@ -25,7 +26,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class TaskFragment extends Fragment {
+public class TaskFragment extends Fragment implements TaskAdapter.OnTaskClickListener{
 
     private RecyclerView rvTasks;
     private TaskAdapter adapter;
@@ -43,6 +44,7 @@ public class TaskFragment extends Fragment {
         rvTasks = view.findViewById(R.id.rv_tasks);
         rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new TaskAdapter();
+        adapter.setOnTaskClickListener(this);
         rvTasks.setAdapter(adapter);
         fetchTasks();
     }
@@ -68,6 +70,22 @@ public class TaskFragment extends Fragment {
                 }
             }
         });
+    }
+    @Override
+    public void onTaskClick(UserTask task) {
+        if ("01".equals(task.getTask_type())) {
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new VideoListFragment())
+                    .addToBackStack(null)
+                    .commit();
+        } else if ("02".equals(task.getTask_type())) {
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new DataFragment())
+                    .addToBackStack(null)
+                    .commit();
+        }
     }
 }
 

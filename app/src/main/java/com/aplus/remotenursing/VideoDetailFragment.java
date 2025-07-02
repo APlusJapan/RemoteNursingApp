@@ -80,7 +80,7 @@ public class VideoDetailFragment extends Fragment {
                 startActivityForResult(it, REQ_FULLSCREEN);
             });
 
-            ((Button) view.findViewById(R.id.btn_back))
+            ((Button) view.findViewById(R.id.VideoDetailPage_btn_back))
                     .setOnClickListener(v -> requireActivity().onBackPressed());
         });
     }

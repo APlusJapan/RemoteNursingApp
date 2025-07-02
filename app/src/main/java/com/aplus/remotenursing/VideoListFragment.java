@@ -41,6 +41,8 @@ public class VideoListFragment extends Fragment implements SeriesAdapter.OnSerie
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        view.findViewById(R.id.VideoListPage_btn_back)
+                .setOnClickListener(v -> requireActivity().onBackPressed());
         rvSeries = view.findViewById(R.id.rv_series);
         rvSeries.setLayoutManager(new LinearLayoutManager(requireContext()));
         // 初始加载空adapter，防止空指针

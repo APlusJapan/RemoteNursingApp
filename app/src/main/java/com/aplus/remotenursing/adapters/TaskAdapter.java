@@ -14,11 +14,16 @@ import com.aplus.remotenursing.models.UserTask;
 import java.util.List;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskVH> {
-
+    public interface OnTaskClickListener {
+        void onTaskClick(UserTask task);
+    }
     private List<UserTask> tasks;
-
+    private OnTaskClickListener listener;
     public void setTasks(List<UserTask> list) {
         this.tasks = list;
+    }
+    public void setOnTaskClickListener(OnTaskClickListener l) {
+        this.listener = l;
     }
 
     @NonNull
@@ -33,6 +38,11 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskVH> {
     public void onBindViewHolder(@NonNull TaskVH holder, int position) {
         UserTask t = tasks.get(position);
         holder.tvName.setText(t.getTask_name());
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onTaskClick(t);
+            }
+        });
     }
 
     @Override
