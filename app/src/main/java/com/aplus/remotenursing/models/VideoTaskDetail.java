@@ -1,6 +1,6 @@
 package com.aplus.remotenursing.models;
 
-public class VideoItem {
+public class VideoTaskDetail {
     private String vedioId;
     private String vedioName;
     private String vedioURL;
@@ -8,7 +8,7 @@ public class VideoItem {
     private String vedioDescription;
     private String vedioSurfaceImage;
 
-    public VideoItem() {}
+    public VideoTaskDetail() {}
 
     public String getVedioId() { return vedioId; }
     public void setVedioId(String vedioId) { this.vedioId = vedioId; }

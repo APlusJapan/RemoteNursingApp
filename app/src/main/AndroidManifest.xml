@@ -35,7 +35,7 @@
         </activity>
         <!-- 新增这一段 -->
         <activity
-            android:name=".FullscreenPlayerActivity"
+            android:name=".VedioFullscreenPlayerActivity"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.RemoteNursing.Fullscreen"
             android:exported="false" />

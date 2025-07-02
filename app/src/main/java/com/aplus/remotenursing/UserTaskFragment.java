@@ -10,13 +10,12 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.GridLayoutManager;
-import com.aplus.remotenursing.adapters.TaskAdapter;
+
+import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.models.UserTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.aplus.remotenursing.VideoListFragment;
-import com.aplus.remotenursing.DataFragment;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -26,24 +25,24 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class TaskFragment extends Fragment implements TaskAdapter.OnTaskClickListener{
+public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTaskClickListener{
 
     private RecyclerView rvTasks;
-    private TaskAdapter adapter;
+    private UserTaskAdapter adapter;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_task, container, false);
+        return inflater.inflate(R.layout.fragment_usertask, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         rvTasks = view.findViewById(R.id.rv_tasks);
         rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
-        adapter = new TaskAdapter();
+        adapter = new UserTaskAdapter();
         adapter.setOnTaskClickListener(this);
         rvTasks.setAdapter(adapter);
         fetchTasks();
@@ -76,13 +75,13 @@ public class TaskFragment extends Fragment implements TaskAdapter.OnTaskClickLis
         if ("01".equals(task.getTask_type())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.fragment_container, new VideoListFragment())
+                    .replace(R.id.fragment_container, new VideoTaskFragment())
                     .addToBackStack(null)
                     .commit();
         } else if ("02".equals(task.getTask_type())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.fragment_container, new DataFragment())
+                    .replace(R.id.fragment_container, new SmartwatchCheckupFragment())
                     .addToBackStack(null)
                     .commit();
         }

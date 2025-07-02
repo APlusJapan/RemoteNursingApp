@@ -9,7 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-public class MeFragment extends Fragment {
+public class MyInfoFragment extends Fragment {
 
     @Nullable
     @Override
@@ -17,6 +17,6 @@ public class MeFragment extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         // 这里引用你稍后要创建的 fragment_me.xml
-        return inflater.inflate(R.layout.fragment_me, container, false);
+        return inflater.inflate(R.layout.fragment_myinfo, container, false);
     }
 }

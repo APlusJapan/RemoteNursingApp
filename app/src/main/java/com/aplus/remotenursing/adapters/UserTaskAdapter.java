@@ -13,7 +13,7 @@ import com.aplus.remotenursing.models.UserTask;
 
 import java.util.List;
 
-public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskVH> {
+public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH> {
     public interface OnTaskClickListener {
         void onTaskClick(UserTask task);
     }
@@ -30,7 +30,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskVH> {
     @Override
     public TaskVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_task, parent, false);
+                .inflate(R.layout.videotask_textitem, parent, false);
         return new TaskVH(v);
     }
 

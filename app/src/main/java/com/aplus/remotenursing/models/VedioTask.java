@@ -1,15 +1,15 @@
 package com.aplus.remotenursing.models;
 
-public class Series {
+public class VedioTask {
     private String vedioSeriesId;
     private String vedioSeriesName;
     private String vedioSurfaceImage;
     private String vedioDescription;
 
     // 必须要有空构造方法
-    public Series() {}
+    public VedioTask() {}
 
-    public Series(String id, String name, String img, String desc) {
+    public VedioTask(String id, String name, String img, String desc) {
         this.vedioSeriesId = id;
         this.vedioSeriesName = name;
         this.vedioSurfaceImage = img;

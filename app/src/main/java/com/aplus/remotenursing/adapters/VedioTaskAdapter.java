@@ -9,26 +9,26 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.aplus.remotenursing.R;
-import com.aplus.remotenursing.models.Series;
+import com.aplus.remotenursing.models.VedioTask;
 import com.bumptech.glide.Glide;
 
 import java.util.List;
 
-public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesViewHolder> {
+public class VedioTaskAdapter extends RecyclerView.Adapter<VedioTaskAdapter.SeriesViewHolder> {
 
     public interface OnSeriesClickListener {
         void onSeriesClick(int position);
     }
 
-    private List<Series> seriesList;
+    private List<VedioTask> seriesList;
     private OnSeriesClickListener listener;
 
-    public SeriesAdapter(List<Series> seriesList, OnSeriesClickListener listener) {
+    public VedioTaskAdapter(List<VedioTask> seriesList, OnSeriesClickListener listener) {
         this.seriesList = seriesList;
         this.listener = listener;
     }
 
-    public void setSeriesList(List<Series> list) {
+    public void setSeriesList(List<VedioTask> list) {
         this.seriesList = list;
     }
 
@@ -36,13 +36,13 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     @Override
     public SeriesViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_series, parent, false);
+                .inflate(R.layout.vediotask_vedioseries, parent, false);
         return new SeriesViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull SeriesViewHolder holder, int position) {
-        Series current = seriesList.get(position);
+        VedioTask current = seriesList.get(position);
         // 加载封面图片（用Glide等库，避免本地resId）
         Glide.with(holder.ivCover.getContext())
                 .load(current.getVedioSurfaceImage())

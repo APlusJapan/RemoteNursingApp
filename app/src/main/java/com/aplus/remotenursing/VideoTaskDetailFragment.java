@@ -14,8 +14,8 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.aplus.remotenursing.adapters.VideoItemAdapter;
-import com.aplus.remotenursing.models.VideoItem;
+import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
+import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
@@ -31,12 +31,12 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class VideoDetailFragment extends Fragment {
+public class VideoTaskDetailFragment extends Fragment {
 
     private static final int REQ_FULLSCREEN = 1001;
     private PlayerView playerView;
     private ExoPlayer player;
-    private VideoItem currentItem;
+    private VideoTaskDetail currentItem;
     private RecyclerView rvOther;
 
     @Nullable
@@ -44,7 +44,7 @@ public class VideoDetailFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_video_detail, container, false);
+        return inflater.inflate(R.layout.fragment_videotask_detail, container, false);
     }
 
     @Override
@@ -64,7 +64,7 @@ public class VideoDetailFragment extends Fragment {
             playerView.setPlayer(player);
             playVideo(currentItem);
 
-            rvOther.setAdapter(new VideoItemAdapter(videoList, item -> {
+            rvOther.setAdapter(new VideoTaskDetailAdapter(videoList, item -> {
                 currentItem = item;
                 playVideo(item);
             }));
@@ -73,10 +73,10 @@ public class VideoDetailFragment extends Fragment {
                 long pos = player.getCurrentPosition();
                 boolean playReady = player.getPlayWhenReady();
                 player.pause();
-                Intent it = new Intent(requireContext(), FullscreenPlayerActivity.class)
-                        .putExtra(FullscreenPlayerActivity.EXTRA_URL, currentItem.getVedioURL())
-                        .putExtra(FullscreenPlayerActivity.EXTRA_START_POS, pos)
-                        .putExtra(FullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady);
+                Intent it = new Intent(requireContext(), VedioFullscreenPlayerActivity.class)
+                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_URL, currentItem.getVedioURL())
+                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_START_POS, pos)
+                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady);
                 startActivityForResult(it, REQ_FULLSCREEN);
             });
 
@@ -86,7 +86,7 @@ public class VideoDetailFragment extends Fragment {
     }
 
     private interface VideoListCallback {
-        void onResult(List<VideoItem> videoList);
+        void onResult(List<VideoTaskDetail> videoList);
     }
 
     private void fetchVideoList(String userId, String vedioSeriesId, VideoListCallback callback) {
@@ -102,7 +102,7 @@ public class VideoDetailFragment extends Fragment {
                 if (response.isSuccessful()) {
                     String json = response.body().string();
                     Gson gson = new Gson();
-                    List<VideoItem> videoList = gson.fromJson(json, new TypeToken<List<VideoItem>>(){}.getType());
+                    List<VideoTaskDetail> videoList = gson.fromJson(json, new TypeToken<List<VideoTaskDetail>>(){}.getType());
                     if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(videoList));
                 } else {
                     if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(null));
@@ -111,7 +111,7 @@ public class VideoDetailFragment extends Fragment {
         });
     }
 
-    private void playVideo(VideoItem item) {
+    private void playVideo(VideoTaskDetail item) {
         player.setMediaItem(MediaItem.fromUri(item.getVedioURL()));
         player.prepare();
         player.play();
@@ -122,9 +122,9 @@ public class VideoDetailFragment extends Fragment {
         super.onActivityResult(req, res, data);
         if (req == REQ_FULLSCREEN && res == Activity.RESULT_OK && data != null) {
             long pos = data.getLongExtra(
-                    FullscreenPlayerActivity.EXTRA_END_POS, 0L);
+                    VedioFullscreenPlayerActivity.EXTRA_END_POS, 0L);
             boolean playReady = data.getBooleanExtra(
-                    FullscreenPlayerActivity.EXTRA_END_PLAYREADY, true);
+                    VedioFullscreenPlayerActivity.EXTRA_END_PLAYREADY, true);
             player.seekTo(pos);
             player.setPlayWhenReady(playReady);
         }

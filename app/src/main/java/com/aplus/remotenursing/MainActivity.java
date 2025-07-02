@@ -5,7 +5,6 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -29,8 +28,8 @@ public class MainActivity extends AppCompatActivity {
         requestBlePermissionsIfNeeded();
 
         // 2. 实例化并 add 两个 Fragment
-        taskFragment = new TaskFragment();
-        meFragment   = new MeFragment();
+        taskFragment = new UserTaskFragment();
+        meFragment   = new MyInfoFragment();
 
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         ft.add(R.id.fragment_container, taskFragment, "task");

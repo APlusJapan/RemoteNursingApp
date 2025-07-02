@@ -11,8 +11,8 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.aplus.remotenursing.adapters.SeriesAdapter;
-import com.aplus.remotenursing.models.Series;
+import com.aplus.remotenursing.adapters.VedioTaskAdapter;
+import com.aplus.remotenursing.models.VedioTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -25,18 +25,18 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class VideoListFragment extends Fragment implements SeriesAdapter.OnSeriesClickListener {
+public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSeriesClickListener {
 
     private RecyclerView rvSeries;
-    private SeriesAdapter adapter;
-    private List<Series> seriesList;
+    private VedioTaskAdapter adapter;
+    private List<VedioTask> seriesList;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_video_list, container, false);
+        return inflater.inflate(R.layout.fragment_videotask, container, false);
     }
 
     @Override
@@ -46,7 +46,7 @@ public class VideoListFragment extends Fragment implements SeriesAdapter.OnSerie
         rvSeries = view.findViewById(R.id.rv_series);
         rvSeries.setLayoutManager(new LinearLayoutManager(requireContext()));
         // 初始加载空adapter，防止空指针
-        adapter = new SeriesAdapter(seriesList, this);
+        adapter = new VedioTaskAdapter(seriesList, this);
         rvSeries.setAdapter(adapter);
         fetchSeriesList();
     }
@@ -64,7 +64,7 @@ public class VideoListFragment extends Fragment implements SeriesAdapter.OnSerie
                 if (response.isSuccessful() && getActivity() != null) {
                     String json = response.body().string();
                     Gson gson = new Gson();
-                    List<Series> list = gson.fromJson(json, new TypeToken<List<Series>>(){}.getType());
+                    List<VedioTask> list = gson.fromJson(json, new TypeToken<List<VedioTask>>(){}.getType());
                     getActivity().runOnUiThread(() -> {
                         seriesList = list;
                         adapter.setSeriesList(seriesList);
@@ -77,8 +77,8 @@ public class VideoListFragment extends Fragment implements SeriesAdapter.OnSerie
 
     @Override
     public void onSeriesClick(int position) {
-        Series selSeries = seriesList.get(position);
-        VideoDetailFragment detailFragment = new VideoDetailFragment();
+        VedioTask selSeries = seriesList.get(position);
+        VideoTaskDetailFragment detailFragment = new VideoTaskDetailFragment();
         Bundle args = new Bundle();
         args.putString("vedioSeriesId", selSeries.getVedioSeriesId());
         args.putString("vedioSeriesName", selSeries.getVedioSeriesName());

@@ -39,7 +39,6 @@ import com.veepoo.protocol.listener.data.IBPDetectDataListener;
 
 import com.veepoo.protocol.model.datas.BpData;
 import com.veepoo.protocol.model.datas.HeartData;
-import com.veepoo.protocol.model.datas.PwdData;
 import com.veepoo.protocol.model.datas.PersonInfoData;
 import com.veepoo.protocol.model.datas.Spo2hData;
 import com.veepoo.protocol.model.datas.SleepData;
@@ -49,13 +48,12 @@ import com.veepoo.protocol.model.enums.EBPDetectModel;
 import com.veepoo.protocol.model.enums.EOprateStauts;
 import com.veepoo.protocol.model.enums.ESex;
 import com.veepoo.protocol.model.enums.EFunctionStatus;
-import com.veepoo.protocol.model.settings.CustomSetting;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class DataFragment extends Fragment {
+public class SmartwatchCheckupFragment extends Fragment {
 
     private static final String TARGET_NAME = "F57L";
     private static final int REQUEST_LOCATION = 1;
@@ -155,7 +153,7 @@ public class DataFragment extends Fragment {
     @SuppressLint("MissingPermission")
     @Override
     public View onCreateView(@NonNull LayoutInflater inf, ViewGroup container, Bundle saved) {
-        View root = inf.inflate(R.layout.fragment_data, container, false);
+        View root = inf.inflate(R.layout.fragment_smartwatch_checkup, container, false);
         root.findViewById(R.id.DataPage_btn_back)
                 .setOnClickListener(v -> requireActivity().onBackPressed());
         tvHeart         = root.findViewById(R.id.tv_heart);

@@ -15,7 +15,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
 
-public class FullscreenPlayerActivity extends AppCompatActivity {
+public class VedioFullscreenPlayerActivity extends AppCompatActivity {
 
     public static final String EXTRA_URL             = "video_url";
     public static final String EXTRA_START_POS       = "start_position";
@@ -33,7 +33,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
 
         // 1) 布局铺满到系统栏
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        setContentView(R.layout.activity_fullscreen_player);
+        setContentView(R.layout.activity_vedio_fullscreen_player);
 
         // 2) 隐藏系统栏并开启 Immersive-Sticky
         WindowInsetsControllerCompat controller =

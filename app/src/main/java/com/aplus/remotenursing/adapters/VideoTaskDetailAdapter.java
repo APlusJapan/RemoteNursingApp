@@ -10,25 +10,25 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.R;
-import com.aplus.remotenursing.models.VideoItem;
+import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.bumptech.glide.Glide;
 import java.util.List;
 
-public class VideoItemAdapter extends RecyclerView.Adapter<VideoItemAdapter.VH> {
-    private final List<VideoItem> items;
+public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetailAdapter.VH> {
+    private final List<VideoTaskDetail> items;
     private final OnVideoClickListener listener;
-    public interface OnVideoClickListener { void onVideoClick(VideoItem item); }
-    public VideoItemAdapter(List<VideoItem> items, OnVideoClickListener listener) {
+    public interface OnVideoClickListener { void onVideoClick(VideoTaskDetail item); }
+    public VideoTaskDetailAdapter(List<VideoTaskDetail> items, OnVideoClickListener listener) {
         this.items = items; this.listener = listener;
     }
     @NonNull @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_video, parent, false);
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.videotask_detaili_videoitem, parent, false);
         return new VH(v);
     }
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
-        VideoItem it = items.get(position);
+        VideoTaskDetail it = items.get(position);
         holder.tvTitle.setText(it.getVedioName());
         Glide.with(holder.ivThumb.getContext())
                 .load(it.getVedioSurfaceImage())
