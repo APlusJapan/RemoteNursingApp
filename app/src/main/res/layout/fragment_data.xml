@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="1dp"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <Button
-        android:id="@+id/DataPage_btn_back"
-        android:layout_width="wrap_content"
+    <!-- 顶部灰色栏放置返回按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="← 返回" />
+        android:orientation="horizontal"
+        android:background="#DDDDDD"
+        android:padding="4dp">
+        <Button
+            android:id="@+id/DataPage_btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="返回" />
+    </LinearLayout>
     <Button
         android:id="@+id/btn_sync"
         android:layout_width="match_parent"
