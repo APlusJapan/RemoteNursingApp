@@ -35,6 +35,13 @@
         <item>自由职业</item>
         <item>其他</item>
     </string-array>
+    <string-array name="income_options">
+        <item>1000以下</item>
+        <item>1001-3000</item>
+        <item>3001-6000</item>
+        <item>6001-10000</item>
+        <item>10000以上</item>
+    </string-array>
     <string-array name="insurance_options">
         <item>城镇职工医保</item>
         <item>城乡居民医保</item>

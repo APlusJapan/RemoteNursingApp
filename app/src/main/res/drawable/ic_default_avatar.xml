@@ -1,0 +1,62 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+
+    <!-- 脸部圆形 -->
+    <path
+        android:fillColor="#FFE0B2"
+        android:pathData="M40,36 m-24,0 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0"/>
+
+    <!-- 头发弧形 -->
+    <path
+        android:fillColor="#8D6E63"
+        android:pathData="M16,40 a24,24 0 1,1 48,0"/>
+
+    <!-- 左眼镜圈 -->
+    <path
+        android:strokeWidth="1"
+        android:strokeColor="#666"
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,40 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"/>
+
+    <!-- 右眼镜圈 -->
+    <path
+        android:strokeWidth="1"
+        android:strokeColor="#666"
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,40 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"/>
+
+    <!-- 左眼珠 -->
+    <path
+        android:fillColor="#333"
+        android:pathData="M30,40 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+
+    <!-- 右眼珠 -->
+    <path
+        android:fillColor="#333"
+        android:pathData="M50,40 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+
+    <!-- 鼻子 -->
+    <path
+        android:strokeWidth="1"
+        android:strokeColor="#A1887F"
+        android:pathData="M40,45 Q41,48 40,48"/>
+
+    <!-- 嘴巴 -->
+    <path
+        android:strokeWidth="2"
+        android:strokeColor="#FF7043"
+        android:pathData="M36,53 Q40,56 44,53"/>
+
+    <!-- 围巾 -->
+    <path
+        android:fillColor="#FF8A65"
+        android:pathData="M32,67 h16 v10 h-16 z"/>
+
+    <!-- 上衣 -->
+    <path
+        android:fillColor="#90A4AE"
+        android:pathData="M28,77 h24 v10 h-24 z"/>
+</vector>

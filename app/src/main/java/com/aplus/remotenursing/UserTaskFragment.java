@@ -15,10 +15,11 @@ import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.models.UserTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
+import android.content.Context;
+import android.content.SharedPreferences;
 import java.io.IOException;
 import java.util.List;
-
+import com.aplus.remotenursing.models.UserInfo;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
@@ -29,6 +30,16 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
     private RecyclerView rvTasks;
     private UserTaskAdapter adapter;
+
+    private String loadUserId() {
+        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        String json = sp.getString("data", null);
+        if (json != null) {
+            UserInfo info = new Gson().fromJson(json, UserInfo.class);
+            return info.getUser_id();
+        }
+        return null;
+    }
 
     @Nullable
     @Override
@@ -49,8 +60,9 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void fetchTasks() {
-        String userId = "U001";
-        String url = "http://192.168.2.9:8080/api/usertask?userId="+userId;
+        String userId = loadUserId();
+        if (userId == null) return;
+        String url = "http://192.168.2.9:8080/api/usertask?userId=" + userId;
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {

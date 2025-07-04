@@ -13,7 +13,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
+import android.content.Context;
+import android.content.SharedPreferences;
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.google.android.exoplayer2.ExoPlayer;
@@ -21,7 +22,7 @@ import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
+import com.aplus.remotenursing.models.UserInfo;
 import java.io.IOException;
 import java.util.List;
 
@@ -39,6 +40,15 @@ public class VideoTaskDetailFragment extends Fragment {
     private VideoTaskDetail currentItem;
     private RecyclerView rvOther;
 
+    private String loadUserId() {
+        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        String json = sp.getString("data", null);
+        if (json != null) {
+            UserInfo info = new Gson().fromJson(json, UserInfo.class);
+            return info.getUser_id();
+        }
+        return null;
+    }
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -49,7 +59,8 @@ public class VideoTaskDetailFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        String userId = "U001";
+        String userId = loadUserId();
+        if (userId == null) return;
         String vedioSeriesId = getArguments() != null ? getArguments().getString("vedioSeriesId") : null;
 
         rvOther = view.findViewById(R.id.rv_other_videos);
