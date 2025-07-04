@@ -21,4 +21,19 @@
     <string name="desc_enter_fullscreen">进入全屏</string>
     <string name="desc_exit_fullscreen">退出全屏</string>
     <string name="desc_back">返回</string>
+    <string name="myinfo_not_logged_in">未登录</string>
+    <string name="myinfo_logged_in">已登录</string>
+    <string name="label_health_report">健康报告</string>
+    <string name="label_permission_manage">权限管理</string>
+    <string name="label_feedback">问题反馈</string>
+    <string name="label_about">关于我们</string>
+    <string name="label_save">保存</string>
+    <string name="label_name">姓名</string>
+    <string name="label_gender">性别</string>
+    <string name="label_birth">出生日期</string>
+    <string name="label_marital_status">婚姻状况</string>
+    <string name="label_education_level">受教育水平</string>
+    <string name="label_living_status">居住情况</string>
+    <string name="label_job_status">职业状态</string>
+    <string name="label_insurance_type">医疗保险类型</string>
 </resources>

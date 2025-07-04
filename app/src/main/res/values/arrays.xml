@@ -1,0 +1,46 @@
+<resources>
+    <string-array name="gender_options">
+        <item>男</item>
+        <item>女</item>
+    </string-array>
+    <string-array name="marital_options">
+        <item>未婚</item>
+        <item>已婚</item>
+        <item>离异</item>
+        <item>丧偶</item>
+        <item>分居</item>
+        <item>其他</item>
+    </string-array>
+    <string-array name="education_options">
+        <item>小学及以下</item>
+        <item>中学</item>
+        <item>高中</item>
+        <item>大专</item>
+        <item>本科</item>
+        <item>研究生</item>
+        <item>其他</item>
+    </string-array>
+    <string-array name="living_options">
+        <item>与配偶同住</item>
+        <item>独居</item>
+        <item>与子女同住</item>
+        <item>其他</item>
+    </string-array>
+    <string-array name="job_options">
+        <item>在职全职</item>
+        <item>在职兼职</item>
+        <item>退休</item>
+        <item>无业</item>
+        <item>务农</item>
+        <item>自由职业</item>
+        <item>其他</item>
+    </string-array>
+    <string-array name="insurance_options">
+        <item>城镇职工医保</item>
+        <item>城乡居民医保</item>
+        <item>新农合</item>
+        <item>商业保险</item>
+        <item>公务员医疗保险</item>
+        <item>其他</item>
+    </string-array>
+</resources>

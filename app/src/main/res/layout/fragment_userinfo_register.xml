@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <ImageButton
+                android:id="@+id/btn_back"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                android:contentDescription="@string/desc_back" />
+            <TextView
+                android:layout_marginStart="8dp"
+                android:text="@string/user_info_placeholder"
+                android:textSize="18sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/lbl_name"
+            android:layout_marginTop="16dp"
+            android:text="@string/label_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:labelFor="@id/et_name" />
+        <EditText
+            android:id="@+id/et_name"
+            android:maxLength="20"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:hint="@string/label_name" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_gender"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_gender"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_birth"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_birth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_marital_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_marital"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_education_level"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_education"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_living_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_living"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_job_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_job"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <TextView
+            android:layout_marginTop="16dp"
+            android:text="@string/label_insurance_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_insurance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_text_border"
+            android:padding="8dp"
+            android:text="" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_marginTop="24dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_save" />
+
+    </LinearLayout>
+</ScrollView>
