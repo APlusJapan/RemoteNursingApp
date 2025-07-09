@@ -4,7 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-
+import java.io.File;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -71,5 +71,25 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         // Android 12 以下无需额外动态申请
+    }
+    private void clearAppCache() {
+        try {
+            deleteDir(getCacheDir());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean deleteDir(File dir) {
+        if (dir != null && dir.isDirectory()) {
+            String[] children = dir.list();
+            if (children != null) {
+                for (String child : children) {
+                    boolean success = deleteDir(new File(dir, child));
+                    if (!success) return false;
+                }
+            }
+        }
+        return dir != null && dir.delete();
     }
 }

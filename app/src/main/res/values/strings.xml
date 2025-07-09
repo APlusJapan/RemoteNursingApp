@@ -40,5 +40,6 @@
     <string name="label_insurance_type">医疗保险类型</string>
 
     <string name="myinfo_offline">离线模式（请检查网络）</string>
+    <string name="toast_login_first">请先在“我的信息”页登录</string>
 
 </resources>
