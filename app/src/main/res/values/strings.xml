@@ -38,4 +38,7 @@
     <string name="label_job_status">职业状态</string>
     <string name="label_income_per_capita">家庭月收入(元)</string>
     <string name="label_insurance_type">医疗保险类型</string>
+
+    <string name="myinfo_offline">离线模式（请检查网络）</string>
+
 </resources>

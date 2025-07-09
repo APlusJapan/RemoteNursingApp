@@ -36,7 +36,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         String json = sp.getString("data", null);
         if (json != null) {
             UserInfo info = new Gson().fromJson(json, UserInfo.class);
-            return info.getUser_id();
+            return info.getUserId();
         }
         return null;
     }

@@ -39,16 +39,18 @@ public class VideoTaskDetailFragment extends Fragment {
     private ExoPlayer player;
     private VideoTaskDetail currentItem;
     private RecyclerView rvOther;
+    private final Gson gson = new Gson(); // 推荐全类唯一
 
     private String loadUserId() {
         SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
         String json = sp.getString("data", null);
         if (json != null) {
-            UserInfo info = new Gson().fromJson(json, UserInfo.class);
-            return info.getUser_id();
+            UserInfo info = gson.fromJson(json, UserInfo.class); // 用成员变量
+            return info.getUserId();
         }
         return null;
     }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -112,7 +114,6 @@ public class VideoTaskDetailFragment extends Fragment {
             @Override public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful()) {
                     String json = response.body().string();
-                    Gson gson = new Gson();
                     List<VideoTaskDetail> videoList = gson.fromJson(json, new TypeToken<List<VideoTaskDetail>>(){}.getType());
                     if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(videoList));
                 } else {

@@ -1,7 +1,6 @@
 package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -10,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,11 +17,12 @@ import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserInfo;
 import com.google.gson.Gson;
+import com.google.android.material.datepicker.MaterialDatePicker;
 
-import java.util.Calendar;
-import com.google.android.material.datepicker.MaterialDatePicker; // 新增
-import java.text.SimpleDateFormat; // 新增
-import java.util.Date; // 新增
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -30,20 +31,40 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import java.io.IOException;
-import java.util.Locale;
 
 public class UserInfoRegisterFragment extends Fragment {
-
+    private static final String ARG_IS_LOGGED_IN = "isLoggedIn";
     private EditText etName, etPhone;
     private TextView tvGender, tvBirth, tvMarital, tvEducation, tvLiving, tvJob, tvIncome, tvInsurance;
     private final Gson gson = new Gson();
     private MaterialDatePicker<Long> birthdayPicker;
+    private boolean isLoggedIn;
+    private AlertDialog progressDialog;
+
+    // 用户上次本地数据（只为onPause用）
+    private UserInfo lastUserInfo;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Bundle args = getArguments();
+        isLoggedIn = args != null && args.getBoolean(ARG_IS_LOGGED_IN, false);
+    }
+
+    public static UserInfoRegisterFragment newInstance(boolean isLoggedIn) {
+        UserInfoRegisterFragment f = new UserInfoRegisterFragment();
+        Bundle args = new Bundle();
+        args.putBoolean(ARG_IS_LOGGED_IN, isLoggedIn);
+        f.setArguments(args);
+        return f;
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_userinfo_register, container, false);
     }
+
     private void initBirthdayPicker() {
         if (birthdayPicker == null) {
             birthdayPicker = MaterialDatePicker.Builder.datePicker()
@@ -57,9 +78,14 @@ public class UserInfoRegisterFragment extends Fragment {
             });
         }
     }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        view.findViewById(R.id.btn_back).setOnClickListener(v -> requireActivity().onBackPressed());
+        view.findViewById(R.id.btn_back).setOnClickListener(v -> {
+            saveInfoLocalAndNotify();
+            requireActivity().getSupportFragmentManager().popBackStack();
+        });
+
         etName = view.findViewById(R.id.et_name);
         etPhone = view.findViewById(R.id.et_phone);
         tvGender = view.findViewById(R.id.tv_gender);
@@ -117,62 +143,156 @@ public class UserInfoRegisterFragment extends Fragment {
         birthdayPicker.show(getParentFragmentManager(), "MATERIAL_DATE_PICKER");
     }
 
-
-
     private void loadLocalInfo() {
         SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
         String json = sp.getString("data", null);
         if (json != null) {
             UserInfo info = gson.fromJson(json, UserInfo.class);
-            etName.setText(info.getUser_name());
+            etName.setText(info.getUserName());
             etPhone.setText(info.getPhone());
             tvGender.setText(info.getGender());
-            tvBirth.setText(info.getBirth_date());
-            tvMarital.setText(info.getMarital_status());
-            tvEducation.setText(info.getEducation_level());
-            tvLiving.setText(info.getLiving_status());
-            tvJob.setText(info.getJob_status());
-            tvIncome.setText(info.getIncome_per_capita());
-            tvInsurance.setText(info.getInsurance_type());
+            tvBirth.setText(info.getBirthDate());
+            tvMarital.setText(info.getMaritalStatus());
+            tvEducation.setText(info.getEducationLevel());
+            tvLiving.setText(info.getLivingStatus());
+            tvJob.setText(info.getJobStatus());
+            tvIncome.setText(info.getIncomePerCapita());
+            tvInsurance.setText(info.getInsuranceType());
+            lastUserInfo = info;
+        }
+    }
+
+    // --- 新增：loading弹窗 ---
+    private void showLoading() {
+        if (progressDialog == null) {
+            progressDialog = new AlertDialog.Builder(requireContext())
+                    .setView(R.layout.dialog_loading)
+                    .setCancelable(false)
+                    .create();
+        }
+        progressDialog.show();
+    }
+    private void hideLoading() {
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+    }
+
+    // 核心方法1：保存到本地并通知前一个Fragment刷新（无论保存还是返回都会用到）
+    private void saveInfoLocalAndNotify() {
+        UserInfo info = new UserInfo();
+        info.setUserName(etName.getText().toString());
+        info.setPhone(etPhone.getText().toString());
+        info.setGender(tvGender.getText().toString());
+        info.setBirthDate(tvBirth.getText().toString());
+        info.setMaritalStatus(tvMarital.getText().toString());
+        info.setEducationLevel(tvEducation.getText().toString());
+        info.setLivingStatus(tvLiving.getText().toString());
+        info.setJobStatus(tvJob.getText().toString());
+        info.setIncomePerCapita(tvIncome.getText().toString());
+        info.setInsuranceType(tvInsurance.getText().toString());
+
+        if (isLoggedIn) {
+            SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+            String local = sp.getString("data", null);
+            if (local != null) {
+                UserInfo localInfo = gson.fromJson(local, UserInfo.class);
+                info.setUserId(localInfo.getUserId());
+            }
+        }
+
+        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        sp.edit().putString("data", gson.toJson(info)).apply();
+
+        // 通知MyInfoFragment刷新
+        Bundle bundle = new Bundle();
+        bundle.putBoolean("user_updated", true);
+        bundle.putString("latest_user_json", gson.toJson(info));
+        getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
+    }
+
+    // 核心方法2：页面即将消失时自动保存并通知，保证即使“返回”也刷新
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getView() != null && isAdded()) {
+            saveInfoLocalAndNotify();
         }
     }
 
     private void saveInfo() {
         UserInfo info = new UserInfo();
-        info.setUser_name(etName.getText().toString());
+        info.setUserName(etName.getText().toString());
         info.setPhone(etPhone.getText().toString());
         info.setGender(tvGender.getText().toString());
-        info.setBirth_date(tvBirth.getText().toString());
-        info.setMarital_status(tvMarital.getText().toString());
-        info.setEducation_level(tvEducation.getText().toString());
-        info.setLiving_status(tvLiving.getText().toString());
-        info.setJob_status(tvJob.getText().toString());
-        info.setIncome_per_capita(tvIncome.getText().toString());
-        info.setInsurance_type(tvInsurance.getText().toString());
+        info.setBirthDate(tvBirth.getText().toString());
+        info.setMaritalStatus(tvMarital.getText().toString());
+        info.setEducationLevel(tvEducation.getText().toString());
+        info.setLivingStatus(tvLiving.getText().toString());
+        info.setJobStatus(tvJob.getText().toString());
+        info.setIncomePerCapita(tvIncome.getText().toString());
+        info.setInsuranceType(tvInsurance.getText().toString());
 
-        String json = gson.toJson(info);
-        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-        sp.edit().putString("data", json).apply();
+        if (isLoggedIn) {
+            SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+            String local = sp.getString("data", null);
+            if (local != null) {
+                UserInfo localInfo = gson.fromJson(local, UserInfo.class);
+                info.setUserId(localInfo.getUserId());
+            }
+        }
+
+        showLoading();
         syncToServer(info);
-        requireActivity().onBackPressed();
     }
 
     private void syncToServer(UserInfo info) {
         OkHttpClient client = new OkHttpClient();
         String json = gson.toJson(info);
         RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
-        Request request = new Request.Builder()
-                .url("http://192.168.2.9:8080/api/user")
-                .post(body)
-                .build();
+        Request request;
+
+        if (isLoggedIn) {
+            String url = "http://192.168.2.9:8080/api/user/" + info.getUserId();
+            request = new Request.Builder().url(url).put(body).build();
+        } else {
+            request = new Request.Builder().url("http://192.168.2.9:8080/api/user").post(body).build();
+        }
+
         client.newCall(request).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException e) { e.printStackTrace(); }
-            @Override public void onResponse(Call call, Response response) throws IOException {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    hideLoading();
+                    Toast.makeText(requireContext(), "保存失败，请检查网络", Toast.LENGTH_SHORT).show();
+                });
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (!isAdded()) return;
                 if (response.isSuccessful()) {
                     String resp = response.body().string();
                     UserInfo saved = gson.fromJson(resp, UserInfo.class);
-                    SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-                    sp.edit().putString("data", gson.toJson(saved)).apply();
+
+                    requireActivity().runOnUiThread(() -> {
+                        hideLoading();
+                        if (!isAdded()) return;
+                        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+                        sp.edit().putString("data", gson.toJson(saved)).apply();
+                        // 通知MyInfoFragment刷新
+                        Bundle bundle = new Bundle();
+                        bundle.putBoolean("user_updated", true);
+                        bundle.putString("latest_user_json", gson.toJson(saved));
+                        getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
+                        // 返回上一级
+                        requireActivity().getSupportFragmentManager().popBackStack();
+                    });
+                } else {
+                    requireActivity().runOnUiThread(() -> {
+                        hideLoading();
+                        Toast.makeText(requireContext(), "服务器错误，保存失败", Toast.LENGTH_SHORT).show();
+                    });
                 }
             }
         });
