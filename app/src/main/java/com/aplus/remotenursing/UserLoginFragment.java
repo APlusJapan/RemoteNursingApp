@@ -9,11 +9,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.Toast;
+import android.text.InputType;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.aplus.remotenursing.models.UserInfo;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -27,10 +30,9 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-import com.aplus.remotenursing.models.UserInfo;
-
 public class UserLoginFragment extends Fragment {
     private EditText etUsername, etPassword;
+    private ImageView ivPwdEye;
     private AlertDialog progressDialog;
     private final Gson gson = new Gson();
 
@@ -45,6 +47,22 @@ public class UserLoginFragment extends Fragment {
         view.findViewById(R.id.btn_back).setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
         etUsername = view.findViewById(R.id.et_username);
         etPassword = view.findViewById(R.id.et_password);
+        ivPwdEye = view.findViewById(R.id.iv_pwd_eye);
+
+        // 密码可见性切换
+        if (ivPwdEye != null && etPassword != null) {
+            ivPwdEye.setOnClickListener(v -> {
+                if (etPassword.getInputType() == (InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD)) {
+                    etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                    ivPwdEye.setImageResource(R.drawable.ic_pwd_eye_open);
+                } else {
+                    etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                    ivPwdEye.setImageResource(R.drawable.ic_pwd_eye_closed);
+                }
+                etPassword.setSelection(etPassword.getText().length());
+            });
+        }
+
         view.findViewById(R.id.btn_login).setOnClickListener(v -> doLogin());
         view.findViewById(R.id.btn_register).setOnClickListener(v -> openRegister());
     }
@@ -61,7 +79,7 @@ public class UserLoginFragment extends Fragment {
     private void showLoading() {
         if (progressDialog == null) {
             progressDialog = new AlertDialog.Builder(requireContext())
-                    .setView(R.layout.dialog_loading)
+                    .setMessage("请稍候...")
                     .setCancelable(false)
                     .create();
         }
@@ -73,8 +91,6 @@ public class UserLoginFragment extends Fragment {
             progressDialog.dismiss();
         }
     }
-
-    // ... 省略 import 和 class 头部
 
     private void doLogin() {
         String username = etUsername.getText().toString().trim();
@@ -108,23 +124,31 @@ public class UserLoginFragment extends Fragment {
                 if (!isAdded()) return;
                 String resp = response.body().string();
                 if (response.isSuccessful()) {
-                    // 推荐后端返回完整UserInfo json，否则这里需要拼装UserInfo对象
                     UserInfo userInfo = gson.fromJson(resp, UserInfo.class);
-                    if (userInfo == null) {
+                    if (userInfo == null || userInfo.getUserId() == null || userInfo.getUserId().isEmpty()) {
                         requireActivity().runOnUiThread(() -> {
                             hideLoading();
                             Toast.makeText(requireContext(), "登录失败，数据异常", Toast.LENGTH_SHORT).show();
                         });
                         return;
                     }
+                    // 保存到本地
                     SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
                     sp.edit().putString("data", gson.toJson(userInfo)).apply();
+
+                    // 通知MyInfoFragment刷新
                     Bundle bundle = new Bundle();
                     bundle.putString("latest_user_json", gson.toJson(userInfo));
                     getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
+
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
-                        requireActivity().getSupportFragmentManager().popBackStack();
+                        // 跳转到用户信息页（MyInfoFragment会自动联网校验，状态绝不会乱）
+                        MyInfoFragment frag = new MyInfoFragment();
+                        requireActivity().getSupportFragmentManager()
+                                .beginTransaction()
+                                .replace(R.id.fragment_container, frag)
+                                .commit();
                     });
                 } else {
                     requireActivity().runOnUiThread(() -> {

@@ -13,13 +13,12 @@
         android:layout_height="48dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_arrow_back"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="24dp"
         android:contentDescription="返回"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="24dp"/>
 
-    <!-- 标题 -->
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="wrap_content"
@@ -39,7 +38,7 @@
         android:id="@+id/et_username"
         android:layout_width="0dp"
         android:layout_height="50dp"
-        android:hint="请输入手机号"
+        android:hint="请输入邮箱或手机号"
         android:background="@drawable/bg_edittext_white_round"
         android:paddingStart="20dp"
         android:textSize="16sp"
@@ -51,7 +50,7 @@
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"/>
 
-    <!-- 密码输入框 + 眼睛 -->
+    <!-- 密码区 -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/pwd_container"
         android:layout_width="0dp"
@@ -93,7 +92,7 @@
             app:layout_constraintBottom_toBottomOf="parent"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 确认密码输入框 + 眼睛 -->
+    <!-- 确认密码区 -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/pwd_confirm_container"
         android:layout_width="0dp"

@@ -7,11 +7,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import com.aplus.remotenursing.UserLoginFragment;
 
 import com.aplus.remotenursing.models.UserInfo;
 import com.google.gson.Gson;
@@ -23,7 +23,6 @@ import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import android.util.Log;
 
 public class MyInfoFragment extends Fragment {
 
@@ -47,41 +46,47 @@ public class MyInfoFragment extends Fragment {
         loadUserInfo();
     }
 
-    // onViewCreated 只做一次初始化，监听 user_info_changed
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         tvUserName = view.findViewById(R.id.tv_username);
         tvLoginState = view.findViewById(R.id.tv_login_state);
+        // 推荐只保留这一个入口，简洁易维护
         view.findViewById(R.id.layout_user_bar).setOnClickListener(v -> {
-            if (isLoggedIn) {
-                openRegister();
-            } else {
-                openLogin();
-            }
-        });
-        tvLoginState.setOnClickListener(v -> {
             if (!isLoggedIn) {
                 openLogin();
+            } else {
+                openRegister(); // 你想实现个人信息编辑可以在这处理
             }
         });
-        // 只监听结果，不在 onResume 里主动刷新
+        // 注册监听 - 只会生效一次（除非Fragment重建）
         getParentFragmentManager().setFragmentResultListener("user_info_changed", this, (key, bundle) -> {
             String userJson = bundle.getString("latest_user_json", null);
             if (userJson != null) {
-                UserInfo info = gson.fromJson(userJson, UserInfo.class);
-                showLoggedIn(info);
+                currentInfo = gson.fromJson(userJson, UserInfo.class);
+                Log.d("MyInfoFragment", "FragmentResultListener, set user: " + userJson);
+                showLoggedIn(currentInfo);
+                // 一定要写入sp，防止下次进来失效
+                SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+                sp.edit().putString("data", userJson).apply();
             } else {
-                loadUserInfo(); // 兼容旧数据流程
+                showNotLoggedIn();
             }
         });
 
-        // 首次进入页面时，显示本地数据
-        loadUserInfo();
+        // 第一次进来（没有FragmentResult），从本地加载
+        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        String userJson = sp.getString("data", null);
+        if (userJson != null) {
+            currentInfo = gson.fromJson(userJson, UserInfo.class);
+            Log.d("MyInfoFragment", "onViewCreated, load user: " + userJson);
+            showLoggedIn(currentInfo);
+        } else {
+            showNotLoggedIn();
+        }
     }
 
 
     private void openRegister() {
-        // 如果已经登录，传递当前用户信息；否则空
         UserInfoRegisterFragment frag = UserInfoRegisterFragment.newInstance(isLoggedIn);
         requireActivity().getSupportFragmentManager()
                 .beginTransaction()
@@ -89,6 +94,7 @@ public class MyInfoFragment extends Fragment {
                 .addToBackStack(null)
                 .commit();
     }
+
     private void openLogin() {
         UserLoginFragment frag = new UserLoginFragment();
         requireActivity().getSupportFragmentManager()
@@ -104,21 +110,31 @@ public class MyInfoFragment extends Fragment {
         currentInfo = null;
 
         if (json != null) {
-            currentInfo = gson.fromJson(json, UserInfo.class);
+            try {
+                currentInfo = gson.fromJson(json, UserInfo.class);
+            } catch (Exception e) {
+                Log.e("MyInfoFragment", "Parse userInfo failed: " + e.getMessage());
+                currentInfo = null;
+            }
         }
-        Log.d("MyInfo", "currentInfo=" + gson.toJson(currentInfo));
-        Log.d("MyInfo", "userId=" + (currentInfo != null ? currentInfo.getUserId() : "null"));
+        Log.d("MyInfoFragment", "currentInfo=" + gson.toJson(currentInfo));
+        Log.d("MyInfoFragment", "userId=" + (currentInfo != null ? currentInfo.getUserId() : "null"));
 
-        // 只要有userId，且不是空，才判定为本地登录
+        // 只刷新本地UI
         if (currentInfo != null && currentInfo.getUserId() != null && !currentInfo.getUserId().isEmpty()) {
+            showLoggedIn(currentInfo);
+            // 联网检查只作为后续后台刷新，不要直接清除本地登录状态
             String url = "http://192.168.2.9:8080/api/user/" + currentInfo.getUserId();
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder().url(url).build();
             client.newCall(request).enqueue(new Callback() {
-                @Override public void onFailure(Call call, IOException e) {
-                    if (getActivity() != null) getActivity().runOnUiThread(() -> showOffline());
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.d("MyInfoFragment", "网络不可用，保留本地登录状态，仅提示");
+                    // 可选：在UI上显示"离线状态"
                 }
-                @Override public void onResponse(Call call, Response response) throws IOException {
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
                     if (response.isSuccessful()) {
                         String resp = response.body().string();
                         UserInfo remote = gson.fromJson(resp, UserInfo.class);
@@ -129,13 +145,28 @@ public class MyInfoFragment extends Fragment {
                             return;
                         }
                     }
-                    if (getActivity() != null) getActivity().runOnUiThread(() -> showNotLoggedIn());
+                    // 只有服务器返回明确无此用户时才清理本地，否则仅提示
+                    if (getActivity() != null) getActivity().runOnUiThread(() -> {
+                        // showNotLoggedIn(); // 不再主动清理
+                        // Optional: Toast.makeText(getContext(), "登录信息已过期，请重新登录", Toast.LENGTH_SHORT).show();
+                    });
                 }
             });
         } else {
             showNotLoggedIn();
         }
     }
+
+
+    // 增加这个方法，彻底清理本地缓存和状态
+    private void clearLogin() {
+        isLoggedIn = false;
+        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        sp.edit().remove("data").apply();
+        tvUserName.setText("未登录");
+        tvLoginState.setText(getString(R.string.myinfo_not_logged_in));
+    }
+
 
     private void showLoggedIn(UserInfo info) {
         isLoggedIn = true;
@@ -150,15 +181,5 @@ public class MyInfoFragment extends Fragment {
         isLoggedIn = false;
         tvUserName.setText("未登录");
         tvLoginState.setText(getString(R.string.myinfo_not_logged_in));
-    }
-
-    private void showOffline() {
-        // 网络不可用，仅本地信息
-        isLoggedIn = true;
-        String displayName = (currentInfo != null && currentInfo.getUserName() != null && !currentInfo.getUserName().isEmpty())
-                ? currentInfo.getUserName()
-                : (currentInfo != null && currentInfo.getPhone() != null ? currentInfo.getPhone() : "用户");
-        tvUserName.setText(displayName);
-        tvLoginState.setText(getString(R.string.myinfo_offline));
     }
 }
