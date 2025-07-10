@@ -41,5 +41,10 @@
 
     <string name="myinfo_offline">离线模式（请检查网络）</string>
     <string name="toast_login_first">请先在“我的信息”页登录</string>
-
+    <string name="label_login">登录</string>
+    <string name="label_register">新用户注册</string>
+    <string name="label_password_confirm">再次输入密码</string>
+    <string name="error_password_format">密码至少6位</string>
+    <string name="error_username_not_exist">用户名或手机号不存在，请注册</string>
+    <string name="error_username_exist">用户名已存在</string>
 </resources>

@@ -11,6 +11,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.aplus.remotenursing.UserLoginFragment;
 
 import com.aplus.remotenursing.models.UserInfo;
 import com.google.gson.Gson;
@@ -51,8 +52,18 @@ public class MyInfoFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         tvUserName = view.findViewById(R.id.tv_username);
         tvLoginState = view.findViewById(R.id.tv_login_state);
-        view.findViewById(R.id.layout_user_bar).setOnClickListener(v -> openRegister());
-
+        view.findViewById(R.id.layout_user_bar).setOnClickListener(v -> {
+            if (isLoggedIn) {
+                openRegister();
+            } else {
+                openLogin();
+            }
+        });
+        tvLoginState.setOnClickListener(v -> {
+            if (!isLoggedIn) {
+                openLogin();
+            }
+        });
         // 只监听结果，不在 onResume 里主动刷新
         getParentFragmentManager().setFragmentResultListener("user_info_changed", this, (key, bundle) -> {
             String userJson = bundle.getString("latest_user_json", null);
@@ -72,6 +83,14 @@ public class MyInfoFragment extends Fragment {
     private void openRegister() {
         // 如果已经登录，传递当前用户信息；否则空
         UserInfoRegisterFragment frag = UserInfoRegisterFragment.newInstance(isLoggedIn);
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, frag)
+                .addToBackStack(null)
+                .commit();
+    }
+    private void openLogin() {
+        UserLoginFragment frag = new UserLoginFragment();
         requireActivity().getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.fragment_container, frag)
@@ -120,20 +139,26 @@ public class MyInfoFragment extends Fragment {
 
     private void showLoggedIn(UserInfo info) {
         isLoggedIn = true;
-        tvUserName.setText(info.getUserName());
+        String displayName = (info.getUserName() != null && !info.getUserName().isEmpty())
+                ? info.getUserName()
+                : (info.getPhone() != null ? info.getPhone() : "用户");
+        tvUserName.setText(displayName);
         tvLoginState.setText(getString(R.string.myinfo_logged_in));
     }
 
     private void showNotLoggedIn() {
         isLoggedIn = false;
-        tvUserName.setText("");
+        tvUserName.setText("未登录");
         tvLoginState.setText(getString(R.string.myinfo_not_logged_in));
     }
 
     private void showOffline() {
         // 网络不可用，仅本地信息
-        isLoggedIn = true; // 本地有信息但无法联网
-        tvUserName.setText(currentInfo != null ? currentInfo.getUserName() : "");
-        tvLoginState.setText(getString(R.string.myinfo_offline)); // 你可以自定义“离线模式”字符串
+        isLoggedIn = true;
+        String displayName = (currentInfo != null && currentInfo.getUserName() != null && !currentInfo.getUserName().isEmpty())
+                ? currentInfo.getUserName()
+                : (currentInfo != null && currentInfo.getPhone() != null ? currentInfo.getPhone() : "用户");
+        tvUserName.setText(displayName);
+        tvLoginState.setText(getString(R.string.myinfo_offline));
     }
 }

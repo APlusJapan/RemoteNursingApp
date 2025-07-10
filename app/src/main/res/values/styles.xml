@@ -7,5 +7,8 @@
         <!-- 可选：状态栏透明，导航栏黑色 -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:background">#FAF3F3</item>
+        <item name="android:textColor">#D9534F</item>
+        <item name="android:windowMinWidthMajor">80%</item>
     </style>
 </resources>
