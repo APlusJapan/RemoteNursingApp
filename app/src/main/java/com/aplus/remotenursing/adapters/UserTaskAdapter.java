@@ -14,20 +14,15 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH> {
-    public interface OnTaskClickListener {
-        void onTaskClick(UserTask task);
-    }
-
+public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.ViewHolder> {
     private List<UserTask> tasks = new ArrayList<>();
     private OnTaskClickListener listener;
 
     public void setTasks(List<UserTask> list) {
-        Log.d("UserTaskAdapter", "setTasks, new size=" + (list == null ? "null" : list.size()));
-        if (list == null) {
-            this.tasks = new ArrayList<>();
-        } else {
+        if (list != null) {
             this.tasks = list;
+        } else {
+            this.tasks = new ArrayList<>();
         }
         notifyDataSetChanged();
     }
@@ -38,19 +33,21 @@ public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH
 
     @NonNull
     @Override
-    public TaskVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_videotask_text, parent, false);
-        return new TaskVH(v);
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_videotask_text, parent, false);
+        return new ViewHolder(v);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull TaskVH holder, int position) {
-        UserTask t = tasks.get(position);
-        holder.tvName.setText(t.getTask_name());
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        UserTask task = tasks.get(position);
+        holder.bind(task);
+
+        holder.itemView.setClickable(true); // 强制可点击
         holder.itemView.setOnClickListener(v -> {
+            Log.d("UserTaskAdapter", "onBindViewHolder clicked: " + task.getTask_name());
             if (listener != null) {
-                listener.onTaskClick(t);
+                listener.onTaskClick(task);
             }
         });
     }
@@ -60,11 +57,18 @@ public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH
         return tasks == null ? 0 : tasks.size();
     }
 
-    static class TaskVH extends RecyclerView.ViewHolder {
-        TextView tvName;
-        TaskVH(@NonNull View itemView) {
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvName = itemView.findViewById(R.id.tv_task_name);
+        }
+        public void bind(UserTask task) {
+            // 设置内容
+            // ((TextView) itemView.findViewById(R.id.xxx)).setText(task.getTask_name());
         }
     }
+
+    public interface OnTaskClickListener {
+        void onTaskClick(UserTask task);
+    }
 }
+

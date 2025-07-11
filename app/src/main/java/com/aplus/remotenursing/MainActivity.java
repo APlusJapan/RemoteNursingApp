@@ -16,8 +16,8 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_BLE_PERMISSIONS = 100;
-    private Fragment taskFragment;
-    private Fragment meFragment;
+    private Fragment usertaskFragment;
+    private Fragment myInfoFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,25 +28,25 @@ public class MainActivity extends AppCompatActivity {
         requestBlePermissionsIfNeeded();
 
         // 2. 实例化并 add 两个 Fragment
-        taskFragment = new UserTaskFragment();
-        meFragment   = new MyInfoFragment();
+        usertaskFragment = new UserTaskFragment();
+        myInfoFragment   = new MyInfoFragment();
 
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        ft.add(R.id.fragment_container, taskFragment, "task");
-        ft.add(R.id.fragment_container, meFragment, "me").hide(meFragment);
+        ft.add(R.id.fragment_container, usertaskFragment, "usertask");
+        ft.add(R.id.fragment_container, myInfoFragment, "myInfo").hide(myInfoFragment);
         ft.commit();
 
         // 3. 底部导航切换
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
             FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-            tx.hide(taskFragment).hide(meFragment);
+            tx.hide(usertaskFragment).hide(myInfoFragment);
 
             int id = item.getItemId();
             if (id == R.id.navigation_task) {
-                tx.show(taskFragment);
+                tx.show(usertaskFragment);
             } else if (id == R.id.navigation_me) {
-                tx.show(meFragment);
+                tx.show(myInfoFragment);
             }
             tx.commit();
             return true;

@@ -2,7 +2,6 @@ package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -10,9 +9,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ImageButton;
-import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -20,6 +16,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserAccount;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.Contants;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -117,7 +116,7 @@ public class UserAccountRegisterFragment extends Fragment {
         obj.addProperty("password", password);
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
-                .url("http://192.168.2.9:8080/api/account/register")
+                .url(ApiConfig.API_ACCOUNT_REGISTER)
                 .post(body)
                 .build();
         client.newCall(request).enqueue(new Callback() {
@@ -143,9 +142,8 @@ public class UserAccountRegisterFragment extends Fragment {
                         });
                         return;
                     }
-                    // 注册成功直接保存
-                    SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-                    sp.edit().putString("data", gson.toJson(userAccount)).apply();
+                    // 注册成功直接保存（用 UserUtil 统一存储）
+                    UserUtil.saveUserAccount(requireContext(), userAccount);
 
                     // 通知刷新
                     Bundle bundle = new Bundle();
@@ -170,5 +168,4 @@ public class UserAccountRegisterFragment extends Fragment {
             }
         });
     }
-
 }

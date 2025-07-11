@@ -1,22 +1,23 @@
 package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.InputType;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.Toast;
-import android.text.InputType;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserAccount;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -106,7 +107,7 @@ public class UserLoginFragment extends Fragment {
         obj.addProperty("password", password);
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
-                .url("http://192.168.2.9:8080/api/account/login")
+                .url(ApiConfig.API_ACCOUNT_LOGIN)
                 .post(body)
                 .build();
         client.newCall(request).enqueue(new Callback() {
@@ -115,7 +116,8 @@ public class UserLoginFragment extends Fragment {
                 if (!isAdded()) return;
                 requireActivity().runOnUiThread(() -> {
                     hideLoading();
-                    Toast.makeText(requireContext(), "网络错误", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.d("Login", "网络错误: " + e.getMessage());
                 });
             }
 
@@ -132,9 +134,8 @@ public class UserLoginFragment extends Fragment {
                         });
                         return;
                     }
-                    // 保存到本地
-                    SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-                    sp.edit().putString("data", gson.toJson(userAccount)).apply();
+                    // 统一用UserUtil保存用户账号（推荐）
+                    UserUtil.saveUserAccount(requireContext(), userAccount);
 
                     // 通知MyInfoFragment刷新
                     Bundle bundle = new Bundle();
@@ -159,5 +160,4 @@ public class UserLoginFragment extends Fragment {
             }
         });
     }
-
 }

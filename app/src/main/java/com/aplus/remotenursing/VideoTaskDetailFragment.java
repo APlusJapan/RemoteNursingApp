@@ -17,6 +17,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.models.VideoTaskDetail;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
@@ -25,7 +27,7 @@ import com.google.gson.reflect.TypeToken;
 import com.aplus.remotenursing.models.UserInfo;
 import java.io.IOException;
 import java.util.List;
-
+import android.widget.Toast;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
@@ -41,15 +43,7 @@ public class VideoTaskDetailFragment extends Fragment {
     private RecyclerView rvOther;
     private final Gson gson = new Gson(); // 推荐全类唯一
 
-    private String loadUserId() {
-        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-        String json = sp.getString("data", null);
-        if (json != null) {
-            UserInfo info = gson.fromJson(json, UserInfo.class); // 用成员变量
-            return info.getUserId();
-        }
-        return null;
-    }
+
 
     @Nullable
     @Override
@@ -61,8 +55,15 @@ public class VideoTaskDetailFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        String userId = loadUserId();
-        if (userId == null) return;
+        String userId = UserUtil.loadUserId(requireContext());
+        if (userId == null) {
+            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new UserLoginFragment())
+                    .commit();
+            return;
+        }
         String vedioSeriesId = getArguments() != null ? getArguments().getString("vedioSeriesId") : null;
 
         rvOther = view.findViewById(R.id.rv_other_videos);
@@ -104,7 +105,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
     private void fetchVideoList(String userId, String vedioSeriesId, VideoListCallback callback) {
         OkHttpClient client = new OkHttpClient();
-        String url = "http://192.168.2.9:8080/api/videos?userId=" + userId + "&vedioSeriesId=" + vedioSeriesId;
+        String url = ApiConfig.API_VIDEOS + "?userId=" + userId + "&vedioSeriesId=" + vedioSeriesId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {

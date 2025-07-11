@@ -1,9 +1,12 @@
 package com.aplus.remotenursing;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -12,7 +15,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.adapters.VedioTaskAdapter;
+import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.VedioTask;
+import com.aplus.remotenusing.common.ApiConfig;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -25,6 +30,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import com.aplus.remotenusing.common.UserUtil;
 public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSeriesClickListener {
 
     private RecyclerView rvSeries;
@@ -46,14 +52,25 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
         rvSeries = view.findViewById(R.id.rv_series);
         rvSeries.setLayoutManager(new LinearLayoutManager(requireContext()));
         // 初始加载空adapter，防止空指针
-        adapter = new VedioTaskAdapter(seriesList, this);
-        rvSeries.setAdapter(adapter);
+        if (adapter == null) {
+            adapter = new VedioTaskAdapter(seriesList, this);
+            rvSeries.setAdapter(adapter);
+        }
         fetchSeriesList();
     }
 
     private void fetchSeriesList() {
-        String userId = "U001";
-        String url = "http://192.168.2.9:8080/api/series?userId=" + userId;
+        String userId = UserUtil.loadUserId(requireContext());
+        if (userId == null) {
+            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new UserLoginFragment())
+                    .commit();
+            return;
+        }
+
+        String url = ApiConfig.API_SERIES + "?userId=" + userId;
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
@@ -74,8 +91,7 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
             }
         });
     }
-
-    @Override
+        @Override
     public void onSeriesClick(int position) {
         VedioTask selSeries = seriesList.get(position);
         VideoTaskDetailFragment detailFragment = new VideoTaskDetailFragment();

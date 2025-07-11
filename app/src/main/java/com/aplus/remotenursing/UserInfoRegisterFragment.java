@@ -2,7 +2,6 @@ package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,6 +15,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserInfo;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.gson.Gson;
 import com.google.android.material.datepicker.MaterialDatePicker;
 
@@ -63,7 +64,6 @@ public class UserInfoRegisterFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         view.findViewById(R.id.btn_back).setOnClickListener(v -> {
-            // 保持这里用 requireActivity 没关系（这是同步返回按钮，不是异步回调，不会引起崩溃）
             requireActivity().getSupportFragmentManager().popBackStack();
         });
 
@@ -156,23 +156,15 @@ public class UserInfoRegisterFragment extends Fragment {
         return true;
     }
 
-    private String getUserIdFromLocal() {
-        SharedPreferences sp = getActivitySafe().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        String userJson = sp.getString("data", null);
-        if (userJson != null) {
-            UserInfo localInfo = gson.fromJson(userJson, UserInfo.class);
-            return localInfo.getUserId();
-        }
-        return null;
-    }
-
+    // ----------- 核心改造点 START -----------
+    // 用户id全部通过 UserUtil 统一读取
     private void fetchAndFillUserInfo() {
-        String userId = getUserIdFromLocal();
+        String userId = UserUtil.loadUserId(requireContext());
         if (userId == null || userId.isEmpty()) return;
 
         showLoading("正在查询，请稍后");
         OkHttpClient client = new OkHttpClient();
-        String url = "http://192.168.2.9:8080/api/userinfo/" + userId;
+        String url = ApiConfig.API_USER_INFO + userId;
         Request request = new Request.Builder().url(url).get().build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -180,10 +172,8 @@ public class UserInfoRegisterFragment extends Fragment {
             public void onFailure(Call call, IOException e) {
                 runUiSafe(() -> {
                     hideLoading();
-                    // showToastSafe("查询失败，请检查网络");
                 });
             }
-
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String resp = response.body().string();
@@ -201,6 +191,7 @@ public class UserInfoRegisterFragment extends Fragment {
             }
         });
     }
+    // ----------- 核心改造点 END -----------
 
     private void fillUserInfo(UserInfo info) {
         etName.setText(info.getUserName());
@@ -228,17 +219,20 @@ public class UserInfoRegisterFragment extends Fragment {
         info.setIncomePerCapita(tvIncome.getText().toString());
         info.setInsuranceType(tvInsurance.getText().toString());
 
-        String userId = getUserIdFromLocal();
+        // ----------- 核心改造点 START -----------
+        // 用户id全部通过 UserUtil 统一读取
+        String userId = UserUtil.loadUserId(requireContext());
         if (userId != null && !userId.isEmpty()) {
             info.setUserId(userId);
         }
+        // ----------- 核心改造点 END -----------
 
         if (!checkInput(info)) return;
 
         showLoading("正在保存，请稍后");
 
         OkHttpClient client = new OkHttpClient();
-        String url = "http://192.168.2.9:8080/api/userinfo/" + userId;
+        String url = ApiConfig.API_USER_INFO + userId;
         Request getRequest = new Request.Builder().url(url).get().build();
 
         client.newCall(getRequest).enqueue(new Callback() {
@@ -249,7 +243,6 @@ public class UserInfoRegisterFragment extends Fragment {
                     showToastSafe("保存失败，请检查网络");
                 });
             }
-
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 boolean exists = false;
@@ -273,12 +266,12 @@ public class UserInfoRegisterFragment extends Fragment {
         Request request;
         if (exists) {
             request = new Request.Builder()
-                    .url("http://192.168.2.9:8080/api/updateUserinfo/" + info.getUserId())
+                    .url(ApiConfig.API_UPDATE_USER_INFO + info.getUserId())
                     .put(body)
                     .build();
         } else {
             request = new Request.Builder()
-                    .url("http://192.168.2.9:8080/api/createUserinfo")
+                    .url(ApiConfig.API_CREATE_USER_INFO)
                     .post(body)
                     .build();
         }
@@ -297,7 +290,6 @@ public class UserInfoRegisterFragment extends Fragment {
                     hideLoading();
                     if (response.isSuccessful()) {
                         showToastSafe("信息保存成功");
-                        // 只在安全环境下执行 Fragment 操作
                         if (isAdded() && getActivity() != null) {
                             while (getActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
                                 getActivity().getSupportFragmentManager().popBackStackImmediate();
@@ -311,15 +303,13 @@ public class UserInfoRegisterFragment extends Fragment {
         });
     }
 
-    // ---- 安全工具方法 ----
-    // getActivity的安全封装，保证不会为空
+    // ---- 工具方法，无需修改 ----
     private Context getActivitySafe() {
         if (getActivity() != null) return getActivity();
         if (getContext() != null) return getContext();
         throw new IllegalStateException("Fragment已分离，getActivity/getContext都为null");
     }
 
-    // UI线程安全运行
     private void runUiSafe(Runnable runnable) {
         if (!isAdded() || getActivity() == null) return;
         getActivity().runOnUiThread(() -> {

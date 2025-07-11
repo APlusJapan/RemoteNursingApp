@@ -1,7 +1,5 @@
 package com.aplus.remotenursing;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,7 +15,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserAccount;
-import com.aplus.remotenursing.models.UserInfo;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -66,7 +65,7 @@ public class MyInfoFragment extends Fragment {
 
         btnLogin.setOnClickListener(v -> openLogin());
         btnLogout.setOnClickListener(v -> {
-            clearLogin();
+            UserUtil.logout(requireContext());
             Toast.makeText(getContext(), "已退出登录", Toast.LENGTH_SHORT).show();
             showNotLoggedIn();
         });
@@ -78,20 +77,17 @@ public class MyInfoFragment extends Fragment {
                 userAccount = gson.fromJson(userJson, UserAccount.class);
                 Log.d("MyAccountFragment", "FragmentResultListener, set user: " + userJson);
                 showLoggedIn(userAccount);
-                // 写入本地
-                SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-                sp.edit().putString("data", userJson).apply();
+                // 使用UserUtil保存
+                UserUtil.saveUserAccount(requireContext(), userAccount);
             } else {
                 showNotLoggedIn();
             }
         });
 
-        // 初始化：从本地加载
-        SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        String userJson = sp.getString("data", null);
-        if (userJson != null) {
-            userAccount = gson.fromJson(userJson, UserAccount.class);
-            Log.d("MyAccountFragment", "onViewCreated, load user: " + userJson);
+        // 初始化：从UserUtil加载
+        userAccount = UserUtil.getUserAccount(requireContext());
+        if (userAccount != null) {
+            Log.d("MyAccountFragment", "onViewCreated, load user: " + gson.toJson(userAccount));
             showLoggedIn(userAccount);
         } else {
             showNotLoggedIn();
@@ -102,7 +98,7 @@ public class MyInfoFragment extends Fragment {
             UserInfoRegisterFragment frag = new UserInfoRegisterFragment();
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.fragment_container, frag) // fragment_container用你实际的容器ID
+                    .replace(R.id.fragment_container, frag)
                     .addToBackStack(null)
                     .commit();
         });
@@ -119,19 +115,9 @@ public class MyInfoFragment extends Fragment {
     }
 
     private void loadUserInfo() {
-        SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        String json = sp.getString("data", null);
-        userAccount = null;
+        userAccount = UserUtil.getUserAccount(requireContext());
 
-        if (json != null) {
-            try {
-                userAccount = gson.fromJson(json, UserAccount.class);
-            } catch (Exception e) {
-                Log.e("MyAccountFragment", "Parse userInfo failed: " + e.getMessage());
-                userAccount = null;
-            }
-        }
-        Log.d("MyAccountFragment", "userAccount=" + gson.toJson(userAccount));
+        Log.d("MyAccountFragment", "userAccount=" + (userAccount != null ? gson.toJson(userAccount) : "null"));
         Log.d("MyAccountFragment", "userId=" + (userAccount != null ? userAccount.getUserId() : "null"));
         Log.d("MyAccountFragment", "loginName=" + (userAccount != null ? userAccount.getLoginName() : "null"));
 
@@ -139,7 +125,7 @@ public class MyInfoFragment extends Fragment {
         if (userAccount != null && userAccount.getUserId() != null && !userAccount.getUserId().isEmpty()) {
             showLoggedIn(userAccount);
 
-            String url = "http://192.168.2.9:8080/api/useraccount/" + userAccount.getUserId();
+            String url = ApiConfig.API_USER_ACCOUNT + userAccount.getUserId();
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder().url(url).build();
             client.newCall(request).enqueue(new Callback() {
@@ -154,7 +140,7 @@ public class MyInfoFragment extends Fragment {
                         UserAccount remote = gson.fromJson(resp, UserAccount.class);
                         if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
                             userAccount = remote;
-                            sp.edit().putString("data", gson.toJson(remote)).apply();
+                            UserUtil.saveUserAccount(requireContext(), remote);
                             if (getActivity() != null) getActivity().runOnUiThread(() -> showLoggedIn(remote));
                             return;
                         }
@@ -164,14 +150,6 @@ public class MyInfoFragment extends Fragment {
         } else {
             showNotLoggedIn();
         }
-    }
-
-    // 彻底清除登录状态
-    private void clearLogin() {
-        isLoggedIn = false;
-        SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        sp.edit().remove("data").apply();
-        userAccount = null;
     }
 
     private void showLoggedIn(UserAccount account) {

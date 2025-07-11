@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -13,35 +14,24 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.models.UserTask;
+import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenusing.common.UserUtil;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import android.content.Context;
-import android.content.SharedPreferences;
+
 import java.io.IOException;
 import java.util.List;
-import com.aplus.remotenursing.models.UserAccount;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import android.util.Log;
 
-public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTaskClickListener{
+public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTaskClickListener {
 
     private RecyclerView rvTasks;
     private UserTaskAdapter adapter;
-
-
-    private String loadUserId() {
-        SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        String json = sp.getString("data", null);
-        if (json != null) {
-            UserAccount account = new Gson().fromJson(json, UserAccount.class);
-            return account.getUserId();
-        }
-        return null;
-    }
 
     @Nullable
     @Override
@@ -55,55 +45,70 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         rvTasks = view.findViewById(R.id.rv_tasks);
         rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
-        adapter = new UserTaskAdapter();
-        Log.d("UserTaskFragment", "adapter hash=" + adapter.hashCode());
 
-        adapter.setOnTaskClickListener(this);
+        if (adapter == null) {
+            adapter = new UserTaskAdapter();
+            adapter.setOnTaskClickListener(this);
+        }
         rvTasks.setAdapter(adapter);
         fetchTasks();
-        view.setBackgroundColor(0xFF00FF00);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        fetchTasks();
     }
 
     private void fetchTasks() {
         Log.d("UserTaskFragment", "fetchTasks(), start!!!");
-        String userId = loadUserId();
+        String userId = UserUtil.loadUserId(requireContext());
         Log.d("UserTaskFragment", "fetchTasks called, userId=" + userId);
 
         if (userId == null) return;
-        String url = "http://192.168.2.9:8080/api/usertask?userId=" + userId;
+        String url = ApiConfig.API_USER_TASK + "?userId=" + userId;
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException e) { e.printStackTrace(); }
-            @Override public void onResponse(Call call, Response response) throws IOException {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("UserTaskFragment", "fetchTasks failed: " + e.getMessage());
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful() && getActivity() != null) {
                     String json = response.body().string();
                     Log.d("UserTaskFragment", "API返回json=" + json);
                     Gson gson = new Gson();
                     List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
                     Log.d("UserTaskFragment", "解析后任务数=" + (list == null ? "null" : list.size()));
-                    java.util.Collections.sort(list,
-                            (a, b) -> Integer.compare(a.getTask_order(), b.getTask_order()));
+                    if (list != null) {
+                        java.util.Collections.sort(list,
+                                (a, b) -> Integer.compare(a.getTask_order(), b.getTask_order()));
+                    }
                     getActivity().runOnUiThread(() -> {
                         adapter.setTasks(list);
                         adapter.notifyDataSetChanged();
                     });
-                }else{
+                } else {
                     Log.d("UserTaskFragment", "接口失败，code=" + response.code());
                 }
-
             }
         });
     }
+
     @Override
     public void onTaskClick(UserTask task) {
+        Log.d("UserTaskFragment", "onTaskClick called, type=" + task.getTask_type());
         if ("01".equals(task.getTask_type())) {
+            Log.d("UserTaskFragment", "准备跳到VideoTaskFragment");
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new VideoTaskFragment())
                     .addToBackStack(null)
                     .commit();
         } else if ("02".equals(task.getTask_type())) {
+            Log.d("UserTaskFragment", "准备跳到SmartwatchCheckupFragment");
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new SmartwatchCheckupFragment())
@@ -111,5 +116,5 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .commit();
         }
     }
-}
 
+}
