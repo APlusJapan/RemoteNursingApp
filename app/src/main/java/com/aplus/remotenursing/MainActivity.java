@@ -40,8 +40,7 @@ public class MainActivity extends AppCompatActivity {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
             FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-            tx.hide(taskFragment)
-                    .hide(meFragment);
+            tx.hide(taskFragment).hide(meFragment);
 
             int id = item.getItemId();
             if (id == R.id.navigation_task) {
@@ -52,6 +51,13 @@ public class MainActivity extends AppCompatActivity {
             tx.commit();
             return true;
         });
+    }
+
+    // 新增：供Fragment调用，主动切换tab并刷新fragment
+    public void switchToTab(int itemId) {
+        BottomNavigationView nav = findViewById(R.id.bottom_nav);
+        nav.setSelectedItemId(itemId);
+        // nav的监听会自动切换Fragment，不需额外操作
     }
 
     private void requestBlePermissionsIfNeeded() {

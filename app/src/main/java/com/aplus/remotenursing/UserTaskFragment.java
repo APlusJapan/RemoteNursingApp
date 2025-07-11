@@ -19,24 +19,26 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import java.io.IOException;
 import java.util.List;
-import com.aplus.remotenursing.models.UserInfo;
+import com.aplus.remotenursing.models.UserAccount;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import android.util.Log;
 
 public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTaskClickListener{
 
     private RecyclerView rvTasks;
     private UserTaskAdapter adapter;
 
+
     private String loadUserId() {
-        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
+        SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
         String json = sp.getString("data", null);
         if (json != null) {
-            UserInfo info = new Gson().fromJson(json, UserInfo.class);
-            return info.getUserId();
+            UserAccount account = new Gson().fromJson(json, UserAccount.class);
+            return account.getUserId();
         }
         return null;
     }
@@ -54,13 +56,19 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         rvTasks = view.findViewById(R.id.rv_tasks);
         rvTasks.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new UserTaskAdapter();
+        Log.d("UserTaskFragment", "adapter hash=" + adapter.hashCode());
+
         adapter.setOnTaskClickListener(this);
         rvTasks.setAdapter(adapter);
         fetchTasks();
+        view.setBackgroundColor(0xFF00FF00);
     }
 
     private void fetchTasks() {
+        Log.d("UserTaskFragment", "fetchTasks(), start!!!");
         String userId = loadUserId();
+        Log.d("UserTaskFragment", "fetchTasks called, userId=" + userId);
+
         if (userId == null) return;
         String url = "http://192.168.2.9:8080/api/usertask?userId=" + userId;
         OkHttpClient client = new OkHttpClient();
@@ -70,15 +78,20 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
             @Override public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful() && getActivity() != null) {
                     String json = response.body().string();
+                    Log.d("UserTaskFragment", "API返回json=" + json);
                     Gson gson = new Gson();
                     List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
+                    Log.d("UserTaskFragment", "解析后任务数=" + (list == null ? "null" : list.size()));
                     java.util.Collections.sort(list,
                             (a, b) -> Integer.compare(a.getTask_order(), b.getTask_order()));
                     getActivity().runOnUiThread(() -> {
                         adapter.setTasks(list);
                         adapter.notifyDataSetChanged();
                     });
+                }else{
+                    Log.d("UserTaskFragment", "接口失败，code=" + response.code());
                 }
+
             }
         });
     }

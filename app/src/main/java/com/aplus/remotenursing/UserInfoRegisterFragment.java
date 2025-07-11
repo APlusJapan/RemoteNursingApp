@@ -33,31 +33,12 @@ import okhttp3.Response;
 import java.io.IOException;
 
 public class UserInfoRegisterFragment extends Fragment {
-    private static final String ARG_IS_LOGGED_IN = "isLoggedIn";
     private EditText etName, etPhone;
     private TextView tvGender, tvBirth, tvMarital, tvEducation, tvLiving, tvJob, tvIncome, tvInsurance;
     private final Gson gson = new Gson();
     private MaterialDatePicker<Long> birthdayPicker;
-    private boolean isLoggedIn;
     private AlertDialog progressDialog;
-
-    // 用户上次本地数据（只为onPause用）
-    private UserInfo lastUserInfo;
-
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Bundle args = getArguments();
-        isLoggedIn = args != null && args.getBoolean(ARG_IS_LOGGED_IN, false);
-    }
-
-    public static UserInfoRegisterFragment newInstance(boolean isLoggedIn) {
-        UserInfoRegisterFragment f = new UserInfoRegisterFragment();
-        Bundle args = new Bundle();
-        args.putBoolean(ARG_IS_LOGGED_IN, isLoggedIn);
-        f.setArguments(args);
-        return f;
-    }
+    private TextView loadingTextView;
 
     @Nullable
     @Override
@@ -82,7 +63,7 @@ public class UserInfoRegisterFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         view.findViewById(R.id.btn_back).setOnClickListener(v -> {
-            saveInfoLocalAndNotify();
+            // 保持这里用 requireActivity 没关系（这是同步返回按钮，不是异步回调，不会引起崩溃）
             requireActivity().getSupportFragmentManager().popBackStack();
         });
 
@@ -98,7 +79,7 @@ public class UserInfoRegisterFragment extends Fragment {
         tvInsurance = view.findViewById(R.id.tv_insurance);
 
         setPickerListeners();
-        loadLocalInfo();
+        fetchAndFillUserInfo();
         view.findViewById(R.id.btn_save).setOnClickListener(v -> saveInfo());
     }
 
@@ -115,7 +96,7 @@ public class UserInfoRegisterFragment extends Fragment {
 
     private void showSingle(TextView target, int arrayRes) {
         String[] items = getResources().getStringArray(arrayRes);
-        new AlertDialog.Builder(requireContext())
+        new AlertDialog.Builder(getActivitySafe())
                 .setItems(items, (d, which) -> target.setText(items[which]))
                 .show();
     }
@@ -123,7 +104,7 @@ public class UserInfoRegisterFragment extends Fragment {
     private void showMulti(TextView target, int arrayRes) {
         String[] items = getResources().getStringArray(arrayRes);
         boolean[] checks = new boolean[items.length];
-        new AlertDialog.Builder(requireContext())
+        new AlertDialog.Builder(getActivitySafe())
                 .setMultiChoiceItems(items, checks, (d, which, isChecked) -> checks[which] = isChecked)
                 .setPositiveButton(android.R.string.ok, (d, w) -> {
                     StringBuilder sb = new StringBuilder();
@@ -143,32 +124,17 @@ public class UserInfoRegisterFragment extends Fragment {
         birthdayPicker.show(getParentFragmentManager(), "MATERIAL_DATE_PICKER");
     }
 
-    private void loadLocalInfo() {
-        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-        String json = sp.getString("data", null);
-        if (json != null) {
-            UserInfo info = gson.fromJson(json, UserInfo.class);
-            etName.setText(info.getUserName());
-            etPhone.setText(info.getPhone());
-            tvGender.setText(info.getGender());
-            tvBirth.setText(info.getBirthDate());
-            tvMarital.setText(info.getMaritalStatus());
-            tvEducation.setText(info.getEducationLevel());
-            tvLiving.setText(info.getLivingStatus());
-            tvJob.setText(info.getJobStatus());
-            tvIncome.setText(info.getIncomePerCapita());
-            tvInsurance.setText(info.getInsuranceType());
-            lastUserInfo = info;
-        }
-    }
-
-    // --- 新增：loading弹窗 ---
-    private void showLoading() {
+    private void showLoading(String text) {
         if (progressDialog == null) {
-            progressDialog = new AlertDialog.Builder(requireContext())
-                    .setView(R.layout.dialog_loading)
+            View dialogView = LayoutInflater.from(getActivitySafe()).inflate(R.layout.dialog_loading, null);
+            loadingTextView = dialogView.findViewById(R.id.tv_loading);
+            progressDialog = new AlertDialog.Builder(getActivitySafe())
+                    .setView(dialogView)
                     .setCancelable(false)
                     .create();
+        }
+        if (loadingTextView != null) {
+            loadingTextView.setText(text);
         }
         progressDialog.show();
     }
@@ -178,46 +144,75 @@ public class UserInfoRegisterFragment extends Fragment {
         }
     }
 
-    // 核心方法1：保存到本地并通知前一个Fragment刷新（无论保存还是返回都会用到）
-    private void saveInfoLocalAndNotify() {
-        UserInfo info = new UserInfo();
-        info.setUserName(etName.getText().toString());
-        info.setPhone(etPhone.getText().toString());
-        info.setGender(tvGender.getText().toString());
-        info.setBirthDate(tvBirth.getText().toString());
-        info.setMaritalStatus(tvMarital.getText().toString());
-        info.setEducationLevel(tvEducation.getText().toString());
-        info.setLivingStatus(tvLiving.getText().toString());
-        info.setJobStatus(tvJob.getText().toString());
-        info.setIncomePerCapita(tvIncome.getText().toString());
-        info.setInsuranceType(tvInsurance.getText().toString());
-
-        if (isLoggedIn) {
-            SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-            String local = sp.getString("data", null);
-            if (local != null) {
-                UserInfo localInfo = gson.fromJson(local, UserInfo.class);
-                info.setUserId(localInfo.getUserId());
-            }
+    private boolean checkInput(UserInfo info) {
+        if (info.getUserName() == null || info.getUserName().trim().isEmpty()) {
+            showToastSafe("请填写姓名");
+            return false;
         }
-
-        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-        sp.edit().putString("data", gson.toJson(info)).apply();
-
-        // 通知MyInfoFragment刷新
-        Bundle bundle = new Bundle();
-        bundle.putBoolean("user_updated", true);
-        bundle.putString("latest_user_json", gson.toJson(info));
-        getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
+        if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
+            showToastSafe("请填写手机号");
+            return false;
+        }
+        return true;
     }
 
-    // 核心方法2：页面即将消失时自动保存并通知，保证即使“返回”也刷新
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (getView() != null && isAdded()) {
-            saveInfoLocalAndNotify();
+    private String getUserIdFromLocal() {
+        SharedPreferences sp = getActivitySafe().getSharedPreferences("user_account", Context.MODE_PRIVATE);
+        String userJson = sp.getString("data", null);
+        if (userJson != null) {
+            UserInfo localInfo = gson.fromJson(userJson, UserInfo.class);
+            return localInfo.getUserId();
         }
+        return null;
+    }
+
+    private void fetchAndFillUserInfo() {
+        String userId = getUserIdFromLocal();
+        if (userId == null || userId.isEmpty()) return;
+
+        showLoading("正在查询，请稍后");
+        OkHttpClient client = new OkHttpClient();
+        String url = "http://192.168.2.9:8080/api/userinfo/" + userId;
+        Request request = new Request.Builder().url(url).get().build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                runUiSafe(() -> {
+                    hideLoading();
+                    // showToastSafe("查询失败，请检查网络");
+                });
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String resp = response.body().string();
+                UserInfo info = null;
+                try {
+                    info = gson.fromJson(resp, UserInfo.class);
+                } catch (Exception ignore) { }
+                final UserInfo finalInfo = info;
+                runUiSafe(() -> {
+                    hideLoading();
+                    if (finalInfo != null && finalInfo.getUserId() != null) {
+                        fillUserInfo(finalInfo);
+                    }
+                });
+            }
+        });
+    }
+
+    private void fillUserInfo(UserInfo info) {
+        etName.setText(info.getUserName());
+        etPhone.setText(info.getPhone());
+        tvGender.setText(info.getGender());
+        tvBirth.setText(info.getBirthDate());
+        tvMarital.setText(info.getMaritalStatus());
+        tvEducation.setText(info.getEducationLevel());
+        tvLiving.setText(info.getLivingStatus());
+        tvJob.setText(info.getJobStatus());
+        tvIncome.setText(info.getIncomePerCapita());
+        tvInsurance.setText(info.getInsuranceType());
     }
 
     private void saveInfo() {
@@ -233,68 +228,109 @@ public class UserInfoRegisterFragment extends Fragment {
         info.setIncomePerCapita(tvIncome.getText().toString());
         info.setInsuranceType(tvInsurance.getText().toString());
 
-        if (isLoggedIn) {
-            SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-            String local = sp.getString("data", null);
-            if (local != null) {
-                UserInfo localInfo = gson.fromJson(local, UserInfo.class);
-                info.setUserId(localInfo.getUserId());
-            }
+        String userId = getUserIdFromLocal();
+        if (userId != null && !userId.isEmpty()) {
+            info.setUserId(userId);
         }
 
-        showLoading();
-        syncToServer(info);
+        if (!checkInput(info)) return;
+
+        showLoading("正在保存，请稍后");
+
+        OkHttpClient client = new OkHttpClient();
+        String url = "http://192.168.2.9:8080/api/userinfo/" + userId;
+        Request getRequest = new Request.Builder().url(url).get().build();
+
+        client.newCall(getRequest).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                runUiSafe(() -> {
+                    hideLoading();
+                    showToastSafe("保存失败，请检查网络");
+                });
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                boolean exists = false;
+                if (response.isSuccessful()) {
+                    try {
+                        String resp = response.body().string();
+                        UserInfo infoRemote = gson.fromJson(resp, UserInfo.class);
+                        exists = (infoRemote != null && infoRemote.getUserId() != null);
+                    } catch (Exception ignore) { }
+                }
+                doSaveOrUpdate(info, exists);
+            }
+        });
     }
 
-    private void syncToServer(UserInfo info) {
+    private void doSaveOrUpdate(UserInfo info, boolean exists) {
         OkHttpClient client = new OkHttpClient();
         String json = gson.toJson(info);
         RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
-        Request request;
 
-        if (isLoggedIn) {
-            String url = "http://192.168.2.9:8080/api/user/" + info.getUserId();
-            request = new Request.Builder().url(url).put(body).build();
+        Request request;
+        if (exists) {
+            request = new Request.Builder()
+                    .url("http://192.168.2.9:8080/api/updateUserinfo/" + info.getUserId())
+                    .put(body)
+                    .build();
         } else {
-            request = new Request.Builder().url("http://192.168.2.9:8080/api/user").post(body).build();
+            request = new Request.Builder()
+                    .url("http://192.168.2.9:8080/api/createUserinfo")
+                    .post(body)
+                    .build();
         }
 
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                if (!isAdded()) return;
-                requireActivity().runOnUiThread(() -> {
+                runUiSafe(() -> {
                     hideLoading();
-                    Toast.makeText(requireContext(), "保存失败，请检查网络", Toast.LENGTH_SHORT).show();
+                    showToastSafe("保存失败，请检查网络");
                 });
             }
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (!isAdded()) return;
-                if (response.isSuccessful()) {
-                    String resp = response.body().string();
-                    UserInfo saved = gson.fromJson(resp, UserInfo.class);
-
-                    requireActivity().runOnUiThread(() -> {
-                        hideLoading();
-                        if (!isAdded()) return;
-                        SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-                        sp.edit().putString("data", gson.toJson(saved)).apply();
-                        // 通知MyInfoFragment刷新
-                        Bundle bundle = new Bundle();
-                        bundle.putBoolean("user_updated", true);
-                        bundle.putString("latest_user_json", gson.toJson(saved));
-                        getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
-                        // 返回上一级
-                        requireActivity().getSupportFragmentManager().popBackStack();
-                    });
-                } else {
-                    requireActivity().runOnUiThread(() -> {
-                        hideLoading();
-                        Toast.makeText(requireContext(), "服务器错误，保存失败", Toast.LENGTH_SHORT).show();
-                    });
-                }
+                runUiSafe(() -> {
+                    hideLoading();
+                    if (response.isSuccessful()) {
+                        showToastSafe("信息保存成功");
+                        // 只在安全环境下执行 Fragment 操作
+                        if (isAdded() && getActivity() != null) {
+                            while (getActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                                getActivity().getSupportFragmentManager().popBackStackImmediate();
+                            }
+                        }
+                    } else {
+                        showToastSafe("服务器错误，保存失败");
+                    }
+                });
             }
         });
+    }
+
+    // ---- 安全工具方法 ----
+    // getActivity的安全封装，保证不会为空
+    private Context getActivitySafe() {
+        if (getActivity() != null) return getActivity();
+        if (getContext() != null) return getContext();
+        throw new IllegalStateException("Fragment已分离，getActivity/getContext都为null");
+    }
+
+    // UI线程安全运行
+    private void runUiSafe(Runnable runnable) {
+        if (!isAdded() || getActivity() == null) return;
+        getActivity().runOnUiThread(() -> {
+            if (!isAdded() || getActivity() == null) return;
+            try {
+                runnable.run();
+            } catch (Throwable ignore) {}
+        });
+    }
+
+    private void showToastSafe(String msg) {
+        runUiSafe(() -> Toast.makeText(getActivitySafe(), msg, Toast.LENGTH_SHORT).show());
     }
 }

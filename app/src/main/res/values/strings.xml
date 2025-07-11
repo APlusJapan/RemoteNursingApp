@@ -12,6 +12,7 @@
     <string name="bluetooth_devices_list">可用蓝牙设备列表</string>
     <string name="bottom_menu_task">每日任务</string>
     <string name="bottom_menu_me">我的信息</string>
+    <string name="user_info_register">用户信息录入</string>
     <string name="user_info_placeholder">用户信息</string>
     <string name="desc_task_list">任务列表</string>
     <string name="status_default">状态信息会在这里显示</string>

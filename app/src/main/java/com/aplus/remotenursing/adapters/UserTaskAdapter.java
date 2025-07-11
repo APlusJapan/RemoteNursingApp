@@ -10,18 +10,28 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.R;
 import com.aplus.remotenursing.models.UserTask;
-
+import android.util.Log;
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.TaskVH> {
     public interface OnTaskClickListener {
         void onTaskClick(UserTask task);
     }
-    private List<UserTask> tasks;
+
+    private List<UserTask> tasks = new ArrayList<>();
     private OnTaskClickListener listener;
+
     public void setTasks(List<UserTask> list) {
-        this.tasks = list;
+        Log.d("UserTaskAdapter", "setTasks, new size=" + (list == null ? "null" : list.size()));
+        if (list == null) {
+            this.tasks = new ArrayList<>();
+        } else {
+            this.tasks = list;
+        }
+        notifyDataSetChanged();
     }
+
     public void setOnTaskClickListener(OnTaskClickListener l) {
         this.listener = l;
     }

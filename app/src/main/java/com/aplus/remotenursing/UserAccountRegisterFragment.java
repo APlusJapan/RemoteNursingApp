@@ -19,7 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.aplus.remotenursing.models.UserInfo;
+import com.aplus.remotenursing.models.UserAccount;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -34,7 +34,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class UserAccountRegisterFragment extends Fragment {
-    private EditText etUsername, etPassword, etPasswordConfirm;
+    private EditText etLoginname, etPassword, etPasswordConfirm;
     private ImageView ivPwdEye, ivPwdEyeConfirm;
     private AlertDialog progressDialog;
     private final Gson gson = new Gson();
@@ -50,7 +50,7 @@ public class UserAccountRegisterFragment extends Fragment {
         // 返回
         view.findViewById(R.id.btn_back).setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
 
-        etUsername = view.findViewById(R.id.et_username);
+        etLoginname = view.findViewById(R.id.et_login_name);
         etPassword = view.findViewById(R.id.et_password);
         etPasswordConfirm = view.findViewById(R.id.et_password_confirm);
         ivPwdEye = view.findViewById(R.id.iv_pwd_eye);
@@ -99,7 +99,7 @@ public class UserAccountRegisterFragment extends Fragment {
     }
 
     private void doRegister() {
-        String username = etUsername.getText().toString().trim();
+        String loginName = etLoginname.getText().toString().trim();
         String password = etPassword.getText().toString();
         String confirm = etPasswordConfirm.getText().toString();
         if (password.length() < 6) {
@@ -113,7 +113,7 @@ public class UserAccountRegisterFragment extends Fragment {
         showLoading();
         OkHttpClient client = new OkHttpClient();
         JsonObject obj = new JsonObject();
-        obj.addProperty("username", username);
+        obj.addProperty("login_name", loginName);
         obj.addProperty("password", password);
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
@@ -135,8 +135,8 @@ public class UserAccountRegisterFragment extends Fragment {
                 if (!isAdded()) return;
                 String resp = response.body().string();
                 if (response.isSuccessful()) {
-                    UserInfo userInfo = gson.fromJson(resp, UserInfo.class);
-                    if (userInfo == null || userInfo.getUserId() == null || userInfo.getUserId().isEmpty()) {
+                    UserAccount userAccount = gson.fromJson(resp, UserAccount.class);
+                    if (userAccount == null || userAccount.getUserId() == null || userAccount.getUserId().isEmpty()) {
                         requireActivity().runOnUiThread(() -> {
                             hideLoading();
                             Toast.makeText(requireContext(), "注册失败，数据异常", Toast.LENGTH_SHORT).show();
@@ -144,13 +144,13 @@ public class UserAccountRegisterFragment extends Fragment {
                         return;
                     }
                     // 注册成功直接保存
-                    SharedPreferences sp = requireContext().getSharedPreferences("user_info", Context.MODE_PRIVATE);
-                    sp.edit().putString("data", gson.toJson(userInfo)).apply();
+                    SharedPreferences sp = requireContext().getSharedPreferences("user_account", Context.MODE_PRIVATE);
+                    sp.edit().putString("data", gson.toJson(userAccount)).apply();
 
                     // 通知刷新
                     Bundle bundle = new Bundle();
-                    bundle.putString("latest_user_json", gson.toJson(userInfo));
-                    getParentFragmentManager().setFragmentResult("user_info_changed", bundle);
+                    bundle.putString("latest_user_json", gson.toJson(userAccount));
+                    getParentFragmentManager().setFragmentResult("user_account_changed", bundle);
 
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();

@@ -10,35 +10,83 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
-        <!-- top user bar -->
+        <!-- top user bar (头像+用户名+登录/退出按钮) -->
         <LinearLayout
             android:id="@+id/layout_user_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="8dp"
-            android:gravity="center_vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
             <ImageView
                 android:id="@+id/iv_avatar"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:src="@drawable/ic_myinfo" />
+
             <LinearLayout
                 android:orientation="vertical"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:layout_marginStart="12dp">
                 <TextView
                     android:id="@+id/tv_username"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text=""/>
+                    android:text=""
+                    android:textSize="17sp"
+                    android:textColor="@android:color/black"
+                    android:textStyle="bold"/>
                 <TextView
                     android:id="@+id/tv_login_state"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/myinfo_not_logged_in" />
+                    android:text="@string/myinfo_not_logged_in"
+                    android:textColor="@android:color/darker_gray"
+                    android:textSize="14sp"/>
             </LinearLayout>
+
+            <!-- 登录按钮，未登录时可见 -->
+            <Button
+                android:id="@+id/btn_login"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="立即登录"
+                android:backgroundTint="@color/colorPrimary"
+                android:textColor="@android:color/white"
+                android:layout_marginStart="8dp"
+                android:visibility="gone" />
+
+            <!-- 退出登录按钮，已登录时可见 -->
+            <Button
+                android:id="@+id/btn_logout"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="退出登录"
+                android:backgroundTint="@color/colorAccent"
+                android:textColor="@android:color/white"
+                android:layout_marginStart="8dp"
+                android:visibility="gone" />
+
         </LinearLayout>
+
+        <!-- 其他功能卡片区域，原样保留 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/userinfo_register"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="2dp">
+            <TextView
+                android:padding="16dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/user_info_register"
+                android:background="#AAFFCC" />
+        </androidx.cardview.widget.CardView>
 
         <androidx.cardview.widget.CardView
             android:id="@+id/card_health_report"
