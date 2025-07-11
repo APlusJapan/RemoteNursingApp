@@ -35,7 +35,7 @@
         android:id="@+id/et_username"
         android:layout_width="0dp"
         android:layout_height="50dp"
-        android:hint="请输入邮箱或手机号"
+        android:hint="请输入手机号"
         android:background="@drawable/bg_edittext_white_round"
         android:paddingStart="20dp"
         android:textSize="16sp"
@@ -46,21 +46,47 @@
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"/>
 
-    <EditText
-        android:id="@+id/et_password"
+    <!-- 密码区 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layout_password"
         android:layout_width="0dp"
         android:layout_height="50dp"
-        android:hint="请输入密码"
         android:background="@drawable/bg_edittext_white_round"
-        android:paddingStart="20dp"
-        android:textSize="16sp"
-        android:inputType="textPassword"
         app:layout_constraintTop_toBottomOf="@+id/et_username"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="24dp"
         android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"/>
+        android:layout_marginEnd="32dp">
+
+        <EditText
+            android:id="@+id/et_password"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:hint="设置6-16位密码"
+            android:paddingStart="20dp"
+            android:textSize="16sp"
+            android:background="@android:color/transparent"
+            android:inputType="textPassword"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/iv_pwd_eye"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageView
+            android:id="@+id/iv_pwd_eye"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_pwd_eye_closed"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="切换密码可见性"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <Button
         android:id="@+id/btn_login"
@@ -70,9 +96,9 @@
         android:textSize="18sp"
         android:background="@drawable/bg_btn_primary_round"
         android:textColor="#FFF"
-        app:layout_constraintTop_toBottomOf="@+id/et_password"
-        app:layout_constraintStart_toStartOf="@+id/et_password"
-        app:layout_constraintEnd_toEndOf="@+id/et_password"
+        app:layout_constraintTop_toBottomOf="@+id/layout_password"
+        app:layout_constraintStart_toStartOf="@+id/layout_password"
+        app:layout_constraintEnd_toEndOf="@+id/layout_password"
         android:layout_marginTop="32dp"/>
 
     <TextView
