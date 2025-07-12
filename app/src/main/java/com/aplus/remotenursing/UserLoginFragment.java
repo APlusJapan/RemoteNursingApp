@@ -144,12 +144,21 @@ public class UserLoginFragment extends Fragment {
 
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
-                        // 跳转到用户信息页（MyInfoFragment会自动联网校验，状态绝不会乱）
-                        MyInfoFragment frag = new MyInfoFragment();
-                        requireActivity().getSupportFragmentManager()
-                                .beginTransaction()
-                                .replace(R.id.fragment_container, frag)
-                                .commit();
+                        // 先缓存当前Activity
+                        MainActivity main = (MainActivity) getActivity();
+
+                        // 先pop（回到主界面）
+                        requireActivity().getSupportFragmentManager().popBackStackImmediate(null, 0);
+
+                        // popBackStack后Fragment已Detach，不能再用requireContext()和getActivity()
+                        // 所以用Activity缓存变量
+                        // 延迟100ms（等待UI稳定），再切tab
+                        if (main != null) {
+                            main.getWindow().getDecorView().postDelayed(() -> {
+                                main.switchToTab(R.id.navigation_me);
+                                Toast.makeText(main, "登录成功！", Toast.LENGTH_SHORT).show();
+                            }, 100);
+                        }
                     });
                 } else {
                     requireActivity().runOnUiThread(() -> {

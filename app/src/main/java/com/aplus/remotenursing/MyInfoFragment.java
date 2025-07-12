@@ -101,6 +101,7 @@ public class MyInfoFragment extends Fragment {
                     .replace(R.id.fragment_container, frag)
                     .addToBackStack(null)
                     .commit();
+            requireActivity().getSupportFragmentManager().popBackStack();
         });
     }
 

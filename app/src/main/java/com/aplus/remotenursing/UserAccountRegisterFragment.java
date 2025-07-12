@@ -142,7 +142,7 @@ public class UserAccountRegisterFragment extends Fragment {
                         });
                         return;
                     }
-                    // 注册成功直接保存（用 UserUtil 统一存储）
+                    // 注册成功直接保存
                     UserUtil.saveUserAccount(requireContext(), userAccount);
 
                     // 通知刷新
@@ -152,13 +152,19 @@ public class UserAccountRegisterFragment extends Fragment {
 
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
-                        // 跳转到用户信息页（MyInfoFragment会联网校验userId，不会乱）
-                        MyInfoFragment frag = new MyInfoFragment();
-                        requireActivity().getSupportFragmentManager()
-                                .beginTransaction()
-                                .replace(R.id.fragment_container, frag)
-                                .commit();
+                        MainActivity main = (MainActivity) getActivity();
+                        if (main != null) {
+                            // 连续pop两次，把Register和Login都弹掉
+                            main.getSupportFragmentManager().popBackStack(); // 弹出Register
+                            main.getSupportFragmentManager().popBackStack(); // 弹出Login，回到tab主页面
+                            // 延迟切tab，避免UI卡顿
+                            main.getWindow().getDecorView().postDelayed(() -> {
+                                main.switchToTab(R.id.navigation_me);
+                                Toast.makeText(main, "注册成功，已登录！", Toast.LENGTH_SHORT).show();
+                            }, 100);
+                        }
                     });
+
                 } else {
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
