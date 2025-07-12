@@ -3,6 +3,7 @@ package com.aplus.remotenursing;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,6 +41,7 @@ public class UserInfoRegisterFragment extends Fragment {
     private MaterialDatePicker<Long> birthdayPicker;
     private AlertDialog progressDialog;
     private TextView loadingTextView;
+    private boolean isRequesting = false; // 防止请求期间页面被pop
 
     @Nullable
     @Override
@@ -64,7 +66,10 @@ public class UserInfoRegisterFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         view.findViewById(R.id.btn_back).setOnClickListener(v -> {
-            requireActivity().getSupportFragmentManager().popBackStack();
+            if (!isRequesting) // 正在请求时不允许pop
+                requireActivity().getSupportFragmentManager().popBackStack();
+            else
+                showToastSafe("操作进行中，请稍候");
         });
 
         etName = view.findViewById(R.id.et_name);
@@ -81,6 +86,17 @@ public class UserInfoRegisterFragment extends Fragment {
         setPickerListeners();
         fetchAndFillUserInfo();
         view.findViewById(R.id.btn_save).setOnClickListener(v -> saveInfo());
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        isRequesting = false;
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+        progressDialog = null;
+        loadingTextView = null;
     }
 
     private void setPickerListeners() {
@@ -125,6 +141,7 @@ public class UserInfoRegisterFragment extends Fragment {
     }
 
     private void showLoading(String text) {
+        isRequesting = true;
         if (progressDialog == null) {
             View dialogView = LayoutInflater.from(getActivitySafe()).inflate(R.layout.dialog_loading, null);
             loadingTextView = dialogView.findViewById(R.id.tv_loading);
@@ -139,6 +156,7 @@ public class UserInfoRegisterFragment extends Fragment {
         progressDialog.show();
     }
     private void hideLoading() {
+        isRequesting = false;
         if (progressDialog != null && progressDialog.isShowing()) {
             progressDialog.dismiss();
         }
@@ -156,8 +174,7 @@ public class UserInfoRegisterFragment extends Fragment {
         return true;
     }
 
-    // ----------- 核心改造点 START -----------
-    // 用户id全部通过 UserUtil 统一读取
+    // ----------- 网络请求安全版 -----------
     private void fetchAndFillUserInfo() {
         String userId = UserUtil.loadUserId(requireContext());
         if (userId == null || userId.isEmpty()) return;
@@ -165,35 +182,57 @@ public class UserInfoRegisterFragment extends Fragment {
         showLoading("正在查询，请稍后");
         OkHttpClient client = new OkHttpClient();
         String url = ApiConfig.API_USER_INFO + userId;
-        Request request = new Request.Builder().url(url).get().build();
+        Log.d("fetchAndFillUserInfo", "fetchAndFillUserInfo, URL: " + url);
 
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                runUiSafe(() -> {
-                    hideLoading();
-                });
-            }
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String resp = response.body().string();
-                UserInfo info = null;
-                try {
-                    info = gson.fromJson(resp, UserInfo.class);
-                } catch (Exception ignore) { }
-                final UserInfo finalInfo = info;
-                runUiSafe(() -> {
-                    hideLoading();
-                    if (finalInfo != null && finalInfo.getUserId() != null) {
-                        fillUserInfo(finalInfo);
+        client.newCall(new Request.Builder().url(url).get().build())
+                .enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        Log.d("UserInfoDebug", "onFailure: " + e.getMessage());
+                        runUiSafe(() -> hideLoading());
+                    }
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (!isAdded() || getActivity() == null) {
+                            Log.d("UserInfoDebug", "Fragment已销毁，不再回调UI");
+                            return;
+                        }
+                        String resp = response.body().string();
+                        Log.d("fetchAndFillUserInfo", "HTTP status: " + response.code() + " body: " + resp);
+
+                        UserInfo info = null;
+                        try {
+                            info = gson.fromJson(resp, UserInfo.class);
+                            Log.d("fetchAndFillUserInfo", "解析后 info: " + info);
+                        } catch (Exception ignore) {
+                            Log.e("fetchAndFillUserInfo", "JSON解析异常: " + ignore.getMessage());
+                        }
+                        final UserInfo finalInfo = info;
+                        runUiSafe(() -> {
+                            hideLoading();
+                            if (finalInfo != null && finalInfo.getUserId() != null) {
+                                Log.d("UserInfoDebug", "will call fillUserInfo");
+                                fillUserInfo(finalInfo);
+                            } else {
+                                showToastSafe("未查到用户信息（" + response.code() + "）");
+                            }
+                        });
                     }
                 });
-            }
-        });
     }
-    // ----------- 核心改造点 END -----------
 
     private void fillUserInfo(UserInfo info) {
+        Log.d("UserInfo", "[DEBUG] userId=" + info.getUserId());
+        Log.d("UserInfo", "[DEBUG] userName=" + info.getUserName());
+        Log.d("UserInfo", "[DEBUG] gender=" + info.getGender());
+        Log.d("UserInfo", "[DEBUG] birthDate=" + info.getBirthDate());
+        Log.d("UserInfo", "[DEBUG] phone=" + info.getPhone());
+        Log.d("UserInfo", "[DEBUG] maritalStatus=" + info.getMaritalStatus());
+        Log.d("UserInfo", "[DEBUG] educationLevel=" + info.getEducationLevel());
+        Log.d("UserInfo", "[DEBUG] livingStatus=" + info.getLivingStatus());
+        Log.d("UserInfo", "[DEBUG] jobStatus=" + info.getJobStatus());
+        Log.d("UserInfo", "[DEBUG] incomePerCapita=" + info.getIncomePerCapita());
+
         etName.setText(info.getUserName());
         etPhone.setText(info.getPhone());
         tvGender.setText(info.getGender());
@@ -219,13 +258,10 @@ public class UserInfoRegisterFragment extends Fragment {
         info.setIncomePerCapita(tvIncome.getText().toString());
         info.setInsuranceType(tvInsurance.getText().toString());
 
-        // ----------- 核心改造点 START -----------
-        // 用户id全部通过 UserUtil 统一读取
         String userId = UserUtil.loadUserId(requireContext());
         if (userId != null && !userId.isEmpty()) {
             info.setUserId(userId);
         }
-        // ----------- 核心改造点 END -----------
 
         if (!checkInput(info)) return;
 
@@ -303,7 +339,7 @@ public class UserInfoRegisterFragment extends Fragment {
         });
     }
 
-    // ---- 工具方法，无需修改 ----
+    // ---- 工具方法 ----
     private Context getActivitySafe() {
         if (getActivity() != null) return getActivity();
         if (getContext() != null) return getContext();
@@ -311,9 +347,17 @@ public class UserInfoRegisterFragment extends Fragment {
     }
 
     private void runUiSafe(Runnable runnable) {
-        if (!isAdded() || getActivity() == null) return;
+        // 进一步优化：Fragment和Activity必须都活着才回调UI
+        if (!isAdded() || getActivity() == null) {
+            Log.d("UserInfoDebug", "runUiSafe return, isAdded=" + isAdded() + " getActivity=" + getActivity());
+            hideLoading();
+            return;
+        }
         getActivity().runOnUiThread(() -> {
-            if (!isAdded() || getActivity() == null) return;
+            if (!isAdded() || getActivity() == null) {
+                hideLoading();
+                return;
+            }
             try {
                 runnable.run();
             } catch (Throwable ignore) {}

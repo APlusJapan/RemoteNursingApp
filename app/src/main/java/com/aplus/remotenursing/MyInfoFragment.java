@@ -94,6 +94,7 @@ public class MyInfoFragment extends Fragment {
         }
         // 跳转到用户信息录入页面
         cardUserInfoRegister.setOnClickListener(v -> {
+            Log.d("NavDebug", "准备跳转到用户信息录入页面");
             if (!LoginChecker.checkLogin(this)) return;
             UserInfoRegisterFragment frag = new UserInfoRegisterFragment();
             requireActivity().getSupportFragmentManager()
@@ -101,7 +102,6 @@ public class MyInfoFragment extends Fragment {
                     .replace(R.id.fragment_container, frag)
                     .addToBackStack(null)
                     .commit();
-            requireActivity().getSupportFragmentManager().popBackStack();
         });
     }
 
