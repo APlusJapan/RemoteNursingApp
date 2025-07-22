@@ -5,7 +5,7 @@ package com.aplus.remotenusing.common;
  */
 public class ApiConfig {
     /** Base server address (must end with a slash) */
-    public static final String BASE_URL = "http://192.168.9.117:8080/api/";
+    public static final String BASE_URL = "http://192.168.2.9:8080/api/";
 
     public static final String API_SERIES = BASE_URL + "series";
     public static final String API_VIDEOS = BASE_URL + "videos";

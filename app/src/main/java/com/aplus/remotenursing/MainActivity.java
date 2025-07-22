@@ -19,6 +19,10 @@ public class MainActivity extends AppCompatActivity {
     private Fragment usertaskFragment;
     private Fragment myInfoFragment;
 
+    // 用于记录当前 tab 索引
+    private int lastTabIndex = 0;
+    private Fragment[] fragments;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -27,9 +31,10 @@ public class MainActivity extends AppCompatActivity {
         // 1. 申请 BLE 相关权限
         requestBlePermissionsIfNeeded();
 
-        // 2. 实例化并 add 两个 Fragment
+        // 2. 实例化 Fragment
         usertaskFragment = new UserTaskFragment();
         myInfoFragment   = new MyInfoFragment();
+        fragments = new Fragment[] { usertaskFragment, myInfoFragment };
 
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         ft.add(R.id.fragment_container, usertaskFragment, "usertask");
@@ -39,16 +44,14 @@ public class MainActivity extends AppCompatActivity {
         // 3. 底部导航切换
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
-            FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-            tx.hide(usertaskFragment).hide(myInfoFragment);
-
-            int id = item.getItemId();
-            if (id == R.id.navigation_task) {
-                tx.show(usertaskFragment);
-            } else if (id == R.id.navigation_me) {
-                tx.show(myInfoFragment);
+            int index = (item.getItemId() == R.id.navigation_task) ? 0 : 1;
+            if (index != lastTabIndex) {
+                FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
+                tx.hide(fragments[lastTabIndex]);
+                tx.show(fragments[index]);
+                tx.commit();
+                lastTabIndex = index;
             }
-            tx.commit();
             return true;
         });
     }
