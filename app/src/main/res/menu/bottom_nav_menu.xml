@@ -7,7 +7,7 @@
         android:title="@string/bottom_menu_task" />
 
     <item
-        android:id="@+id/navigation_me"
+        android:id="@+id/navigation_myInfo"
         android:icon="@drawable/ic_myinfo"
         android:title="@string/bottom_menu_me" />
 </menu>

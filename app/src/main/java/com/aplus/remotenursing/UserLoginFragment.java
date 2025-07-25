@@ -155,7 +155,7 @@ public class UserLoginFragment extends Fragment {
                         // 延迟100ms（等待UI稳定），再切tab
                         if (main != null) {
                             main.getWindow().getDecorView().postDelayed(() -> {
-                                main.switchToTab(R.id.navigation_me);
+                                main.switchToTab(R.id.navigation_myInfo);
                                 Toast.makeText(main, "登录成功！", Toast.LENGTH_SHORT).show();
                             }, 100);
                         }

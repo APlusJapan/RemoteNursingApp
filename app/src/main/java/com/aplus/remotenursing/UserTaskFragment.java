@@ -114,7 +114,15 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .replace(R.id.fragment_container, new SmartwatchCheckupFragment())
                     .addToBackStack(null)
                     .commit();
+        } else if ("03".equals(task.getTask_type())) {
+            Log.d("UserTaskFragment", "准备跳到DailyCheckInFragment");
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new DailyCheckInFragment())
+                    .addToBackStack(null)
+                    .commit();
         }
     }
+
 
 }

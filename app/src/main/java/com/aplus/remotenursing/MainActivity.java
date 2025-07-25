@@ -10,7 +10,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
-
+import android.util.Log;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -44,16 +44,21 @@ public class MainActivity extends AppCompatActivity {
         // 3. 底部导航切换
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
-            int index = (item.getItemId() == R.id.navigation_task) ? 0 : 1;
-            if (index != lastTabIndex) {
-                FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
-                tx.hide(fragments[lastTabIndex]);
-                tx.show(fragments[index]);
-                tx.commit();
-                lastTabIndex = index;
+            Fragment fragment;
+            if (item.getItemId() == R.id.navigation_task) {
+                fragment = new UserTaskFragment();
+            } else if (item.getItemId() == R.id.navigation_myInfo) {
+                fragment = new MyInfoFragment();
+            } else {
+                return false;
             }
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .commit();
             return true;
         });
+
+
     }
 
     // 新增：供Fragment调用，主动切换tab并刷新fragment

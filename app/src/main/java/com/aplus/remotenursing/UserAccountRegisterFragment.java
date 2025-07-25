@@ -159,7 +159,7 @@ public class UserAccountRegisterFragment extends Fragment {
                             main.getSupportFragmentManager().popBackStack(); // 弹出Login，回到tab主页面
                             // 延迟切tab，避免UI卡顿
                             main.getWindow().getDecorView().postDelayed(() -> {
-                                main.switchToTab(R.id.navigation_me);
+                                main.switchToTab(R.id.navigation_myInfo);
                                 Toast.makeText(main, "注册成功，已登录！", Toast.LENGTH_SHORT).show();
                             }, 100);
                         }
