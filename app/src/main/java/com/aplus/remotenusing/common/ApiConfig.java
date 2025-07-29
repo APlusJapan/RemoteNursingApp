@@ -18,5 +18,7 @@ public class ApiConfig {
     public static final String API_USER_ACCOUNT = BASE_URL + "useraccount/"; // requires userId after slash
     public static final String API_CHECKIN_FIELDS = BASE_URL + "checkin/field/form/"; // 需要formId拼接
     public static final String API_CHECKIN_RECORD = BASE_URL + "checkin/record";
+    public static final String API_QUESTIONNAIRE_FIELDS = BASE_URL + "questionnaire/field/form/";
+    public static final String API_QUESTIONNAIRE_RECORD = BASE_URL + "questionnaire/record";
 
 }

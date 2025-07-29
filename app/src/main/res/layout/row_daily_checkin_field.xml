@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<!-- row_daily_checkin_field.xml -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -18,5 +18,12 @@
         android:textSize="16sp"
         android:layout_marginStart="16dp"/>
 
-    <!-- 右侧输入/选择控件由Java动态添加 -->
+    <FrameLayout
+        android:id="@+id/right_container"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:layout_marginEnd="16dp"/>
+
 </LinearLayout>

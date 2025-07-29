@@ -121,8 +121,13 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .replace(R.id.fragment_container, new DailyCheckInFragment())
                     .addToBackStack(null)
                     .commit();
+        }else if ("04".equals(task.getTask_type())) {
+            Log.d("QuestionnaireFragment", "准备跳到QuestionnaireFragment");
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new QuestionnaireFragment())
+                    .addToBackStack(null)
+                    .commit();
         }
     }
-
-
 }
