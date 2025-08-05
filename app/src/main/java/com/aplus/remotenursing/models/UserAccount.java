@@ -8,7 +8,8 @@ public class UserAccount {
 
     @SerializedName(value = "loginName", alternate = {"login_name"})
     private String loginName;
-
+    @SerializedName(value = "nickName", alternate = {"nick_name"})
+    private String nickName;
     public UserAccount() {}
 
     // ---- Getter & Setter (全部用驼峰风格，和字段保持一致) ----
@@ -16,4 +17,6 @@ public class UserAccount {
     public void setUserId(String userId) { this.userId = userId; }
     public String getLoginName() { return loginName; }
     public void setLoginName(String loginName) { this.loginName = loginName; }
+    public String getNickName() { return nickName; }
+    public void setNickName(String nickName) { this.nickName = nickName; }
 }

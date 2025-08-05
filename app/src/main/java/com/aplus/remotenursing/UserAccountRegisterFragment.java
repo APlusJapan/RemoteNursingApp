@@ -101,6 +101,10 @@ public class UserAccountRegisterFragment extends Fragment {
         String loginName = etLoginname.getText().toString().trim();
         String password = etPassword.getText().toString();
         String confirm = etPasswordConfirm.getText().toString();
+        if (!loginName.matches("^1\\d{10}$")) {
+            Toast.makeText(requireContext(), "请输入有效的手机号", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (password.length() < 6) {
             Toast.makeText(requireContext(), "密码至少6位", Toast.LENGTH_SHORT).show();
             return;
@@ -111,14 +115,21 @@ public class UserAccountRegisterFragment extends Fragment {
         }
         showLoading();
         OkHttpClient client = new OkHttpClient();
+
+        // 生成昵称：“用户”+手机号后四位
+        String nickName = "用户" + loginName.substring(loginName.length() - 4);
+
         JsonObject obj = new JsonObject();
         obj.addProperty("login_name", loginName);
         obj.addProperty("password", password);
+        obj.addProperty("nick_name", nickName); // 关键行！
+
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
                 .url(ApiConfig.API_ACCOUNT_REGISTER)
                 .post(body)
                 .build();
+
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -128,7 +139,6 @@ public class UserAccountRegisterFragment extends Fragment {
                     Toast.makeText(requireContext(), "网络错误", Toast.LENGTH_SHORT).show();
                 });
             }
-
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 if (!isAdded()) return;
@@ -164,7 +174,6 @@ public class UserAccountRegisterFragment extends Fragment {
                             }, 100);
                         }
                     });
-
                 } else {
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
@@ -174,4 +183,5 @@ public class UserAccountRegisterFragment extends Fragment {
             }
         });
     }
+
 }

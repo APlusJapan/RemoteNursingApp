@@ -20,5 +20,7 @@ public class ApiConfig {
     public static final String API_CHECKIN_RECORD = BASE_URL + "checkin/record";
     public static final String API_QUESTIONNAIRE_FIELDS = BASE_URL + "questionnaire/field/form/";
     public static final String API_QUESTIONNAIRE_RECORD = BASE_URL + "questionnaire/record";
+    public static final String API_POINT_RULES = BASE_URL + "point/rule";
+    public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
 
 }

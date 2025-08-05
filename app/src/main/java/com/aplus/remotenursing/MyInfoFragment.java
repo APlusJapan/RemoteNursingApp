@@ -156,14 +156,7 @@ public class MyInfoFragment extends Fragment {
     private void showLoggedIn(UserAccount account) {
         isLoggedIn = true;
 
-        // 提取手机后4位
-        String phoneSuffix = "";
-        if (account.getLoginName() != null && account.getLoginName().length() >= 4) {
-            phoneSuffix = account.getLoginName().substring(account.getLoginName().length() - 4);
-        }
-        String displayName = "用户" + phoneSuffix;
-
-        tvUserName.setText(displayName);
+        tvUserName.setText(account.getNickName());
         tvLoginState.setText(getString(R.string.myinfo_logged_in));
         btnLogin.setVisibility(View.GONE);
         btnLogout.setVisibility(View.VISIBLE);
