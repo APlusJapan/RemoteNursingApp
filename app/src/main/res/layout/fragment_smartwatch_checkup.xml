@@ -1,90 +1,251 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="1dp"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-    <!-- 顶部灰色栏放置返回按钮 -->
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F8F8F8"
+    android:padding="0dp">
+
+    <!-- 顶部栏 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:orientation="horizontal"
-        android:background="#DDDDDD"
-        android:padding="4dp">
-        <Button
-            android:id="@+id/DataPage_btn_back"
+        android:background="#ffffff"
+        android:gravity="center_vertical">
+
+        <ImageButton
+            android:id="@+id/smartwatch_btn_back"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:padding="12dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_arrow_back_black_24dp"
+            android:contentDescription="返回" />
+
+        <TextView
+            android:id="@+id/tv_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="返回" />
+            android:text="睡前体检"
+            android:textSize="22sp"
+            android:textColor="#222"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp"/>
     </LinearLayout>
-    <Button
-        android:id="@+id/btn_sync"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="同步生理数据" />
 
-    <!-- 心率 -->
-    <TextView
-        android:id="@+id/tv_heart"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="心率：-"
-        android:textSize="16sp"
-        android:paddingTop="8dp" />
+    <Space android:layout_width="match_parent" android:layout_height="18dp"/>
 
-    <!-- 步数 -->
-    <TextView
-        android:id="@+id/tv_steps"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="步数：-"
-        android:textSize="16sp"
-        android:paddingTop="4dp" />
+    <!-- 体检按钮 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_checkup"
+        android:layout_width="260dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center_horizontal"
+        android:text="开始体检"
+        android:textSize="22sp"
+        android:textColor="#2563eb"
+        app:cornerRadius="28dp"
+        app:strokeWidth="2dp"
+        app:strokeColor="#2563eb"
+        android:backgroundTint="#FFFFFF"
+        android:stateListAnimator="@null"
+        android:textStyle="bold"
+        android:elevation="4dp"/>
 
-    <!-- 血氧  -->
+    <!-- 测量进度提示 -->
     <TextView
-        android:id="@+id/tv_spo2"
-        android:layout_width="match_parent"
+        android:id="@+id/tv_measure_status"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="血氧：-"
-        android:textSize="16sp"
-        android:paddingTop="4dp" />
+        android:text="请点击“开始体检”同步数据"
+        android:textSize="20sp"
+        android:textColor="#2563eb"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"/>
 
-    <!-- 血压-->
-    <TextView
-        android:id="@+id/tv_bp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="血压：-"
-        android:textSize="16sp"
-        android:paddingTop="4dp" />
+    <Space android:layout_width="match_parent" android:layout_height="16dp"/>
 
-    <!-- 血糖-->
-    <TextView
-        android:id="@+id/tv_bloodGlucose"
+    <!-- CardView分组的测量项 -->
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="血糖：-"
-        android:textSize="16sp"
-        android:paddingTop="4dp" />
+        android:layout_gravity="center_horizontal"
+        card_view:cardCornerRadius="22dp"
+        card_view:cardElevation="5dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="12dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:background="#ffffff">
 
-    <!-- 睡眠 -->
-    <TextView
-        android:id="@+id/tv_sleep"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="睡眠：-"
-        android:textSize="16sp"
-        android:paddingTop="4dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="18dp">
 
-    <!-- 通用状态/日志 -->
-    <TextView
-        android:id="@+id/tv_data"
+            <!-- 步数 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:id="@+id/tv_steps"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="步数：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_steps"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+            <!-- 心率 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:id="@+id/tv_heartrate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="心率：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_heartrate"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+            <!-- 血氧 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:id="@+id/tv_spo2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="血氧：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_spo2"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+            <!-- 血压 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:id="@+id/tv_bp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="血压：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_bp"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+            <!-- 血糖 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
+                <TextView
+                    android:id="@+id/tv_bg"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="血糖：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_bg"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+
+            <!-- 睡眠 -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <TextView
+                    android:id="@+id/tv_sleep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="睡眠时长：" android:textSize="22sp"
+                    android:textColor="#222"/>
+                <ProgressBar
+                    android:id="@+id/progress_sleep"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:indeterminate="true"
+                    android:indeterminateTint="#2563eb"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_checkup_result"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/status_default"
-        android:textSize="14sp"
-        android:textColor="#666666"
-        android:paddingTop="8dp" />
+        android:layout_gravity="center_horizontal"
+        card_view:cardCornerRadius="16dp"
+        card_view:cardElevation="4dp"
+        android:layout_margin="20dp"
+        android:layout_marginTop="18dp"
+        android:background="#fff"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_checkup_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="体检结论将在此处显示"
+            android:textColor="#2563eb"
+            android:textSize="20sp"
+            android:padding="20dp"/>
+    </androidx.cardview.widget.CardView>
 </LinearLayout>

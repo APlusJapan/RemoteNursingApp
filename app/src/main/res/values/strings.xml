@@ -48,4 +48,16 @@
     <string name="error_password_format">密码至少6位</string>
     <string name="error_username_not_exist">用户名或手机号不存在，请注册</string>
     <string name="error_username_exist">用户名已存在</string>
+
+    <string name="checkup_heart_rate_low">心率偏低</string>
+    <string name="checkup_heart_rate_high">心率偏高</string>
+    <string name="checkup_spo2_low">血氧偏低</string>
+    <string name="checkup_spo2_high">血氧偏高</string>
+    <string name="checkup_bp_high_low">血压偏低</string>
+    <string name="checkup_bp_high_high">血压偏高</string>
+    <string name="checkup_blood_glucose_low">血糖偏低</string>
+    <string name="checkup_blood_glucose_high">血糖偏高</string>
+    <string name="checkup_step_low">步数未达标</string>
+    <string name="checkup_sleep_time_low">睡眠时长不足</string>
+    <string name="checkup_all_normal">各项体征正常，请继续保持！</string>
 </resources>

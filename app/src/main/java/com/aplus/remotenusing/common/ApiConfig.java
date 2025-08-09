@@ -22,5 +22,6 @@ public class ApiConfig {
     public static final String API_QUESTIONNAIRE_RECORD = BASE_URL + "questionnaire/record";
     public static final String API_POINT_RULES = BASE_URL + "point/rule";
     public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
+    public static final String API_CHECKUP_STANDARD = BASE_URL + "checkup-standard/by-user/";
 
 }
