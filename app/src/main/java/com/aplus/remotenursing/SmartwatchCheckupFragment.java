@@ -72,6 +72,14 @@ public class SmartwatchCheckupFragment extends Fragment {
     private int lastSteps = 0, lastHeart = 0, lastSpo2 = 0, lastBpHigh = 0, lastBpLow = 0, lastSleep = 0;
     private float lastBloodGlucose = 0f;
 
+    // ===== 新增：睡眠相关数据变量 =====
+    private int lastSleepQuality = 0;      // 睡眠质量
+    private int lastWakeCount = 0;         // 睡眠中起床次数
+    private int lastDeepSleepTime = 0;     // 深睡时长(分钟)
+    private int lastLightSleepTime = 0;    // 浅睡时长(分钟)
+    private Date lastSleepDown = null;     // 入睡时间
+    private Date lastSleepUp = null;       // 起床时间
+
     // 标准
     private List<CheckupStandard> standardList = new ArrayList<>();
     private String userId = null; // 动态获取
@@ -485,8 +493,39 @@ public class SmartwatchCheckupFragment extends Fragment {
                 log("收到睡眠数据：day=" + day + ", allSleepTime=" + sd.getAllSleepTime());
                 if (!hasCompleted[0]) {
                     hasSleepData[0] = true;
+
+                    // ===== 获取所有睡眠相关数据 =====
                     int total = sd.getAllSleepTime();
                     lastSleep = total;  // 分钟
+
+                    // 获取新增的睡眠数据
+                    lastSleepQuality = sd.getSleepQulity();          // 睡眠质量
+                    lastWakeCount = sd.getWakeCount();               // 睡眠中起床次数
+                    lastDeepSleepTime = sd.getDeepSleepTime();       // 深睡时长(分钟)
+                    lastLightSleepTime = sd.getLowSleepTime();       // 浅睡时长(分钟)
+
+                    // 处理入睡和起床时间
+                    TimeData sleepDownTime = sd.getSleepDown();
+                    TimeData sleepUpTime = sd.getSleepUp();
+
+                    if (sleepDownTime != null) {
+                        lastSleepDown = convertTimeDataToDate(sleepDownTime);
+                    }
+                    if (sleepUpTime != null) {
+                        lastSleepUp = convertTimeDataToDate(sleepUpTime);
+                    }
+
+                    // 记录详细睡眠数据日志
+                    log("睡眠详细数据 - 总时长:" + total + "分钟, 质量:" + lastSleepQuality +
+                            ", 起床次数:" + lastWakeCount + ", 深睡:" + lastDeepSleepTime + "分钟" +
+                            ", 浅睡:" + lastLightSleepTime + "分钟");
+                    if (lastSleepDown != null) {
+                        log("入睡时间: " + new SimpleDateFormat("HH:mm").format(lastSleepDown));
+                    }
+                    if (lastSleepUp != null) {
+                        log("起床时间: " + new SimpleDateFormat("HH:mm").format(lastSleepUp));
+                    }
+
                     safeUi(() -> tvSleep.setText("睡眠总：" + formatMinutes(total)));
                     hideAllProgressBars();
                     hasCompleted[0] = true;
@@ -509,6 +548,13 @@ public class SmartwatchCheckupFragment extends Fragment {
                         log("睡眠数据读取完成但无数据，设置默认值");
                         hasCompleted[0] = true;
                         lastSleep = 0;
+                        // 重置所有睡眠相关变量
+                        lastSleepQuality = 0;
+                        lastWakeCount = 0;
+                        lastDeepSleepTime = 0;
+                        lastLightSleepTime = 0;
+                        lastSleepDown = null;
+                        lastSleepUp = null;
                         safeUi(() -> {
                             tvSleep.setText("睡眠时长：-");
                             hideAllProgressBars();
@@ -518,6 +564,21 @@ public class SmartwatchCheckupFragment extends Fragment {
                 }, 1000);
             }
         }, 1);
+    }
+
+    // ===== 新增：TimeData转Date的辅助方法 =====
+    private Date convertTimeDataToDate(TimeData timeData) {
+        try {
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
+            cal.set(Calendar.MINUTE, timeData.getMinute());
+            cal.set(Calendar.SECOND, timeData.getSecond());
+            cal.set(Calendar.MILLISECOND, 0);
+            return cal.getTime();
+        } catch (Exception e) {
+            log("TimeData转换失败: " + e.getMessage());
+            return null;
+        }
     }
 
     private void showProgressBarFor(String item) {
@@ -660,7 +721,7 @@ public class SmartwatchCheckupFragment extends Fragment {
             case IN_PROGRESS:
                 btnSync.setText("正在体检。。");
                 btnSync.setEnabled(false);
-                tvStatus.setText(TextUtils.isEmpty(msg) ? "正在采集数据…" : msg);
+                tvStatus.setText(TextUtils.isEmpty(msg) ? "正在采集数据，请等待…" : msg);
                 if (cardResult != null) cardResult.setVisibility(View.GONE);
                 break;
             case FINISHED:
@@ -708,6 +769,15 @@ public class SmartwatchCheckupFragment extends Fragment {
         tvSleep.setText("睡眠：-");
         lastSteps = lastHeart = lastSpo2 = lastBpHigh = lastBpLow = lastSleep = 0;
         lastBloodGlucose = 0f;
+
+        // ===== 重置新增的睡眠相关变量 =====
+        lastSleepQuality = 0;
+        lastWakeCount = 0;
+        lastDeepSleepTime = 0;
+        lastLightSleepTime = 0;
+        lastSleepDown = null;
+        lastSleepUp = null;
+
         heartRateList.clear();
         spo2hList.clear();
         hasRetrieved = false;
@@ -753,6 +823,16 @@ public class SmartwatchCheckupFragment extends Fragment {
                 + ", bpHigh=" + lastBpHigh + ", bpLow=" + lastBpLow + ", glucose=" + lastBloodGlucose
                 + ", sleep=" + lastSleep);
 
+        // ===== 记录新增的睡眠详细数据 =====
+        log("睡眠详细数据: sleepQuality=" + lastSleepQuality + ", wakeCount=" + lastWakeCount
+                + ", deepSleep=" + lastDeepSleepTime + ", lightSleep=" + lastLightSleepTime);
+        if (lastSleepDown != null) {
+            log("入睡时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
+        }
+        if (lastSleepUp != null) {
+            log("起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
+        }
+
         if (TextUtils.isEmpty(userId)) {
             log("未登录用户，跳过上传");
             return;
@@ -770,16 +850,18 @@ public class SmartwatchCheckupFragment extends Fragment {
         // 使用 BigDecimal
         body.bloodGlucose = new BigDecimal(String.valueOf(lastBloodGlucose));
 
-        body.sleepQuality = 0;
-        body.wakeCount = 0;
-        body.deepSleepTime = 0;    // 设置为0而不是null
-        body.lightSleepTime = 0;   // 设置为0而不是null
+        // ===== 设置新增的睡眠相关数据 =====
+        body.sleepQuality = lastSleepQuality;
+        body.wakeCount = lastWakeCount;
+        body.deepSleepTime = lastDeepSleepTime;
+        body.lightSleepTime = lastLightSleepTime;
         body.allSleepTime = lastSleep;
-        body.sleepDown = null;
-        body.sleepUp = null;
+        body.sleepDown = lastSleepDown;
+        body.sleepUp = lastSleepUp;
 
         UserAccount userAccount = UserUtil.getUserAccount(requireContext());
         body.adminId = userAccount != null ? userAccount.getAdminId() : null;
+        body.isDeleted = false;
 
         String url = ApiConfig.API_CHECKUP_RECORD_SAVE;
         log("准备发送请求到: " + url);
