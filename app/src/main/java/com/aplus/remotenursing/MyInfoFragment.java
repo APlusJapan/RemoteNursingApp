@@ -33,7 +33,7 @@ public class MyInfoFragment extends Fragment {
     private TextView tvLoginState;
     private ImageView ivAvatar;
     private Button btnLogin, btnLogout;
-    private View  cardUserInfoRegister;
+    private View cardUserInfoRegister;
     private final Gson gson = new Gson();
     private boolean isLoggedIn = false;
     private UserAccount userAccount;
@@ -121,6 +121,8 @@ public class MyInfoFragment extends Fragment {
         Log.d("MyAccountFragment", "userAccount=" + (userAccount != null ? gson.toJson(userAccount) : "null"));
         Log.d("MyAccountFragment", "userId=" + (userAccount != null ? userAccount.getUserId() : "null"));
         Log.d("MyAccountFragment", "loginName=" + (userAccount != null ? userAccount.getLoginName() : "null"));
+        // 添加 adminId 的日志输出
+        Log.d("MyAccountFragment", "adminId=" + (userAccount != null ? userAccount.getAdminId() : "null"));
 
         // 本地已登录，联网后台检查有效性
         if (userAccount != null && userAccount.getUserId() != null && !userAccount.getUserId().isEmpty()) {
@@ -138,13 +140,20 @@ public class MyInfoFragment extends Fragment {
                 public void onResponse(Call call, Response response) throws IOException {
                     if (response.isSuccessful()) {
                         String resp = response.body().string();
+                        Log.d("MyAccountFragment", "从服务器获取用户信息响应: " + resp);
                         UserAccount remote = gson.fromJson(resp, UserAccount.class);
                         if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
                             userAccount = remote;
                             UserUtil.saveUserAccount(requireContext(), remote);
+                            Log.d("MyAccountFragment", "更新后的用户信息: userId=" + remote.getUserId()
+                                    + ", loginName=" + remote.getLoginName()
+                                    + ", nickName=" + remote.getNickName()
+                                    + ", adminId=" + remote.getAdminId());
                             if (getActivity() != null) getActivity().runOnUiThread(() -> showLoggedIn(remote));
                             return;
                         }
+                    } else {
+                        Log.d("MyAccountFragment", "服务器响应失败: " + response.code());
                     }
                 }
             });
@@ -160,6 +169,12 @@ public class MyInfoFragment extends Fragment {
         tvLoginState.setText(getString(R.string.myinfo_logged_in));
         btnLogin.setVisibility(View.GONE);
         btnLogout.setVisibility(View.VISIBLE);
+
+        // 输出完整的用户信息用于调试
+        Log.d("MyAccountFragment", "显示已登录状态, 用户信息: userId=" + account.getUserId()
+                + ", loginName=" + account.getLoginName()
+                + ", nickName=" + account.getNickName()
+                + ", adminId=" + account.getAdminId());
     }
 
     private void showNotLoggedIn() {

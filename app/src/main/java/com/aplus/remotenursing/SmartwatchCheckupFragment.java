@@ -35,10 +35,15 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
 import okhttp3.*;
+import java.text.SimpleDateFormat;
+import java.math.BigDecimal;
 
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenusing.common.UserUtil;
 
+/**
+ * 体检流程 + 结果上传
+ */
 public class SmartwatchCheckupFragment extends Fragment {
     private static final String TARGET_NAME = "F57L";
     private static final int REQUEST_LOCATION = 1;
@@ -71,7 +76,11 @@ public class SmartwatchCheckupFragment extends Fragment {
     private List<CheckupStandard> standardList = new ArrayList<>();
     private String userId = null; // 动态获取
 
-    // 标准Bean
+    // ====== 新增：上传相关 ======
+    private final OkHttpClient http = new OkHttpClient();
+    private final Gson gson = new Gson();
+
+    // ====== 后台"标准"模型（保持与你现有解析一致）======
     public static class CheckupStandard {
         public String itemCode;
         public String itemName;
@@ -79,6 +88,30 @@ public class SmartwatchCheckupFragment extends Fragment {
         public String maxValue;
         public String valueType;
         public String unit;
+    }
+
+    // 修改请求模型，匹配后端实体
+    public static class BackendUserCheckupRecord {
+        public Integer id;
+        public String userId;
+        public String measureDate;       // 改为 String，格式 yyyy-MM-dd
+        public Integer steps;
+        public Integer heartRate;
+        public Integer spo2;
+        public Integer lowBloodPressure;
+        public Integer highBloodPressure;
+        public BigDecimal bloodGlucose;  // 改为 BigDecimal
+
+        public Integer sleepQuality;
+        public Integer wakeCount;
+        public Integer deepSleepTime;
+        public Integer lightSleepTime;
+        public Integer allSleepTime;
+        public Date sleepDown;
+        public Date sleepUp;
+
+        public String adminId;
+        public Boolean isDeleted;
     }
 
     private final IABluetoothStateListener mBleStateListener = new IABluetoothStateListener() {
@@ -188,11 +221,12 @@ public class SmartwatchCheckupFragment extends Fragment {
 
         updateCheckupUI(CheckupStatus.BEFORE, null);
 
-        // --------- 获取 userId -----------
+        // 获取 userId
         UserAccount userAccount = UserUtil.getUserAccount(requireContext());
         userId = userAccount != null ? userAccount.getUserId() : null;
+        log("当前用户ID: " + userId);
 
-        // ---加载标准后再设置体检按钮---
+        // 加载标准后再绑定按钮
         loadCheckupStandard(userId, () -> {
             btnSync.setOnClickListener(v -> {
                 if (checkupStatus != CheckupStatus.IN_PROGRESS) {
@@ -213,7 +247,6 @@ public class SmartwatchCheckupFragment extends Fragment {
     // --------标准加载--------
     private void loadCheckupStandard(String userId, Runnable afterLoad) {
         if (TextUtils.isEmpty(userId)) {
-            // 没有userId则直接回调
             safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
             return;
         }
@@ -240,7 +273,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         });
     }
 
-    // ========== 下面全保留你原有方法 ==========
+    // =================== 原有流程 ===================
 
     @SuppressLint("MissingPermission")
     private void startScanAndConnect() {
@@ -430,26 +463,57 @@ public class SmartwatchCheckupFragment extends Fragment {
         tvMeasureStatus.setText("正在读取睡眠数据…");
         showProgressBarFor("sleep");
         final boolean[] hasSleepData = {false};
+        final boolean[] hasCompleted = {false};
+
+        // 添加超时机制，防止睡眠数据读取卡住
+        uiHandler.postDelayed(() -> {
+            if (!hasCompleted[0]) {
+                log("睡眠数据读取超时，强制完成");
+                hasCompleted[0] = true;
+                lastSleep = 0;
+                safeUi(() -> {
+                    tvSleep.setText("睡眠时长：-");
+                    hideAllProgressBars();
+                    showCheckupResultAndFinish();
+                });
+            }
+        }, 5000); // 5秒超时
+
         mgr.readSleepData(writeCallback, new ISleepDataListener() {
             @Override
             public void onSleepDataChange(String day, SleepData sd) {
-                hasSleepData[0] = true;
-                int total = sd.getAllSleepTime();
-                lastSleep = total;
-                safeUi(() -> tvSleep.setText("睡眠总：" + formatMinutes(total)));
-                hideAllProgressBars();
-                safeUi(() -> showCheckupResultAndFinish());
+                log("收到睡眠数据：day=" + day + ", allSleepTime=" + sd.getAllSleepTime());
+                if (!hasCompleted[0]) {
+                    hasSleepData[0] = true;
+                    int total = sd.getAllSleepTime();
+                    lastSleep = total;  // 分钟
+                    safeUi(() -> tvSleep.setText("睡眠总：" + formatMinutes(total)));
+                    hideAllProgressBars();
+                    hasCompleted[0] = true;
+                    safeUi(() -> showCheckupResultAndFinish());
+                }
             }
-            @Override public void onSleepProgress(float p) {}
-            @Override public void onSleepProgressDetail(String d, int p) {}
-            @Override public void onReadSleepComplete() {
+            @Override
+            public void onSleepProgress(float p) {
+                log("睡眠数据进度：" + p);
+            }
+            @Override
+            public void onSleepProgressDetail(String d, int p) {
+                log("睡眠数据详细进度：" + d + ", " + p);
+            }
+            @Override
+            public void onReadSleepComplete() {
                 log("睡眠数据-读取结束");
                 uiHandler.postDelayed(() -> {
-                    if (!hasSleepData[0]) {
+                    if (!hasSleepData[0] && !hasCompleted[0]) {
+                        log("睡眠数据读取完成但无数据，设置默认值");
+                        hasCompleted[0] = true;
                         lastSleep = 0;
-                        safeUi(() -> tvSleep.setText("睡眠时长：-"));
-                        hideAllProgressBars();
-                        safeUi(() -> showCheckupResultAndFinish());
+                        safeUi(() -> {
+                            tvSleep.setText("睡眠时长：-");
+                            hideAllProgressBars();
+                            showCheckupResultAndFinish();
+                        });
                     }
                 }, 1000);
             }
@@ -483,6 +547,7 @@ public class SmartwatchCheckupFragment extends Fragment {
     }
 
     private void showCheckupResultAndFinish() {
+        log("=== showCheckupResultAndFinish 开始执行 ===");
         hideAllProgressBars();
         tvMeasureStatus.setText("体检完成！");
         String stepsDesc = lastSteps + "步";
@@ -499,6 +564,8 @@ public class SmartwatchCheckupFragment extends Fragment {
         tvBloodGlucose.setText("血糖：" + bgDesc);
         tvSleep.setText("睡眠时长：" + sleepDesc);
 
+        log("=== 开始生成结论文案 ===");
+        // ===== 生成结论文案 =====
         StringBuilder sb = new StringBuilder();
         CheckupStandard stdHeart = findStandard("HEART_RATE");
         CheckupStandard stdSpo2 = findStandard("SPO2");
@@ -528,19 +595,16 @@ public class SmartwatchCheckupFragment extends Fragment {
             int stdBpHighMax = Integer.parseInt(stdBpHigh.maxValue);
             int stdBpLowMax = Integer.parseInt(stdBpLow.maxValue);
             boolean hadBeenBpHigh = false;
-            // 高血压判断（舒张压和收缩压任何一个大于阈值的情况）
             if(lastBpHigh > stdBpHighMax || lastBpLow > stdBpLowMax){
                 sb.append(getString(R.string.checkup_bp_high_high)).append("；");
                 hadBeenBpHigh = true;
             }
-            // 低血压判断（非高血压，且舒张压和收缩压任何一个小于阈值的情况）
             int stdBpHighMin = Integer.parseInt(stdBpHigh.minValue);
             int stdBpLowMin = Integer.parseInt(stdBpLow.minValue);
-            if(!hadBeenBpHigh  && (lastBpLow < stdBpHighMin || lastBpLow < stdBpLowMin)){
+            if(!hadBeenBpHigh && (lastBpHigh < stdBpHighMin || lastBpLow < stdBpLowMin)){
                 sb.append(getString(R.string.checkup_bp_high_low)).append("；");
             }
         }
-
         // 血糖
         if (stdGlucose != null) {
             float min = Float.parseFloat(stdGlucose.minValue);
@@ -558,16 +622,23 @@ public class SmartwatchCheckupFragment extends Fragment {
         }
         // 睡眠
         if (stdSleep != null) {
-            int min = Integer.parseInt(stdSleep.minValue);
+            int min = Integer.parseInt(stdSleep.minValue); // 注意：这里是分钟
             if (lastSleep < min)
                 sb.append(getString(R.string.checkup_sleep_time_low)).append("；");
         }
         if (sb.length() == 0) sb.append(getString(R.string.checkup_all_normal));
 
-        tvResult.setText(sb.toString());
+        String conclusion = sb.toString();
+        tvResult.setText(conclusion);
         cardResult.setVisibility(View.VISIBLE);
 
+        log("=== 准备更新UI状态 ===");
         updateCheckupUI(CheckupStatus.FINISHED, "体检完成！");
+
+        log("=== 准备调用uploadTodayRecord ===");
+        // ===== 上传到后台 =====
+        uploadTodayRecord();
+        log("=== uploadTodayRecord 调用完成 ===");
     }
 
     private CheckupStandard findStandard(String itemCode) {
@@ -583,7 +654,7 @@ public class SmartwatchCheckupFragment extends Fragment {
             case BEFORE:
                 btnSync.setText("开始体检");
                 btnSync.setEnabled(true);
-                tvStatus.setText(TextUtils.isEmpty(msg) ? "请点击“开始体检”同步数据" : msg);
+                tvStatus.setText(TextUtils.isEmpty(msg) ? "请点击开始体检同步数据" : msg);
                 if (cardResult != null) cardResult.setVisibility(View.GONE);
                 break;
             case IN_PROGRESS:
@@ -609,6 +680,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         }
         isScanning = false;
     }
+
     @SuppressLint("MissingPermission")
     @Override
     public void onDestroyView() {
@@ -642,7 +714,103 @@ public class SmartwatchCheckupFragment extends Fragment {
         if (cardResult != null) cardResult.setVisibility(View.GONE);
     }
 
-    private void log(String msg) { }
-    private void safeUi(Runnable r) { uiHandler.post(() -> { if (isAdded()) r.run(); }); }
-    private String formatMinutes(int min) { int h = min / 60, m = min % 60; return h + "小时" + m + "分"; }
+    // 修改log方法，确保日志能正常输出
+    private void log(String msg) {
+        Log.d("SmartwatchCheckup", msg);
+        System.out.println("SmartwatchCheckup: " + msg);
+    }
+
+    private void safeUi(Runnable r) {
+        uiHandler.post(() -> {
+            if (isAdded()) r.run();
+        });
+    }
+
+    private String formatMinutes(int min) {
+        int h = min / 60, m = min % 60;
+        return h + "小时" + m + "分";
+    }
+
+    // 修改 todayAt00() 方法，返回 yyyy-MM-dd 格式的字符串
+    private String todayAt00String() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+
+        // 返回 yyyy-MM-dd 格式
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        return sdf.format(cal.getTime());
+    }
+
+    // ===== 新：直接上送 UserCheckupRecord =====
+    // 修改 uploadTodayRecord() 方法
+    private void uploadTodayRecord() {
+        log("=== uploadTodayRecord 方法开始执行 ===");
+        log("当前userId: " + userId);
+        log("当前测量数据: steps=" + lastSteps + ", heart=" + lastHeart + ", spo2=" + lastSpo2
+                + ", bpHigh=" + lastBpHigh + ", bpLow=" + lastBpLow + ", glucose=" + lastBloodGlucose
+                + ", sleep=" + lastSleep);
+
+        if (TextUtils.isEmpty(userId)) {
+            log("未登录用户，跳过上传");
+            return;
+        }
+
+        BackendUserCheckupRecord body = new BackendUserCheckupRecord();
+        body.userId = userId;
+        body.measureDate = todayAt00String();    // 使用字符串格式
+        body.steps = lastSteps;
+        body.heartRate = lastHeart;
+        body.spo2 = lastSpo2;
+        body.lowBloodPressure = lastBpLow;
+        body.highBloodPressure = lastBpHigh;
+
+        // 使用 BigDecimal
+        body.bloodGlucose = new BigDecimal(String.valueOf(lastBloodGlucose));
+
+        body.sleepQuality = 0;
+        body.wakeCount = 0;
+        body.deepSleepTime = 0;    // 设置为0而不是null
+        body.lightSleepTime = 0;   // 设置为0而不是null
+        body.allSleepTime = lastSleep;
+        body.sleepDown = null;
+        body.sleepUp = null;
+
+        UserAccount userAccount = UserUtil.getUserAccount(requireContext());
+        body.adminId = userAccount != null ? userAccount.getAdminId() : null;
+
+        String url = ApiConfig.API_CHECKUP_RECORD_SAVE;
+        log("准备发送请求到: " + url);
+        log("请求体JSON: " + gson.toJson(body));
+
+        Request req = new Request.Builder()
+                .url(url)
+                .post(RequestBody.create(
+                        MediaType.parse("application/json; charset=utf-8"),
+                        gson.toJson(body)
+                ))
+                .build();
+
+        log("=== 开始发送HTTP请求 ===");
+        http.newCall(req).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                log("体检记录上传失败：" + e.getMessage());
+                e.printStackTrace();
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (!response.isSuccessful()) {
+                    String responseBody = response.body() != null ? response.body().string() : "无响应体";
+                    log("体检记录上传失败，code=" + response.code() + ", message=" + response.message() + ", body=" + responseBody);
+                } else {
+                    String responseBody = response.body() != null ? response.body().string() : "成功";
+                    log("体检记录上传成功，响应: " + responseBody);
+                }
+            }
+        });
+        log("=== HTTP请求已提交 ===");
+    }
 }
