@@ -13,8 +13,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import android.content.Context;
-import android.content.SharedPreferences;
+
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.aplus.remotenusing.common.ApiConfig;
@@ -24,7 +23,7 @@ import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.aplus.remotenursing.models.UserInfo;
+
 import java.io.IOException;
 import java.util.List;
 import android.widget.Toast;
@@ -50,7 +49,7 @@ public class VideoTaskDetailFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_videotask_detail, container, false);
+        return inflater.inflate(R.layout.fragment_video_task_detail, container, false);
     }
 
     @Override
@@ -64,12 +63,12 @@ public class VideoTaskDetailFragment extends Fragment {
                     .commit();
             return;
         }
-        String vedioSeriesId = getArguments() != null ? getArguments().getString("vedioSeriesId") : null;
+        String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : null;
 
         rvOther = view.findViewById(R.id.rv_other_videos);
         rvOther.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        fetchVideoList(userId, vedioSeriesId, videoList -> {
+        fetchVideoList(userId, videoSeriesId, videoList -> {
             if (videoList == null || videoList.isEmpty()) return;
 
             currentItem = videoList.get(0);
@@ -87,10 +86,10 @@ public class VideoTaskDetailFragment extends Fragment {
                 long pos = player.getCurrentPosition();
                 boolean playReady = player.getPlayWhenReady();
                 player.pause();
-                Intent it = new Intent(requireContext(), VedioFullscreenPlayerActivity.class)
-                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_URL, currentItem.getVedioURL())
-                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_START_POS, pos)
-                        .putExtra(VedioFullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady);
+                Intent it = new Intent(requireContext(), VideoFullscreenPlayerActivity.class)
+                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_URL, currentItem.getvideoURL())
+                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_POS, pos)
+                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady);
                 startActivityForResult(it, REQ_FULLSCREEN);
             });
 
@@ -103,9 +102,9 @@ public class VideoTaskDetailFragment extends Fragment {
         void onResult(List<VideoTaskDetail> videoList);
     }
 
-    private void fetchVideoList(String userId, String vedioSeriesId, VideoListCallback callback) {
+    private void fetchVideoList(String userId, String videoSeriesId, VideoListCallback callback) {
         OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_VIDEOS + "?userId=" + userId + "&vedioSeriesId=" + vedioSeriesId;
+        String url = ApiConfig.API_VIDEO_DETAIL_SERIES_BY_ID + videoSeriesId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
@@ -125,7 +124,7 @@ public class VideoTaskDetailFragment extends Fragment {
     }
 
     private void playVideo(VideoTaskDetail item) {
-        player.setMediaItem(MediaItem.fromUri(item.getVedioURL()));
+        player.setMediaItem(MediaItem.fromUri(item.getvideoURL()));
         player.prepare();
         player.play();
     }
@@ -135,9 +134,9 @@ public class VideoTaskDetailFragment extends Fragment {
         super.onActivityResult(req, res, data);
         if (req == REQ_FULLSCREEN && res == Activity.RESULT_OK && data != null) {
             long pos = data.getLongExtra(
-                    VedioFullscreenPlayerActivity.EXTRA_END_POS, 0L);
+                    VideoFullscreenPlayerActivity.EXTRA_END_POS, 0L);
             boolean playReady = data.getBooleanExtra(
-                    VedioFullscreenPlayerActivity.EXTRA_END_PLAYREADY, true);
+                    VideoFullscreenPlayerActivity.EXTRA_END_PLAYREADY, true);
             player.seekTo(pos);
             player.setPlayWhenReady(playReady);
         }

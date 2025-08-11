@@ -1,7 +1,5 @@
 package com.aplus.remotenursing;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,9 +12,8 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.aplus.remotenursing.adapters.VedioTaskAdapter;
-import com.aplus.remotenursing.models.UserAccount;
-import com.aplus.remotenursing.models.VedioTask;
+import com.aplus.remotenursing.adapters.VideoTaskAdapter;
+import com.aplus.remotenursing.models.VideoTask;
 import com.aplus.remotenusing.common.ApiConfig;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -31,18 +28,18 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 import com.aplus.remotenusing.common.UserUtil;
-public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSeriesClickListener {
+public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSeriesClickListener {
 
     private RecyclerView rvSeries;
-    private VedioTaskAdapter adapter;
-    private List<VedioTask> seriesList;
+    private VideoTaskAdapter adapter;
+    private List<VideoTask> seriesList;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_videotask, container, false);
+        return inflater.inflate(R.layout.fragment_video_task, container, false);
     }
 
     @Override
@@ -53,7 +50,7 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
         rvSeries.setLayoutManager(new LinearLayoutManager(requireContext()));
         // 初始加载空adapter，防止空指针
         if (adapter == null) {
-            adapter = new VedioTaskAdapter(seriesList, this);
+            adapter = new VideoTaskAdapter(seriesList, this);
             rvSeries.setAdapter(adapter);
         }
         fetchSeriesList();
@@ -70,7 +67,7 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
             return;
         }
 
-        String url = ApiConfig.API_SERIES + "?userId=" + userId;
+        String url = ApiConfig.API_VIDEO_TASK_BY_USER + userId;
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
@@ -81,7 +78,7 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
                 if (response.isSuccessful() && getActivity() != null) {
                     String json = response.body().string();
                     Gson gson = new Gson();
-                    List<VedioTask> list = gson.fromJson(json, new TypeToken<List<VedioTask>>(){}.getType());
+                    List<VideoTask> list = gson.fromJson(json, new TypeToken<List<VideoTask>>(){}.getType());
                     getActivity().runOnUiThread(() -> {
                         seriesList = list;
                         adapter.setSeriesList(seriesList);
@@ -91,13 +88,13 @@ public class VideoTaskFragment extends Fragment implements VedioTaskAdapter.OnSe
             }
         });
     }
-        @Override
+    @Override
     public void onSeriesClick(int position) {
-        VedioTask selSeries = seriesList.get(position);
+        VideoTask selSeries = seriesList.get(position);
         VideoTaskDetailFragment detailFragment = new VideoTaskDetailFragment();
         Bundle args = new Bundle();
-        args.putString("vedioSeriesId", selSeries.getVedioSeriesId());
-        args.putString("vedioSeriesName", selSeries.getVedioSeriesName());
+        args.putString("VideoSeriesId", selSeries.getVideoSeriesId());
+        args.putString("VideoSeriesName", selSeries.getVideoSeriesName());
         detailFragment.setArguments(args);
         requireActivity()
                 .getSupportFragmentManager()

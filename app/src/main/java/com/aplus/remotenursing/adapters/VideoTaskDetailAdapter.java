@@ -23,15 +23,15 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
     }
     @NonNull @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_videotask_detaili_video, parent, false);
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_video_task_detail, parent, false);
         return new VH(v);
     }
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         VideoTaskDetail it = items.get(position);
-        holder.tvTitle.setText(it.getVedioName());
+        holder.tvTitle.setText(it.getvideoName());
         Glide.with(holder.ivThumb.getContext())
-                .load(it.getVedioSurfaceImage())
+                .load(it.getvideoSurfaceImage())
                 .placeholder(R.drawable.ic_video)
                 .error(R.drawable.ic_video)
                 .into(holder.ivThumb);

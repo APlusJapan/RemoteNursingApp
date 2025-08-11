@@ -7,8 +7,8 @@ public class ApiConfig {
     /** Base server address (must end with a slash) */
     public static final String BASE_URL = "http://192.168.2.9:8080/api/";
 
-    public static final String API_SERIES = BASE_URL + "series";
-    public static final String API_VIDEOS = BASE_URL + "videos";
+    public static final String API_VIDEO_TASK_BY_USER = BASE_URL + "video-task/user/";
+    public static final String API_VIDEO_DETAIL_SERIES_BY_ID = BASE_URL + "video-detail/series/";
     public static final String API_USER_TASK = BASE_URL + "usertask";
     public static final String API_USER_INFO = BASE_URL + "userinfo/";       // requires userId after slash
     public static final String API_UPDATE_USER_INFO = BASE_URL + "updateUserinfo/"; // requires userId after slash
