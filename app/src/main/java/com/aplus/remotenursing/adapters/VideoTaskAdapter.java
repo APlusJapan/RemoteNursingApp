@@ -43,14 +43,25 @@ public class VideoTaskAdapter extends RecyclerView.Adapter<VideoTaskAdapter.Seri
     @Override
     public void onBindViewHolder(@NonNull SeriesViewHolder holder, int position) {
         VideoTask current = seriesList.get(position);
-        // 加载封面图片（用Glide等库，避免本地resId）
+
+        // 加载封面图片
         Glide.with(holder.ivCover.getContext())
                 .load(current.getVideoSurfaceImage())
                 .placeholder(R.drawable.ic_video) // 默认占位
                 .error(R.drawable.ic_video)       // 加载失败
                 .into(holder.ivCover);
 
+        // 设置标题
         holder.tvTitle.setText(current.getVideoSeriesName());
+
+        // 设置描述（新增）
+        if (holder.tvDescription != null) {
+            if (current.getVideoDescription() != null && !current.getVideoDescription().isEmpty()) {
+                holder.tvDescription.setText(current.getVideoDescription());
+            } else {
+                holder.tvDescription.setText("视频描述内容，简要说明视频的主要内容和训练要点");
+            }
+        }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
@@ -67,11 +78,13 @@ public class VideoTaskAdapter extends RecyclerView.Adapter<VideoTaskAdapter.Seri
     static class SeriesViewHolder extends RecyclerView.ViewHolder {
         ImageView ivCover;
         TextView tvTitle;
+        TextView tvDescription;  // 新增：描述
 
         public SeriesViewHolder(@NonNull View itemView) {
             super(itemView);
             ivCover = itemView.findViewById(R.id.iv_series_thumbnail);
             tvTitle = itemView.findViewById(R.id.tv_series_name);
+            tvDescription = itemView.findViewById(R.id.tv_series_description);  // 新增
         }
     }
 }

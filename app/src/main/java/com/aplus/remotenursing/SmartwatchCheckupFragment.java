@@ -518,7 +518,7 @@ public class SmartwatchCheckupFragment extends Fragment {
                                 String.format("%02d", sleepDownTime.getSecond()));
                         lastSleepDown = adjustSleepTime(sleepDownTime, true);
                         if (lastSleepDown != null) {
-                            log("处理后入睡时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
+                            log("处理后入睡时 间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
                         }
                     } else {
                         log("未获取到入睡时间数据");
