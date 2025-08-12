@@ -10,21 +10,21 @@ public class VideoTaskDetail {
 
     public VideoTaskDetail() {}
 
-    public String getvideoId() { return videoId; }
-    public void setvideoId(String videoId) { this.videoId = videoId; }
+    public String getVideoId() { return videoId; }
+    public void setVideoId(String videoId) { this.videoId = videoId; }
 
-    public String getvideoName() { return videoName; }
-    public void setvideoName(String videoName) { this.videoName = videoName; }
+    public String getVideoName() { return videoName; }
+    public void setVideoName(String videoName) { this.videoName = videoName; }
 
-    public String getvideoURL() { return videoURL; }
-    public void setvideoURL(String videoURL) { this.videoURL = videoURL; }
+    public String getVideoURL() { return videoURL; }
+    public void setVideoURL(String videoURL) { this.videoURL = videoURL; }
 
-    public String getvideoDuration() { return videoDuration; }
-    public void setvideoDuration(String videoDuration) { this.videoDuration = videoDuration; }
+    public String getVideoDuration() { return videoDuration; }
+    public void setVideoDuration(String videoDuration) { this.videoDuration = videoDuration; }
 
-    public String getvideoDescription() { return videoDescription; }
-    public void setvideoDescription(String videoDescription) { this.videoDescription = videoDescription; }
+    public String getVideoDescription() { return videoDescription; }
+    public void setVideoDescription(String videoDescription) { this.videoDescription = videoDescription; }
 
-    public String getvideoSurfaceImage() { return videoSurfaceImage; }
-    public void setvideoSurfaceImage(String videoSurfaceImage) { this.videoSurfaceImage = videoSurfaceImage; }
+    public String getVideoSurfaceImage() { return videoSurfaceImage; }
+    public void setVideoSurfaceImage(String videoSurfaceImage) { this.videoSurfaceImage = videoSurfaceImage; }
 }

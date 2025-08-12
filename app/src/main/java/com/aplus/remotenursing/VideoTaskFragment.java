@@ -93,8 +93,8 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
         VideoTask selSeries = seriesList.get(position);
         VideoTaskDetailFragment detailFragment = new VideoTaskDetailFragment();
         Bundle args = new Bundle();
-        args.putString("VideoSeriesId", selSeries.getVideoSeriesId());
-        args.putString("VideoSeriesName", selSeries.getVideoSeriesName());
+        args.putString("videoSeriesId", selSeries.getVideoSeriesId());
+        args.putString("videoSeriesName", selSeries.getVideoSeriesName());
         detailFragment.setArguments(args);
         requireActivity()
                 .getSupportFragmentManager()

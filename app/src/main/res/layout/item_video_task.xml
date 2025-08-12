@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="2dp"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <!-- 系列封面图 -->
+        <ImageView
+            android:id="@+id/iv_series_thumbnail"
+            android:layout_width="80dp"
+            android:layout_height="60dp"
+            android:scaleType="centerCrop"
+            android:background="@android:color/darker_gray"
+            android:src="@drawable/ic_video_placeholder"
+            android:contentDescription="@string/content_desc_video_thumbnail" />
+
+        <!-- 系列信息 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <!-- 系列标题 -->
+            <TextView
+                android:id="@+id/tv_series_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/rehabilitation_training_series"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <!-- 系列描述 -->
+            <TextView
+                android:id="@+id/tv_series_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/video_description_placeholder"
+                android:textSize="14sp"
+                android:textColor="@android:color/darker_gray"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <!-- 视频数量 - 修复颜色对比度问题 -->
+            <TextView
+                android:id="@+id/tv_video_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/default_duration"
+                android:textSize="12sp"
+                android:textColor="@android:color/white"
+                android:background="@android:color/black"
+                android:padding="6dp"
+                android:minHeight="24dp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- 箭头图标 -->
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_vertical"
+            android:src="@drawable/ic_arrow_back"
+            android:rotation="180"
+            android:contentDescription="@string/content_desc_more_options" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

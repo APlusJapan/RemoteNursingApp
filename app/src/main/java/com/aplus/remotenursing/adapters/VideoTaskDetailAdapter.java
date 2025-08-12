@@ -29,9 +29,9 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         VideoTaskDetail it = items.get(position);
-        holder.tvTitle.setText(it.getvideoName());
+        holder.tvTitle.setText(it.getVideoName());
         Glide.with(holder.ivThumb.getContext())
-                .load(it.getvideoSurfaceImage())
+                .load(it.getVideoSurfaceImage())
                 .placeholder(R.drawable.ic_video)
                 .error(R.drawable.ic_video)
                 .into(holder.ivThumb);
@@ -42,8 +42,8 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
         ImageView ivThumb; TextView tvTitle;
         VH(@NonNull View v) {
             super(v);
-            ivThumb = v.findViewById(R.id.iv_video_thumb);
-            tvTitle = v.findViewById(R.id.tv_video_title);
+            ivThumb = v.findViewById(R.id.iv_video_thumbnail);
+            tvTitle = v.findViewById(R.id.tv_video_name);
         }
     }
 }

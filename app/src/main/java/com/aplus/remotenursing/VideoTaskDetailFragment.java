@@ -13,7 +13,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
+import android.content.Context;
+import android.content.SharedPreferences;
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.aplus.remotenusing.common.ApiConfig;
@@ -23,7 +24,7 @@ import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
+import com.aplus.remotenursing.models.UserInfo;
 import java.io.IOException;
 import java.util.List;
 import android.widget.Toast;
@@ -87,7 +88,7 @@ public class VideoTaskDetailFragment extends Fragment {
                 boolean playReady = player.getPlayWhenReady();
                 player.pause();
                 Intent it = new Intent(requireContext(), VideoFullscreenPlayerActivity.class)
-                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_URL, currentItem.getvideoURL())
+                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_URL, currentItem.getVideoURL())
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_POS, pos)
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady);
                 startActivityForResult(it, REQ_FULLSCREEN);
@@ -102,9 +103,9 @@ public class VideoTaskDetailFragment extends Fragment {
         void onResult(List<VideoTaskDetail> videoList);
     }
 
-    private void fetchVideoList(String userId, String videoSeriesId, VideoListCallback callback) {
+    private void fetchVideoList(String userId, String vedioSeriesId, VideoListCallback callback) {
         OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_VIDEO_DETAIL_SERIES_BY_ID + videoSeriesId;
+        String url = ApiConfig.API_VIDEO_DETAIL_BY_SERIES_ID + vedioSeriesId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
@@ -124,7 +125,7 @@ public class VideoTaskDetailFragment extends Fragment {
     }
 
     private void playVideo(VideoTaskDetail item) {
-        player.setMediaItem(MediaItem.fromUri(item.getvideoURL()));
+        player.setMediaItem(MediaItem.fromUri(item.getVideoURL()));
         player.prepare();
         player.play();
     }

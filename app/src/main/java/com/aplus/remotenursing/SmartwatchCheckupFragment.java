@@ -99,24 +99,28 @@ public class SmartwatchCheckupFragment extends Fragment {
     }
 
     // 修改请求模型，匹配后端实体
+    // 修改SmartwatchCheckupFragment中的BackendUserCheckupRecord类
+
     public static class BackendUserCheckupRecord {
         public Integer id;
         public String userId;
-        public String measureDate;       // 改为 String，格式 yyyy-MM-dd
+        public String measureDate;       // 保持String类型，但确保格式正确
         public Integer steps;
         public Integer heartRate;
         public Integer spo2;
         public Integer lowBloodPressure;
         public Integer highBloodPressure;
-        public BigDecimal bloodGlucose;  // 改为 BigDecimal
+        public BigDecimal bloodGlucose;
 
         public Integer sleepQuality;
         public Integer wakeCount;
         public Integer deepSleepTime;
         public Integer lightSleepTime;
         public Integer allSleepTime;
-        public Date sleepDown;
-        public Date sleepUp;
+
+        // 修改：将Date类型改为String，使用ISO格式
+        public String sleepDown;         // 改为String，格式: "yyyy-MM-dd'T'HH:mm:ss"
+        public String sleepUp;           // 改为String，格式: "yyyy-MM-dd'T'HH:mm:ss"
 
         public String adminId;
         public Boolean isDeleted;
@@ -494,36 +498,60 @@ public class SmartwatchCheckupFragment extends Fragment {
                 if (!hasCompleted[0]) {
                     hasSleepData[0] = true;
 
-                    // ===== 获取所有睡眠相关数据 =====
+                    // 获取睡眠总时长
                     int total = sd.getAllSleepTime();
-                    lastSleep = total;  // 分钟
+                    lastSleep = total;
 
-                    // 获取新增的睡眠数据
-                    lastSleepQuality = sd.getSleepQulity();          // 睡眠质量
-                    lastWakeCount = sd.getWakeCount();               // 睡眠中起床次数
-                    lastDeepSleepTime = sd.getDeepSleepTime();       // 深睡时长(分钟)
-                    lastLightSleepTime = sd.getLowSleepTime();       // 浅睡时长(分钟)
+                    // 获取睡眠详细数据
+                    lastSleepQuality = sd.getSleepQulity();
+                    lastWakeCount = sd.getWakeCount();
+                    lastDeepSleepTime = sd.getDeepSleepTime();
+                    lastLightSleepTime = sd.getLowSleepTime();
 
-                    // 处理入睡和起床时间
+                    // 处理入睡和起床时间 - 增强调试
                     TimeData sleepDownTime = sd.getSleepDown();
                     TimeData sleepUpTime = sd.getSleepUp();
 
                     if (sleepDownTime != null) {
-                        lastSleepDown = convertTimeDataToDate(sleepDownTime);
-                    }
-                    if (sleepUpTime != null) {
-                        lastSleepUp = convertTimeDataToDate(sleepUpTime);
+                        log("原始入睡时间: " + sleepDownTime.getHour() + ":" +
+                                String.format("%02d", sleepDownTime.getMinute()) + ":" +
+                                String.format("%02d", sleepDownTime.getSecond()));
+                        lastSleepDown = adjustSleepTime(sleepDownTime, true);
+                        if (lastSleepDown != null) {
+                            log("处理后入睡时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
+                        }
+                    } else {
+                        log("未获取到入睡时间数据");
                     }
 
-                    // 记录详细睡眠数据日志
-                    log("睡眠详细数据 - 总时长:" + total + "分钟, 质量:" + lastSleepQuality +
-                            ", 起床次数:" + lastWakeCount + ", 深睡:" + lastDeepSleepTime + "分钟" +
-                            ", 浅睡:" + lastLightSleepTime + "分钟");
-                    if (lastSleepDown != null) {
-                        log("入睡时间: " + new SimpleDateFormat("HH:mm").format(lastSleepDown));
+                    if (sleepUpTime != null) {
+                        log("原始起床时间: " + sleepUpTime.getHour() + ":" +
+                                String.format("%02d", sleepUpTime.getMinute()) + ":" +
+                                String.format("%02d", sleepUpTime.getSecond()));
+                        lastSleepUp = adjustSleepTime(sleepUpTime, false);
+                        if (lastSleepUp != null) {
+                            log("处理后起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
+                        }
+                    } else {
+                        log("未获取到起床时间数据");
                     }
-                    if (lastSleepUp != null) {
-                        log("起床时间: " + new SimpleDateFormat("HH:mm").format(lastSleepUp));
+
+                    // 验证时间逻辑
+                    if (lastSleepDown != null && lastSleepUp != null) {
+                        long sleepDurationMillis = lastSleepUp.getTime() - lastSleepDown.getTime();
+                        long sleepDurationMinutes = sleepDurationMillis / (1000 * 60);
+                        log("计算的睡眠时长: " + sleepDurationMinutes + "分钟，设备报告: " + total + "分钟");
+
+                        // 如果计算的睡眠时长为负数，说明跨日处理有问题
+                        if (sleepDurationMinutes < 0) {
+                            log("警告：睡眠时长为负数，可能是跨日处理错误");
+                            // 尝试修正：如果起床时间在入睡时间之前，给起床时间加一天
+                            Calendar cal = Calendar.getInstance();
+                            cal.setTime(lastSleepUp);
+                            cal.add(Calendar.DAY_OF_MONTH, 1);
+                            lastSleepUp = cal.getTime();
+                            log("修正后起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
+                        }
                     }
 
                     safeUi(() -> tvSleep.setText("睡眠总：" + formatMinutes(total)));
@@ -567,19 +595,24 @@ public class SmartwatchCheckupFragment extends Fragment {
     }
 
     // ===== 新增：TimeData转Date的辅助方法 =====
-    private Date convertTimeDataToDate(TimeData timeData) {
-        try {
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
-            cal.set(Calendar.MINUTE, timeData.getMinute());
-            cal.set(Calendar.SECOND, timeData.getSecond());
-            cal.set(Calendar.MILLISECOND, 0);
-            return cal.getTime();
-        } catch (Exception e) {
-            log("TimeData转换失败: " + e.getMessage());
-            return null;
-        }
-    }
+//    private Date convertTimeDataToDate(TimeData timeData) {
+//        try {
+//            Calendar cal = Calendar.getInstance(); // 使用当前时区
+//            // 保持当前日期，只设置时间
+//            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
+//            cal.set(Calendar.MINUTE, timeData.getMinute());
+//            cal.set(Calendar.SECOND, timeData.getSecond());
+//            cal.set(Calendar.MILLISECOND, 0);
+//
+//            Date result = cal.getTime();
+//            log("TimeData转换: " + timeData.getHour() + ":" + timeData.getMinute() +
+//                    " -> " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(result));
+//            return result;
+//        } catch (Exception e) {
+//            log("TimeData转换失败: " + e.getMessage());
+//            return null;
+//        }
+//    }
 
     private void showProgressBarFor(String item) {
         progressSteps.setVisibility(View.GONE);
@@ -816,22 +849,14 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     // ===== 新：直接上送 UserCheckupRecord =====
     // 修改 uploadTodayRecord() 方法
+    // 在SmartwatchCheckupFragment中，完全替换uploadTodayRecord方法
+
     private void uploadTodayRecord() {
         log("=== uploadTodayRecord 方法开始执行 ===");
         log("当前userId: " + userId);
         log("当前测量数据: steps=" + lastSteps + ", heart=" + lastHeart + ", spo2=" + lastSpo2
                 + ", bpHigh=" + lastBpHigh + ", bpLow=" + lastBpLow + ", glucose=" + lastBloodGlucose
                 + ", sleep=" + lastSleep);
-
-        // ===== 记录新增的睡眠详细数据 =====
-        log("睡眠详细数据: sleepQuality=" + lastSleepQuality + ", wakeCount=" + lastWakeCount
-                + ", deepSleep=" + lastDeepSleepTime + ", lightSleep=" + lastLightSleepTime);
-        if (lastSleepDown != null) {
-            log("入睡时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
-        }
-        if (lastSleepUp != null) {
-            log("起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
-        }
 
         if (TextUtils.isEmpty(userId)) {
             log("未登录用户，跳过上传");
@@ -840,7 +865,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
         BackendUserCheckupRecord body = new BackendUserCheckupRecord();
         body.userId = userId;
-        body.measureDate = todayAt00String();    // 使用字符串格式
+        body.measureDate = todayAt00String();    // 使用 yyyy-MM-dd 格式
         body.steps = lastSteps;
         body.heartRate = lastHeart;
         body.spo2 = lastSpo2;
@@ -850,14 +875,16 @@ public class SmartwatchCheckupFragment extends Fragment {
         // 使用 BigDecimal
         body.bloodGlucose = new BigDecimal(String.valueOf(lastBloodGlucose));
 
-        // ===== 设置新增的睡眠相关数据 =====
+        // 设置睡眠相关数据
         body.sleepQuality = lastSleepQuality;
         body.wakeCount = lastWakeCount;
         body.deepSleepTime = lastDeepSleepTime;
         body.lightSleepTime = lastLightSleepTime;
         body.allSleepTime = lastSleep;
-        body.sleepDown = lastSleepDown;
-        body.sleepUp = lastSleepUp;
+
+        // 修复：将Date转换为ISO格式字符串
+        body.sleepDown = formatDateToISO(lastSleepDown);
+        body.sleepUp = formatDateToISO(lastSleepUp);
 
         UserAccount userAccount = UserUtil.getUserAccount(requireContext());
         body.adminId = userAccount != null ? userAccount.getAdminId() : null;
@@ -895,4 +922,53 @@ public class SmartwatchCheckupFragment extends Fragment {
         });
         log("=== HTTP请求已提交 ===");
     }
+
+    // 新增：日期格式化为ISO字符串的辅助方法
+    private String formatDateToISO(Date date) {
+        if (date == null) {
+            return null;
+        }
+
+        // 使用本地时区格式化，不转换为UTC
+        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+        String result = isoFormat.format(date);
+        log("日期格式化: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date) + " -> " + result);
+        return result;
+    }
+    // 3. 新增：如果需要特定处理睡眠时间跨日问题
+    private Date adjustSleepTime(TimeData timeData, boolean isSleepDown) {
+        try {
+            Calendar cal = Calendar.getInstance();
+
+            // 获取今天的日期
+            Calendar today = Calendar.getInstance();
+            today.set(Calendar.HOUR_OF_DAY, 0);
+            today.set(Calendar.MINUTE, 0);
+            today.set(Calendar.SECOND, 0);
+            today.set(Calendar.MILLISECOND, 0);
+
+            cal.setTime(today.getTime());
+            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
+            cal.set(Calendar.MINUTE, timeData.getMinute());
+            cal.set(Calendar.SECOND, timeData.getSecond());
+
+            // 如果是入睡时间且在早上6点之前，认为是昨天晚上
+            if (isSleepDown && timeData.getHour() < 6) {
+                cal.add(Calendar.DAY_OF_MONTH, -1);
+            }
+            // 如果是起床时间且在晚上18点之后，认为是明天早上
+            else if (!isSleepDown && timeData.getHour() > 18) {
+                cal.add(Calendar.DAY_OF_MONTH, 1);
+            }
+
+            Date result = cal.getTime();
+            log((isSleepDown ? "入睡" : "起床") + "时间处理: " + timeData.getHour() + ":" + timeData.getMinute() +
+                    " -> " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(result));
+            return result;
+        } catch (Exception e) {
+            log("睡眠时间处理失败: " + e.getMessage());
+            return null;
+        }
+    }
+
 }

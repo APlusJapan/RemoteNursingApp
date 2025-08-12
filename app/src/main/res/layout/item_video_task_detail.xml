@@ -1,34 +1,140 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="8dp">
+    android:layout_margin="8dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
 
-    <!-- 缩略图 -->
-    <ImageView
-        android:id="@+id/iv_video_thumb"
-        android:layout_width="120dp"
-        android:layout_height="80dp"
-        android:scaleType="centerCrop"
-        android:src="@drawable/ic_video" />
-
-    <!-- 标题等文本 -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:gravity="center_vertical">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:baselineAligned="false">
 
-        <TextView
-            android:id="@+id/tv_video_title"
-            android:layout_width="match_parent"
+        <!-- 视频缩略图 -->
+        <RelativeLayout
+            android:layout_width="120dp"
+            android:layout_height="80dp">
+
+            <ImageView
+                android:id="@+id/iv_video_thumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@android:color/darker_gray"
+                android:contentDescription="@string/content_desc_video_thumbnail" />
+
+            <!-- 播放按钮覆盖层 -->
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_centerInParent="true"
+                android:src="@drawable/ic_play_circle"
+                android:alpha="0.8"
+                android:contentDescription="@string/content_desc_play_button" />
+
+            <!-- 时长显示 -->
+            <TextView
+                android:id="@+id/tv_video_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="true"
+                android:layout_margin="4dp"
+                android:background="@android:color/black"
+                android:padding="4dp"
+                android:text="@string/default_duration"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:visibility="visible"
+                android:contentDescription="@string/content_desc_video_duration" />
+
+        </RelativeLayout>
+
+        <!-- 视频信息 -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="视频标题"
-            android:textSize="16sp"
-            android:textColor="#222"/>
-        <!-- 可以按需再加时长、描述等 -->
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical"
+            android:baselineAligned="false">
+
+            <!-- 视频标题 -->
+            <TextView
+                android:id="@+id/tv_video_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/video_title_placeholder"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:ellipsize="end" />
+
+            <!-- 视频描述 -->
+            <TextView
+                android:id="@+id/tv_video_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/video_description_placeholder"
+                android:textSize="14sp"
+                android:textColor="@android:color/darker_gray"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:visibility="visible" />
+
+            <!-- 底部信息栏 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:baselineAligned="false">
+
+                <!-- 正在播放指示器 -->
+                <View
+                    android:id="@+id/view_playing_indicator"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@android:color/holo_red_light"
+                    android:layout_marginEnd="8dp"
+                    android:visibility="gone"
+                    android:contentDescription="@string/content_desc_playing_indicator" />
+
+                <TextView
+                    android:id="@+id/tv_playing_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/now_playing"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/holo_blue_dark"
+                    android:visibility="gone" />
+
+                <!-- 填充空间 -->
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <!-- 更多选项按钮 -->
+                <ImageView
+                    android:id="@+id/iv_more_options"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_more_vert"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp"
+                    android:contentDescription="@string/content_desc_more_options" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+</androidx.cardview.widget.CardView>
