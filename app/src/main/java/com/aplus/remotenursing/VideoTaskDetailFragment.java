@@ -14,8 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import android.content.Context;
-import android.content.SharedPreferences;
+
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.aplus.remotenusing.common.ApiConfig;
@@ -26,9 +25,12 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.aplus.remotenursing.models.UserInfo;
+
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+
 import android.widget.Toast;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -85,8 +87,12 @@ public class VideoTaskDetailFragment extends Fragment {
             if (videoList == null || videoList.isEmpty()) return;
 
             this.videoList = videoList;
-            currentVideoIndex = 0;
-            currentItem = videoList.get(0);
+
+            // 按视频顺序排序
+            sortVideosByOrder();
+
+            // 查找当前播放的视频，如果没有则播放第一个
+            findAndSetCurrentVideo();
 
             playerView = view.findViewById(R.id.player_view);
             player = new ExoPlayer.Builder(requireContext()).build();
@@ -119,6 +125,9 @@ public class VideoTaskDetailFragment extends Fragment {
             // 设置初始播放状态
             adapter.setCurrentPlayingItem(currentItem);
 
+            // 新增：初始化时也要滚动到当前播放的视频
+            scrollToCurrentVideo();
+
             // 全屏按钮点击事件
             view.findViewById(R.id.btn_fullscreen).setOnClickListener(v -> {
                 long pos = player.getCurrentPosition();
@@ -133,12 +142,48 @@ public class VideoTaskDetailFragment extends Fragment {
                 startActivityForResult(it, REQ_FULLSCREEN);
             });
 
-            // 返回按钮点击事件 - 修复：使用ImageButton而不是Button
+            // 返回按钮点击事件
             ImageButton backButton = view.findViewById(R.id.VideoDetailPage_btn_back);
             if (backButton != null) {
                 backButton.setOnClickListener(v -> requireActivity().onBackPressed());
             }
         });
+    }
+
+    // 新增：按视频顺序排序
+    private void sortVideosByOrder() {
+        if (videoList != null) {
+            Collections.sort(videoList, new Comparator<VideoTaskDetail>() {
+                @Override
+                public int compare(VideoTaskDetail v1, VideoTaskDetail v2) {
+                    Integer order1 = v1.getVideoOrder();
+                    Integer order2 = v2.getVideoOrder();
+
+                    // 如果order为null，放到最后
+                    if (order1 == null && order2 == null) return 0;
+                    if (order1 == null) return 1;
+                    if (order2 == null) return -1;
+
+                    return order1.compareTo(order2);
+                }
+            });
+        }
+    }
+
+    // 新增：查找并设置当前播放的视频
+    private void findAndSetCurrentVideo() {
+        currentVideoIndex = 0;
+        currentItem = videoList.get(0); // 默认第一个
+
+        // 查找后台标记为当前播放的视频
+        for (int i = 0; i < videoList.size(); i++) {
+            VideoTaskDetail video = videoList.get(i);
+            if (video.isCurrentlyPlaying()) {
+                currentVideoIndex = i;
+                currentItem = video;
+                break;
+            }
+        }
     }
 
     private interface VideoListCallback {
@@ -183,7 +228,7 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    // 新增：播放下一个视频
+    // 播放下一个视频
     private void playNextVideo() {
         if (videoList != null && videoList.size() > 0) {
             // 如果是最后一个视频，回到第一个（循环播放）
@@ -207,7 +252,7 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    // 新增：滚动到当前播放的视频
+    // 滚动到当前播放的视频
     private void scrollToCurrentVideo() {
         if (rvOther != null && currentVideoIndex >= 0) {
             // 延迟一点执行滚动，确保适配器已更新
