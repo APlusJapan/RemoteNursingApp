@@ -12,8 +12,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.aplus.remotenusing.common.ApiConfig;
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.UserUtil;
 
 import org.json.*;
 

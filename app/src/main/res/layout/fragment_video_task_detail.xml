@@ -58,6 +58,19 @@
             app:controller_layout_id="@layout/activity_player_control_view"
             app:surface_type="texture_view" />
 
+        <!-- 下载进度条 - 添加在播放器底部 -->
+        <ProgressBar
+            android:id="@+id/progress_download"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="50dp"
+            android:layout_marginHorizontal="20dp"
+            android:visibility="gone"
+            android:progressTint="#FF4081"
+            android:progressBackgroundTint="#66FFFFFF" />
+
         <!-- 全屏按钮 - 移到右上角避免重叠 -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -84,6 +97,92 @@
         </LinearLayout>
     </FrameLayout>
 
+    <!-- 缓存管理区域 - 新增 -->
+    <LinearLayout
+        android:id="@+id/cache_management_section"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/rounded_background"
+        android:padding="16dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toBottomOf="@id/normal_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="缓存管理"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#222"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 缓存状态行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <Button
+                android:id="@+id/btn_cache_status"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="未缓存"
+                android:background="@drawable/button_secondary"
+                android:textColor="#333333"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/tv_cache_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="缓存大小: 0 MB"
+                android:textSize="14sp"
+                android:textColor="#666666"
+                android:gravity="center"
+                android:layout_gravity="center_vertical" />
+
+        </LinearLayout>
+
+        <!-- 缓存操作按钮行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_preload"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="预下载系列"
+                android:background="@drawable/button_outline"
+                android:textColor="#007AFF"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_clear_cache"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="清理缓存"
+                android:background="@drawable/button_outline"
+                android:textColor="#FF3B30"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
     <!-- 系列标题 - 更大字体 -->
     <TextView
         android:id="@+id/tv_more_series"
@@ -96,7 +195,7 @@
         android:layout_marginStart="20dp"
         android:layout_marginTop="20dp"
         android:layout_marginEnd="20dp"
-        app:layout_constraintTop_toBottomOf="@id/normal_container"
+        app:layout_constraintTop_toBottomOf="@id/cache_management_section"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 

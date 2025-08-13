@@ -22,7 +22,7 @@ import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
-import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenursing.common.ApiConfig;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.veepoo.protocol.VPOperateManager;
@@ -39,7 +39,7 @@ import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
 
 import com.aplus.remotenursing.models.UserAccount;
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtil;
 
 /**
  * 体检流程 + 结果上传

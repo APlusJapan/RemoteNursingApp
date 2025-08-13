@@ -14,9 +14,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.aplus.remotenursing.manager.LoginCheckerManager;
 import com.aplus.remotenursing.models.UserAccount;
-import com.aplus.remotenusing.common.ApiConfig;
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.UserUtil;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -95,7 +96,7 @@ public class MyInfoFragment extends Fragment {
         // 跳转到用户信息录入页面
         cardUserInfoRegister.setOnClickListener(v -> {
             Log.d("NavDebug", "准备跳转到用户信息录入页面");
-            if (!LoginChecker.checkLogin(this)) return;
+            if (!LoginCheckerManager.checkLogin(this)) return;
             UserInfoRegisterFragment frag = new UserInfoRegisterFragment();
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()

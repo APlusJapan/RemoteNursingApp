@@ -14,7 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.adapters.VideoTaskAdapter;
 import com.aplus.remotenursing.models.VideoTask;
-import com.aplus.remotenusing.common.ApiConfig;
+import com.aplus.remotenursing.common.ApiConfig;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -28,7 +28,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtil;
 
 public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSeriesClickListener {
 

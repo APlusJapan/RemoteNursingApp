@@ -18,8 +18,8 @@ import com.aplus.remotenursing.adapters.BannerAdapter;
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.UserTask;
-import com.aplus.remotenusing.common.ApiConfig;
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.UserUtil;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 

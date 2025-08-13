@@ -12,8 +12,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.aplus.remotenursing.models.VideoTaskDetail;
-import com.aplus.remotenusing.common.ApiConfig;
-import com.aplus.remotenusing.common.UserUtil;
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.UserUtil;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
