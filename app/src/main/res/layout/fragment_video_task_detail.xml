@@ -4,26 +4,40 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/container_video_detail"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#F8F8F8">
 
-    <!-- 顶部灰色栏放置返回按钮 -->
+    <!-- 顶部栏 - 参照睡前体检样式 -->
     <LinearLayout
         android:id="@+id/VideoDetailPage_top_bar"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="60dp"
         android:orientation="horizontal"
-        android:background="#DDDDDD"
-        android:padding="4dp"
+        android:background="#ffffff"
+        android:gravity="center_vertical"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
-        <Button
+
+        <ImageButton
             android:id="@+id/VideoDetailPage_btn_back"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:padding="12dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_arrow_back_black_24dp"
+            android:contentDescription="返回" />
+
+        <TextView
+            android:id="@+id/tv_video_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="返回" />
+            android:text="视频播放"
+            android:textSize="22sp"
+            android:textColor="#222"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp"/>
     </LinearLayout>
-
 
     <!-- 播放器，16:9 -->
     <FrameLayout
@@ -40,59 +54,84 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             app:use_controller="true"
-            app:show_timeout="5000"/>
+            app:show_timeout="3000"
+            app:controller_layout_id="@layout/activity_player_control_view"
+            app:surface_type="texture_view" />
 
-        <!-- 全屏按钮 -->
+        <!-- 全屏按钮 - 移到右上角避免重叠 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:gravity="end|bottom"
-            android:layout_margin="16dp">
+            android:gravity="end|top"
+            android:layout_margin="20dp">
 
             <TextView
                 android:id="@+id/btn_fullscreen"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="40dp"
-                android:minHeight="48dp"
-                android:paddingVertical="8dp"
-                android:paddingHorizontal="12dp"
+                android:minWidth="120dp"
+                android:minHeight="80dp"
+                android:paddingVertical="16dp"
+                android:paddingHorizontal="20dp"
                 android:gravity="center"
                 android:background="@drawable/bg_text_border"
                 android:clickable="true"
                 android:focusable="true"
                 android:text="全屏"
-                android:textSize="18sp"
-                android:textColor="@android:color/white"/>
+                android:textSize="28sp"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"/>
         </LinearLayout>
     </FrameLayout>
 
-    <!-- —— 新增：横向同系列视频列表 —— -->
+    <!-- 系列标题 - 更大字体 -->
     <TextView
         android:id="@+id/tv_more_series"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="更多 A 系列视频"
-        android:textSize="14sp"
-        android:textColor="#444"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="12dp"
+        android:textSize="24sp"
+        android:textColor="#222"
+        android:textStyle="bold"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
         app:layout_constraintTop_toBottomOf="@id/normal_container"
-        app:layout_constraintStart_toStartOf="parent"/>
-    <!-- 其他视频列表：竖向 -->
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- 分隔线 -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="20dp"
+        android:background="#DDDDDD"
+        app:layout_constraintTop_toBottomOf="@id/tv_more_series"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- 其他视频列表：适老化设计 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_other_videos"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:contentDescription="@string/desc_other_videos_list"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        app:layout_constraintTop_toBottomOf="@id/tv_more_series"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/divider"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
-    <!-- 全屏容器，保持不动 -->
+
+    <!-- 全屏容器 -->
     <FrameLayout
         android:id="@+id/fullscreen_container"
         android:layout_width="match_parent"
@@ -103,23 +142,24 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="end|top"
-            android:layout_margin="16dp">
+            android:layout_margin="20dp">
 
             <TextView
                 android:id="@+id/btn_exit_fullscreen"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="40dp"
-                android:minHeight="48dp"
-                android:paddingVertical="8dp"
-                android:paddingHorizontal="12dp"
+                android:minWidth="80dp"
+                android:minHeight="60dp"
+                android:paddingVertical="12dp"
+                android:paddingHorizontal="16dp"
                 android:gravity="center"
                 android:background="@drawable/bg_text_border"
                 android:clickable="true"
                 android:focusable="true"
                 android:text="退出"
-                android:textSize="18sp"
-                android:textColor="@android:color/white"/>
+                android:textSize="20sp"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"/>
         </LinearLayout>
     </FrameLayout>
 

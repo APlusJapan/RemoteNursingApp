@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_gravity="bottom"
+    android:orientation="vertical"
+    android:gravity="bottom">
+
+    <!-- 播放控制栏背景 - 大幅缩小内边距和高度 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#99000000"
+        android:padding="4dp"
+        android:layout_marginBottom="2dp">
+
+        <!-- 进度条区域 - 大幅缩小间距 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <!-- 当前时间 - 增大字体 -->
+            <TextView
+                android:id="@id/exo_position"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:minWidth="50dp"
+                android:gravity="center" />
+
+            <!-- 进度条 - 大幅缩小高度 -->
+            <com.google.android.exoplayer2.ui.DefaultTimeBar
+                android:id="@id/exo_progress"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginLeft="6dp"
+                android:layout_marginRight="6dp"
+                android:minHeight="20dp" />
+
+            <!-- 总时间 - 增大字体 -->
+            <TextView
+                android:id="@id/exo_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:minWidth="50dp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- 播放控制按钮区域 - 适老化文字按钮 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <!-- 快退15秒 - 文字按钮 -->
+            <TextView
+                android:id="@id/exo_rew"
+                android:layout_width="80dp"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_text_border"
+                android:text="倒退"
+                android:textColor="@android:color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="快退15秒" />
+
+            <!-- 播放按钮 - 文字按钮 -->
+            <TextView
+                android:id="@id/exo_play"
+                android:layout_width="80dp"
+                android:layout_height="48dp"
+                android:layout_margin="8dp"
+                android:background="@drawable/bg_text_border"
+                android:text="播放"
+                android:textColor="@android:color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="播放" />
+
+            <!-- 暂停按钮 - 文字按钮 -->
+            <TextView
+                android:id="@id/exo_pause"
+                android:layout_width="80dp"
+                android:layout_height="48dp"
+                android:layout_margin="8dp"
+                android:background="@drawable/bg_text_border"
+                android:text="暂停"
+                android:textColor="@android:color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="暂停" />
+
+            <!-- 快进15秒 - 文字按钮 -->
+            <TextView
+                android:id="@id/exo_ffwd"
+                android:layout_width="80dp"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_text_border"
+                android:text="快进"
+                android:textColor="@android:color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="快进15秒" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
