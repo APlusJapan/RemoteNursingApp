@@ -55,12 +55,13 @@
             android:layout_height="match_parent"
             app:use_controller="true"
             app:show_timeout="3000"
-            app:controller_layout_id="@layout/activity_player_control_view"
-            app:surface_type="texture_view" />
+            app:controller_layout_id="@layout/activity_player_control_view"/>
 
         <!-- 下载进度条 - 添加在播放器底部 -->
         <ProgressBar
             android:id="@+id/progress_download"
+            android:max="100"
+            android:indeterminate="false"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="6dp"

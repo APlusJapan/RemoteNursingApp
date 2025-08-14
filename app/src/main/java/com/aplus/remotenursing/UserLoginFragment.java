@@ -17,7 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -135,7 +135,7 @@ public class UserLoginFragment extends Fragment {
                         return;
                     }
                     // 统一用UserUtil保存用户账号（推荐）
-                    UserUtil.saveUserAccount(requireContext(), userAccount);
+                    UserUtils.saveUserAccount(requireContext(), userAccount);
 
                     // 通知MyInfoFragment刷新
                     Bundle bundle = new Bundle();

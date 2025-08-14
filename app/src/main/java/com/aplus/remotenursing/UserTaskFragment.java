@@ -19,7 +19,7 @@ import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.UserTask;
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -80,7 +80,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         //cardDailyCheck.setVisibility(View.GONE);
 
         // 登录状态
-        UserAccount userAccount = UserUtil.getUserAccount(requireContext());
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
         if (userAccount != null && userAccount.getNickName() != null) {
             tvNickName.setText(userAccount.getNickName());
         } else {
@@ -152,7 +152,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void fetchUserPoint() {
-        String userId = UserUtil.loadUserId(requireContext());
+        String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) return;
         OkHttpClient client = new OkHttpClient();
         String url = ApiConfig.API_USERPOINT_USERACCOUNT + userId;
@@ -203,7 +203,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void fetchTasks() {
-        String userId = UserUtil.loadUserId(requireContext());
+        String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) return;
         String url = ApiConfig.API_USER_TASK + "?userId=" + userId;
         OkHttpClient client = new OkHttpClient();

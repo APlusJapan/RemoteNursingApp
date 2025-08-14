@@ -17,7 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserInfo;
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 import com.google.gson.Gson;
 import com.google.android.material.datepicker.MaterialDatePicker;
 
@@ -176,7 +176,7 @@ public class UserInfoRegisterFragment extends Fragment {
 
     // ----------- 网络请求安全版 -----------
     private void fetchAndFillUserInfo() {
-        String userId = UserUtil.loadUserId(requireContext());
+        String userId = UserUtils.loadUserId(requireContext());
         if (userId == null || userId.isEmpty()) return;
 
         showLoading("正在查询，请稍后");
@@ -258,7 +258,7 @@ public class UserInfoRegisterFragment extends Fragment {
         info.setIncomePerCapita(tvIncome.getText().toString());
         info.setInsuranceType(tvInsurance.getText().toString());
 
-        String userId = UserUtil.loadUserId(requireContext());
+        String userId = UserUtils.loadUserId(requireContext());
         if (userId != null && !userId.isEmpty()) {
             info.setUserId(userId);
         }

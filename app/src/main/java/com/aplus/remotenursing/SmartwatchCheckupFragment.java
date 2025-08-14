@@ -1,6 +1,5 @@
 package com.aplus.remotenursing;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
@@ -39,7 +38,7 @@ import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
 
 import com.aplus.remotenursing.models.UserAccount;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 
 /**
  * 体检流程 + 结果上传
@@ -234,7 +233,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         updateCheckupUI(CheckupStatus.BEFORE, null);
 
         // 获取 userId
-        UserAccount userAccount = UserUtil.getUserAccount(requireContext());
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
         userId = userAccount != null ? userAccount.getUserId() : null;
         log("当前用户ID: " + userId);
 
@@ -886,7 +885,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         body.sleepDown = formatDateToISO(lastSleepDown);
         body.sleepUp = formatDateToISO(lastSleepUp);
 
-        UserAccount userAccount = UserUtil.getUserAccount(requireContext());
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
         body.adminId = userAccount != null ? userAccount.getAdminId() : null;
         body.isDeleted = false;
 

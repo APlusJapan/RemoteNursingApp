@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import com.aplus.remotenursing.models.UserAccount;
 import com.google.gson.Gson;
 
-public class UserUtil {
+public class UserUtils {
 
     public static void saveUserAccount(Context context, UserAccount account) {
         SharedPreferences sp = context.getSharedPreferences(Contants.LOCAL_FILE_NAME, Context.MODE_PRIVATE);

@@ -6,6 +6,7 @@ package com.aplus.remotenursing.common;
 public class ApiConfig {
     /** Base server address (must end with a slash) */
     public static final String BASE_URL = "http://192.168.2.9:8080/api/";
+    public static final String ALIYUN_OSS_PRIVACY_URL =  "https://bucket-copd-pr-vedios.oss-cn-hangzhou.aliyuncs.com/privacy/privacy.htm";
 
     public static final String API_VIDEO_TASK_BY_USER = BASE_URL + "video-task/user/";
     public static final String API_VIDEO_DETAIL_BY_SERIES_ID = BASE_URL + "video-detail/series/";

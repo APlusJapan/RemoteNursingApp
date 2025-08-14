@@ -17,7 +17,7 @@ import androidx.fragment.app.Fragment;
 import com.aplus.remotenursing.manager.LoginCheckerManager;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -66,7 +66,7 @@ public class MyInfoFragment extends Fragment {
 
         btnLogin.setOnClickListener(v -> openLogin());
         btnLogout.setOnClickListener(v -> {
-            UserUtil.logout(requireContext());
+            UserUtils.logout(requireContext());
             Toast.makeText(getContext(), "已退出登录", Toast.LENGTH_SHORT).show();
             showNotLoggedIn();
         });
@@ -79,14 +79,14 @@ public class MyInfoFragment extends Fragment {
                 Log.d("MyAccountFragment", "FragmentResultListener, set user: " + userJson);
                 showLoggedIn(userAccount);
                 // 使用UserUtil保存
-                UserUtil.saveUserAccount(requireContext(), userAccount);
+                UserUtils.saveUserAccount(requireContext(), userAccount);
             } else {
                 showNotLoggedIn();
             }
         });
 
         // 初始化：从UserUtil加载
-        userAccount = UserUtil.getUserAccount(requireContext());
+        userAccount = UserUtils.getUserAccount(requireContext());
         if (userAccount != null) {
             Log.d("MyAccountFragment", "onViewCreated, load user: " + gson.toJson(userAccount));
             showLoggedIn(userAccount);
@@ -117,7 +117,7 @@ public class MyInfoFragment extends Fragment {
     }
 
     private void loadUserInfo() {
-        userAccount = UserUtil.getUserAccount(requireContext());
+        userAccount = UserUtils.getUserAccount(requireContext());
 
         Log.d("MyAccountFragment", "userAccount=" + (userAccount != null ? gson.toJson(userAccount) : "null"));
         Log.d("MyAccountFragment", "userId=" + (userAccount != null ? userAccount.getUserId() : "null"));
@@ -145,7 +145,7 @@ public class MyInfoFragment extends Fragment {
                         UserAccount remote = gson.fromJson(resp, UserAccount.class);
                         if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
                             userAccount = remote;
-                            UserUtil.saveUserAccount(requireContext(), remote);
+                            UserUtils.saveUserAccount(requireContext(), remote);
                             Log.d("MyAccountFragment", "更新后的用户信息: userId=" + remote.getUserId()
                                     + ", loginName=" + remote.getLoginName()
                                     + ", nickName=" + remote.getNickName()

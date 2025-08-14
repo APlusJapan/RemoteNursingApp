@@ -1,131 +1,68 @@
 package com.aplus.remotenursing.manager;
 
-
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Environment;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * 增强的权限检查工具类 - 适配不同Android版本
+ * 存储权限助手（面向“应用私有外部目录”默认不需要任何权限）
  */
 public class PermissionManager {
+
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
 
     /**
-     * 获取当前Android版本需要的存储权限
-     */
-    public static String[] getRequiredStoragePermissions() {
-        List<String> permissions = new ArrayList<>();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ 使用新的媒体权限
-            permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
-            permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Android 6-12 使用传统存储权限
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-        }
-
-        return permissions.toArray(new String[0]);
-    }
-
-    /**
-     * 检查存储权限
+     * 你的缓存目录在 getExternalFilesDir(...)，不需要任何运行时权限。
+     * 只有当你需要访问“系统媒体库/公共目录”时，才需要下面的权限。
      */
     public static boolean hasStoragePermission(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 检查是否有所有文件访问权限
-            return Environment.isExternalStorageManager();
-        } else {
-            // 检查传统权限
-            String[] permissions = getRequiredStoragePermissions();
-            for (String permission : permissions) {
-                if (ContextCompat.checkSelfPermission(context, permission)
-                        != PackageManager.PERMISSION_GRANTED) {
-                    return false;
-                }
+        // 针对当前缓存方案，恒为 true
+        return true;
+    }
+
+    /** 无需请求（保持兼容调用处，不做任何动作） */
+    public static void requestStoragePermission(Activity activity) {
+        // no-op
+    }
+
+    /** 无需请求（保持兼容调用处，不做任何动作） */
+    public static void requestStoragePermission(Fragment fragment) {
+        // no-op
+    }
+
+    /** 兼容外部传进来的回调，恒认为失败/或直接 true 均可，这里返回 true 避免阻断流程 */
+    public static boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        return true;
+    }
+
+    /** 若未来真的要访问系统媒体库，可用这个辅助（目前没用到） */
+    public static boolean ensureMediaLibraryReadPermission(Fragment fragment) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(fragment.requireContext(), Manifest.permission.READ_MEDIA_VIDEO)
+                    != PackageManager.PERMISSION_GRANTED) {
+                fragment.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_VIDEO}, REQUEST_STORAGE_PERMISSION);
+                return false;
             }
+            return true;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(fragment.requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                fragment.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_STORAGE_PERMISSION);
+                return false;
+            }
+            return true;
+        } else {
             return true;
         }
     }
 
-    /**
-     * 在Activity中请求存储权限
-     */
-    public static void requestStoragePermission(Activity activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 需要特殊处理
-            requestManageExternalStoragePermission(activity);
-        } else {
-            // 传统权限请求
-            String[] permissions = getRequiredStoragePermissions();
-            ActivityCompat.requestPermissions(activity, permissions, REQUEST_STORAGE_PERMISSION);
-        }
-    }
-
-    /**
-     * 在Fragment中请求存储权限
-     */
-    public static void requestStoragePermission(Fragment fragment) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 需要特殊处理
-            requestManageExternalStoragePermission(fragment.requireActivity());
-        } else {
-            // 传统权限请求
-            String[] permissions = getRequiredStoragePermissions();
-            fragment.requestPermissions(permissions, REQUEST_STORAGE_PERMISSION);
-        }
-    }
-
-    /**
-     * Android 11+ 请求管理外部存储权限
-     */
-    private static void requestManageExternalStoragePermission(Activity activity) {
-        try {
-            android.content.Intent intent = new android.content.Intent();
-            intent.setAction(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            android.net.Uri uri = android.net.Uri.fromParts("package", activity.getPackageName(), null);
-            intent.setData(uri);
-            activity.startActivity(intent);
-        } catch (Exception e) {
-            // 如果无法打开设置，降级到传统权限请求
-            String[] permissions = getRequiredStoragePermissions();
-            ActivityCompat.requestPermissions(activity, permissions, REQUEST_STORAGE_PERMISSION);
-        }
-    }
-
-    /**
-     * 处理权限请求结果
-     */
-    public static boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == REQUEST_STORAGE_PERMISSION) {
-            if (grantResults.length > 0) {
-                for (int result : grantResults) {
-                    if (result != PackageManager.PERMISSION_GRANTED) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 检查网络权限（通常不需要运行时请求）
-     */
+    // 网络权限通常不需要运行时请求
     public static boolean hasNetworkPermission(Context context) {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.INTERNET)
                 == PackageManager.PERMISSION_GRANTED;

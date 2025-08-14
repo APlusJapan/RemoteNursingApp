@@ -1,38 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:theme="@style/Theme.RemoteNursing">
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 蓝牙权限 -->
-    <uses-permission android:name="android.permission.BLUETOOTH"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- Android 12+ 蓝牙权限 -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <!-- 蓝牙（按版本拆分） -->
+    <!-- 仅 <= Android 11 (API 30) 使用旧权限 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <!-- 如果做 BLE 扫描且需要定位（仅 <=30）才保留；否则可以删 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30"/>
+
+    <!-- Android 12+ 新蓝牙权限（如果需要 BLE 扫描/连接） -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- 如需 BLE 广播再加：BLUETOOTH_ADVERTISE -->
+    <!-- <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" /> -->
+
+    <!-- 声明设备能力（不是权限，但强烈建议） -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
 
     <!-- 网络权限 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 
-    <!-- 存储权限 -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+    <!-- 不需要任何存储相关权限：删除 READ/WRITE_EXTERNAL_STORAGE、READ_MEDIA_*、MANAGE_EXTERNAL_STORAGE -->
 
-    <!-- Android 10+ 需要的权限 -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <!-- 其它 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- 基础前台服务权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Android 13+ 需要的权限 -->
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- 如果后台保持蓝牙设备连接（Android 14+ 建议） -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:targetApi="34" />
 
-    <!-- 防止应用被系统杀掉 -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 如果做较长时间的后台数据同步/下载（Android 14+ 建议） -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
+        tools:targetApi="34" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -44,16 +55,21 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RemoteNursing"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:requestLegacyExternalStorage="true"
-        android:preserveLegacyExternalStorage="true"
         tools:targetApi="33">
+        <service
+            android:name=".ble.BleForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|dataSync" />
+        <activity
+            android:name=".PrivacyActivity"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
@@ -61,8 +77,6 @@
             android:name=".VideoFullscreenPlayerActivity"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.RemoteNursing.Fullscreen"
-            android:exported="false" />
-
+            android:exported="false"/>
     </application>
-
 </manifest>

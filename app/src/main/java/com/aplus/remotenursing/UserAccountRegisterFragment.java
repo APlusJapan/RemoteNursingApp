@@ -1,7 +1,6 @@
 package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
-import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -17,8 +16,7 @@ import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.Contants;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -153,7 +151,7 @@ public class UserAccountRegisterFragment extends Fragment {
                         return;
                     }
                     // 注册成功直接保存
-                    UserUtil.saveUserAccount(requireContext(), userAccount);
+                    UserUtils.saveUserAccount(requireContext(), userAccount);
 
                     // 通知刷新
                     Bundle bundle = new Bundle();

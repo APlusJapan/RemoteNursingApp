@@ -28,7 +28,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 
 public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSeriesClickListener {
 
@@ -61,7 +61,7 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
     }
 
     private void fetchSeriesList() {
-        String userId = UserUtil.loadUserId(requireContext());
+        String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) {
             Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
             requireActivity().getSupportFragmentManager()

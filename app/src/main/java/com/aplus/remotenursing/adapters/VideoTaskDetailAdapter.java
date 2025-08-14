@@ -12,43 +12,68 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.aplus.remotenursing.R;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.bumptech.glide.Glide;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetailAdapter.VH> {
 
     private final List<VideoTaskDetail> items;
     private final OnVideoClickListener listener;
-    private VideoTaskDetail currentPlayingItem; // 新增：当前播放的视频
+    private VideoTaskDetail currentPlayingItem; // 当前播放的视频（仅保存引用，比较用id）
 
     public interface OnVideoClickListener {
         void onVideoClick(VideoTaskDetail item);
     }
 
     public VideoTaskDetailAdapter(List<VideoTaskDetail> items, OnVideoClickListener listener) {
-        this.items = items;
+        // 确保内部列表可变
+        this.items = (items != null) ? items : new ArrayList<>();
         this.listener = listener;
     }
 
-    // 新增：设置当前播放的视频
+    /** 新增：外部刷新数据源（与 Fragment 中的 adapter.setData(...) 对应） */
+    public void setData(List<VideoTaskDetail> newItems) {
+        this.items.clear();
+        if (newItems != null) {
+            this.items.addAll(newItems);
+        }
+        // 如果当前播放项存在，尽量在新列表中定位它，便于高亮
+        if (currentPlayingItem != null) {
+            String playingId = currentPlayingItem.getVideoId();
+            int idx = findIndexById(playingId);
+            if (idx >= 0) {
+                // 用新列表里的对象替换引用，避免 equals 失败
+                currentPlayingItem = items.get(idx);
+            } else {
+                currentPlayingItem = null;
+            }
+        }
+        notifyDataSetChanged();
+    }
+
+    /** 新增：设置当前播放的视频（根据 id 做局部刷新，避免全量刷新） */
     public void setCurrentPlayingItem(VideoTaskDetail item) {
-        VideoTaskDetail oldPlaying = this.currentPlayingItem;
-        this.currentPlayingItem = item;
+        String oldId = (currentPlayingItem != null) ? currentPlayingItem.getVideoId() : null;
+        String newId = (item != null) ? item.getVideoId() : null;
 
-        // 更新旧的播放项
-        if (oldPlaying != null) {
-            int oldIndex = items.indexOf(oldPlaying);
-            if (oldIndex >= 0) {
-                notifyItemChanged(oldIndex);
-            }
-        }
+        // 更新引用为列表里真实持有的对象，避免 indexOf 因对象不同失败
+        int newIndex = findIndexById(newId);
+        int oldIndex = findIndexById(oldId);
 
-        // 更新新的播放项
-        if (item != null) {
-            int newIndex = items.indexOf(item);
-            if (newIndex >= 0) {
-                notifyItemChanged(newIndex);
-            }
+        currentPlayingItem = (newIndex >= 0) ? items.get(newIndex) : null;
+
+        if (oldIndex >= 0) notifyItemChanged(oldIndex);
+        if (newIndex >= 0) notifyItemChanged(newIndex);
+    }
+
+    private int findIndexById(String videoId) {
+        if (videoId == null) return -1;
+        for (int i = 0; i < items.size(); i++) {
+            VideoTaskDetail it = items.get(i);
+            if (videoId.equals(it.getVideoId())) return i;
         }
+        return -1;
     }
 
     @NonNull
@@ -63,10 +88,10 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
     public void onBindViewHolder(@NonNull VH holder, int position) {
         VideoTaskDetail item = items.get(position);
 
-        // 设置视频标题
+        // 标题
         holder.tvTitle.setText(item.getVideoName());
 
-        // 设置视频描述
+        // 描述
         if (holder.tvDescription != null) {
             if (item.getVideoDescription() != null && !item.getVideoDescription().isEmpty()) {
                 holder.tvDescription.setText(item.getVideoDescription());
@@ -77,7 +102,7 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
             }
         }
 
-        // 设置视频时长
+        // 时长
         if (holder.tvDuration != null) {
             if (item.getVideoDuration() != null && !item.getVideoDuration().isEmpty()) {
                 holder.tvDuration.setText(item.getVideoDuration());
@@ -86,8 +111,11 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
             }
         }
 
-        // 设置播放状态指示
-        boolean isCurrentPlaying = item.equals(currentPlayingItem);
+        // 播放状态（按 videoId 比较更稳妥）
+        boolean isCurrentPlaying = false;
+        if (currentPlayingItem != null && currentPlayingItem.getVideoId() != null) {
+            isCurrentPlaying = currentPlayingItem.getVideoId().equals(item.getVideoId());
+        }
         if (holder.tvPlayingStatus != null) {
             holder.tvPlayingStatus.setVisibility(isCurrentPlaying ? View.VISIBLE : View.GONE);
         }
@@ -95,18 +123,16 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
             holder.viewPlayingIndicator.setVisibility(isCurrentPlaying ? View.VISIBLE : View.GONE);
         }
 
-        // 加载缩略图
+        // 缩略图
         Glide.with(holder.ivThumb.getContext())
                 .load(item.getVideoSurfaceImage())
                 .placeholder(R.drawable.ic_video)
                 .error(R.drawable.ic_video)
                 .into(holder.ivThumb);
 
-        // 设置点击事件
+        // 点击事件
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onVideoClick(item);
-            }
+            if (listener != null) listener.onVideoClick(item);
         });
     }
 
@@ -118,10 +144,10 @@ public class VideoTaskDetailAdapter extends RecyclerView.Adapter<VideoTaskDetail
     static class VH extends RecyclerView.ViewHolder {
         ImageView ivThumb;
         TextView tvTitle;
-        TextView tvDescription;     // 新增：视频描述
-        TextView tvDuration;        // 新增：视频时长
-        TextView tvPlayingStatus;   // 新增：播放状态文字
-        View viewPlayingIndicator;  // 新增：播放状态指示器
+        TextView tvDescription;
+        TextView tvDuration;
+        TextView tvPlayingStatus;
+        View viewPlayingIndicator;
 
         VH(@NonNull View v) {
             super(v);

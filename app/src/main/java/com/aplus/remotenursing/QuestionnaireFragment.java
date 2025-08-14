@@ -13,7 +13,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtil;
+import com.aplus.remotenursing.common.UserUtils;
 
 import org.json.*;
 
@@ -43,7 +43,7 @@ public class QuestionnaireFragment extends Fragment {
         btnBack = view.findViewById(R.id.btn_back);
         tvTitle = view.findViewById(R.id.tv_title);
 
-        userId = UserUtil.loadUserId(requireContext());
+        userId = UserUtils.loadUserId(requireContext());
         tvTitle.setText("问卷调查");
 
         btnBack.setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
