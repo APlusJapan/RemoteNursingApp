@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{APP_NAME}} 隐私政策（{{POLICY_VERSION}}）</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans CJK SC",sans-serif;line-height:1.6;color:#222;padding:16px;max-width:900px;margin:0 auto;}
+    h1,h2{line-height:1.3}
+    code,pre{background:#f6f8fa;border-radius:6px;padding:2px 6px}
+    table{border-collapse:collapse;width:100%;margin:12px 0}
+    th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
+    small{color:#666}
+    .toc a{color:#0366d6;text-decoration:none}
+  </style>
+</head>
+<body>
+<h1>{{APP_NAME}} 隐私政策</h1>
+<p><small>生效日期：{{EFFECTIVE_DATE}} ｜ 版本号：{{POLICY_VERSION}}</small></p>
+
+<div class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#intro">引言</a></li>
+    <li><a href="#what">我们收集的信息</a></li>
+    <li><a href="#how">我们如何使用信息</a></li>
+    <li><a href="#permission">设备权限说明</a></li>
+    <li><a href="#sdk">第三方 SDK/服务</a></li>
+    <li><a href="#store">信息存储与安全</a></li>
+    <li><a href="#rights">您的权利</a></li>
+    <li><a href="#minor">未成年人保护</a></li>
+    <li><a href="#change">政策变更</a></li>
+    <li><a href="#contact">联系我们</a></li>
+  </ol>
+</div>
+
+<h2 id="intro">一、引言</h2>
+<p>
+  欢迎使用{{APP_NAME}}（以下简称“本应用”）。我们非常重视您的个人信息和隐私保护。本政策适用于您通过本应用获得的相关产品与服务。
+  请您在使用前仔细阅读并充分理解本政策的全部条款。<b>如您不同意本政策，可能无法继续使用与个人信息相关的功能。</b>
+</p>
+
+<h2 id="what">二、我们收集的信息</h2>
+<p>我们遵循“最少够用”的原则，按功能需要收集信息：</p>
+
+<h3>1. 账号与基础信息（如有账号体系时）</h3>
+<ul>
+  <li>必要信息：手机号/用户名、登录凭证（令牌/会话）；用于账号登录、身份验证与安全。</li>
+  <li>可选信息：头像、昵称；用于个性化展示。</li>
+  <li>如未提供上述信息，可能无法使用需要登录的功能。</li>
+</ul>
+
+<h3>2. 设备与日志信息</h3>
+<ul>
+  <li>设备信息：设备型号、系统版本、应用版本、网络类型、崩溃日志；用于兼容性适配与故障定位。</li>
+  <li>我们<b>不采集</b>与个人身份强相关的敏感标识（如 IMEI/IMSI）用于画像或广告。</li>
+</ul>
+
+<h3>3. 训练视频使用数据</h3>
+<ul>
+  <li>播放进度、播放时长、离线缓存状态等；用于继续播放、优化体验与统计质量。</li>
+  <li>缓存视频文件仅保存在<b>本机应用私有目录</b>，可在应用内“清理缓存”删除。</li>
+</ul>
+
+<h3>4. 蓝牙设备连接与同步数据（如连接指定健康手表）</h3>
+<ul>
+  <li>蓝牙设备信息（设备名、MAC 地址*）：用于连接与识别目标设备。<br/>
+    <small>* 我们仅在本地用于连接，不上传或用于画像。</small>
+  </li>
+  <li>设备同步数据（如心率、步数、训练时长等按设备能力而定）：仅用于向您展示与记录训练效果。</li>
+</ul>
+
+<h3>5. 位置数据</h3>
+<ul>
+  <li>仅在 Android 11 及以下版本，出于系统限制，为了执行 BLE 扫描，<b>需要定位权限</b>。<b>我们不采集、存储或上传您的位置信息</b>。</li>
+</ul>
+
+<h2 id="how">三、我们如何使用信息</h2>
+<ul>
+  <li>实现核心功能：视频播放与训练指导、BLE 设备连接与同步。</li>
+  <li>账号与安全：登录验证、风控与异常排查。</li>
+  <li>故障诊断与性能优化：崩溃分析、兼容性适配。</li>
+  <li>依法配合：在法律法规要求或行政/司法机关请求范围内配合提供必要信息。</li>
+</ul>
+
+<h2 id="permission">四、设备权限说明</h2>
+<p>我们不会默认开启权限，只有在您主动操作或使用相关功能时才会申请：</p>
+<table>
+  <thead><tr><th>权限名称</th><th>适用版本</th><th>用途与场景</th><th>是否可关闭</th></tr></thead>
+  <tbody>
+  <tr>
+    <td>蓝牙扫描（BLUETOOTH_SCAN）/连接（BLUETOOTH_CONNECT）</td>
+    <td>Android 12 及以上</td>
+    <td>搜索并连接健康手表，保持数据同步。</td>
+    <td>可关闭，关闭后无法搜索/连接设备。</td>
+  </tr>
+  <tr>
+    <td>位置（ACCESS_FINE/COARSE_LOCATION）</td>
+    <td>Android 11 及以下</td>
+    <td>系统限制：进行 BLE 扫描需要定位权限。<b>本应用不采集或存储您的定位数据。</b></td>
+    <td>可关闭，关闭后无法搜索设备。</td>
+  </tr>
+  <tr>
+    <td>通知（POST_NOTIFICATIONS）</td>
+    <td>Android 13 及以上</td>
+    <td>用于展示设备连接状态/同步进度等前台通知。</td>
+    <td>可关闭，不影响核心功能。</td>
+  </tr>
+  <tr>
+    <td>前台服务（FOREGROUND_SERVICE 及类型）</td>
+    <td>依据系统版本</td>
+    <td>在后台保持与设备连接或长时同步任务时，显示常驻通知以保障稳定。</td>
+    <td>不可单独关闭（系统能力），但您可随时停止相关功能。</td>
+  </tr>
+  <tr>
+    <td>网络（INTERNET/ACCESS_NETWORK_STATE/ACCESS_WIFI_STATE）</td>
+    <td>所有版本</td>
+    <td>请求视频资源、账号登录与同步数据；判断网络状态以优化体验。</td>
+    <td>不可用即无法联网功能。</td>
+  </tr>
+  <tr>
+    <td>唤醒锁（WAKE_LOCK）</td>
+    <td>所有版本</td>
+    <td>在特定场景下保持短时唤醒，避免同步/播放被系统中断。</td>
+    <td>系统控制，不涉及个人信息。</td>
+  </tr>
+  </tbody>
+</table>
+
+<h2 id="sdk">五、第三方 SDK/服务</h2>
+<p>我们尽量减少第三方接入。当前集成情况如下（如有变动将及时更新）：</p>
+<table>
+  <thead><tr><th>名称</th><th>提供方</th><th>用途</th><th>可能收集的信息</th><th>隐私政策</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>OkHttp（网络库）</td>
+      <td>Square</td>
+      <td>发起网络请求</td>
+      <td>网络请求元数据（由我们控制，不对第三方泄露用户数据）</td>
+      <td>https://square.github.io/okhttp/</td>
+    </tr>
+    <tr>
+      <td>ExoPlayer（播放器）</td>
+      <td>Google</td>
+      <td>视频播放</td>
+      <td>不直接采集个人信息</td>
+      <td>https://exoplayer.dev/</td>
+    </tr>
+    <tr>
+      <td>Glide（图片库）</td>
+      <td>Google</td>
+      <td>加载图片</td>
+      <td>不直接采集个人信息</td>
+      <td>https://bumptech.github.io/glide/</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="store">六、信息存储与安全</h2>
+<ul>
+  <li>存储地点：服务器位于{{REGISTERED_ADDRESS}}（如有跨境，详见下文“跨境传输”）。</li>
+  <li>存储期限：按实现目的所必需的最短期限或法律法规要求保存。超期后将删除或匿名化处理。</li>
+  <li>本地缓存：视频缓存仅保存在应用私有目录，可在“设置—清理缓存”中删除；卸载应用时自动清除。</li>
+  <li>安全措施：加密传输（HTTPS/TLS）；访问控制与最小权限原则；日志审计与异常告警。</li>
+</ul>
+
+<h3>数据共享、转让与公开披露</h3>
+<p>除法律法规要求或获得您的单独同意，我们不会向第三方共享、转让或公开披露您的个人信息。</p>
+
+<h3>委托处理与数据出境（如适用）</h3>
+<p>如涉及委托处理与跨境传输，我们将评估必要性、最小化并依法履行评估、合同或备案义务，并征得您的单独同意。</p>
+
+<h2 id="rights">七、您的权利</h2>
+<p>依据适用法律（包括但不限于《个人信息保护法》），您享有以下权利：</p>
+<ul>
+  <li>访问、更正、删除您的个人信息；</li>
+  <li>撤回同意、注销账号；</li>
+  <li>获取个人信息副本；</li>
+  <li>约束自动化决策；</li>
+  <li>查询投诉渠道：您可通过本政策提供的方式联系我们，或向有关监管部门投诉。</li>
+</ul>
+
+<h2 id="minor">八、未成年人保护</h2>
+<p>我们主要面向成年人群体。若您为未成年人，请在监护人同意与指导下使用。本应用不会主动收集未成年人的敏感个人信息。</p>
+
+<h2 id="change">九、政策更新</h2>
+<p>当本政策发生重大变更时，我们会通过应用内显著位置提示或弹窗征得您的同意后再继续提供相关服务。</p>
+
+<h2 id="contact">十、联系我们</h2>
+<ul>
+  <li>运营主体：{{COMPANY_NAME}}</li>
+  <li>联系邮箱：{{CONTACT_EMAIL}}</li>
+  <li>官网：{{OFFICIAL_WEBSITE}}</li>
+  <li>地址：{{REGISTERED_ADDRESS}}</li>
+</ul>
+
+<p>如您对本政策有任何问题，欢迎与我们联系。</p>
+</body>
+</html>
