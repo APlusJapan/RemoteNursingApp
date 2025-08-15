@@ -3,6 +3,7 @@ package com.aplus.remotenursing.models;
 public class VideoTaskDetail {
     private String videoId;
     private String videoName;
+    private String videoSeriesId;
     private String videoURL;
     private String videoDuration;
     private String videoDescription;
@@ -17,7 +18,13 @@ public class VideoTaskDetail {
     // 原有字段的getter和setter
     public String getVideoId() { return videoId; }
     public void setVideoId(String videoId) { this.videoId = videoId; }
+    public String getVideoSeriesId() {
+        return videoSeriesId;
+    }
 
+    public void setVideoSeriesId(String videoSeriesId) {
+        this.videoSeriesId = videoSeriesId;
+    }
     public String getVideoName() { return videoName; }
     public void setVideoName(String videoName) { this.videoName = videoName; }
 

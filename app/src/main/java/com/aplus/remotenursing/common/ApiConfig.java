@@ -25,5 +25,6 @@ public class ApiConfig {
     public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
     public static final String API_CHECKUP_STANDARD = BASE_URL + "checkup-standard/by-user/";
     public static final String API_CHECKUP_RECORD_SAVE = BASE_URL + "user-checkup-record";
+    public static final String API_VIDEO_HISTORY_RECORD_SAVE = BASE_URL + "video-play-history/batch-update";
 
 }
