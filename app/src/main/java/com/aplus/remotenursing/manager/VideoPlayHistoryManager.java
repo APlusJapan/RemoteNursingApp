@@ -2,176 +2,308 @@ package com.aplus.remotenursing.manager;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 import android.util.Log;
-import com.aplus.remotenursing.models.VideoPlayRecord;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.models.UserAccount;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import okhttp3.*;
 
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+/**
+ * 视频播放历史管理器
+ * 记录每个视频的播放次数，下次打开应用时自动上传并清除本地记录
+ */
 public class VideoPlayHistoryManager {
     private static final String TAG = "VideoPlayHistoryManager";
-    private static final String PREF_NAME = "video_play_data";
-    private static VideoPlayHistoryManager instance;
+    private static final String PREFS_NAME = "video_play_history";
+    private static final String KEY_PLAY_RECORDS = "play_records";
 
     private Context context;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+    private SharedPreferences prefs;
+    private Gson gson;
+    // 修改：使用List存储所有播放记录，避免覆盖
+    private List<PlayCountRecord> playRecordsList;
 
-    private VideoPlayHistoryManager(Context context) {
-        this.context = context.getApplicationContext();
-    }
+    // 单例模式
+    private static VideoPlayHistoryManager instance;
 
-    public static synchronized VideoPlayHistoryManager getInstance(Context context) {
+    public static VideoPlayHistoryManager getInstance(Context context) {
         if (instance == null) {
-            instance = new VideoPlayHistoryManager(context);
+            synchronized (VideoPlayHistoryManager.class) {
+                if (instance == null) {
+                    instance = new VideoPlayHistoryManager(context.getApplicationContext());
+                }
+            }
         }
         return instance;
     }
 
-    /**
-     * 获取昨天及之前的播放数据
-     */
-    public List<VideoPlayRecord> getHistoryPlayData(String userId, String adminId) {
-        List<VideoPlayRecord> historyData = new ArrayList<>();
-        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+    private VideoPlayHistoryManager(Context context) {
+        this.context = context;
+        this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.gson = new Gson();
+        this.playRecordsList = new ArrayList<>();
+        loadLocalRecords();
+    }
 
+    /**
+     * 播放记录数据结构 - 对应后台 VideoPlayHistory 实体
+     */
+    public static class PlayCountRecord {
+        public String playHistoryId;     // 播放记录ID
+        public String userId;            // 用户ID
+        public String videoId;           // 视频ID
+        public String videoSeriesId;     // 视频系列ID
+        public String videoName;         // 视频名称
+        public String videoSeriesName;   // 视频系列名称
+        public String playTime;          // 播放次数（作为字符串存储）
+        public String videoDuration;     // 视频时长
+        public String playDate;          // 播放日期 yyyy-MM-dd 格式
+        public int playCount;            // 本地计数器
+        public long timestamp;           // 添加时间戳用于区分记录
+
+        public PlayCountRecord() {}
+
+        public PlayCountRecord(String videoId, String videoSeriesId, String videoName,
+                               String videoSeriesName, String videoDuration) {
+            this.videoId = videoId;
+            this.videoSeriesId = videoSeriesId;
+            this.videoName = videoName;
+            this.videoSeriesName = videoSeriesName;
+            this.videoDuration = videoDuration;
+            this.playCount = 1; // 改为1，表示播放了1次
+            this.playTime = "1"; // 初始播放次数为1
+            this.timestamp = System.currentTimeMillis(); // 记录时间戳
+
+            // 设置今天的日期
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            this.playDate = dateFormat.format(new Date());
+
+            // 生成唯一的播放历史ID
+            this.playHistoryId = "PH" + System.currentTimeMillis();
+        }
+    }
+
+    /**
+     * 记录视频播放一次
+     * 修改：每次播放都创建新记录，或合并同一天同一视频的播放次数
+     */
+    public void recordVideoPlay(String videoId, String videoSeriesId, String videoName,
+                                String videoSeriesName, String videoDuration) {
+        if (TextUtils.isEmpty(videoId)) {
+            Log.w(TAG, "videoId为空，跳过记录");
+            return;
+        }
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String today = dateFormat.format(new Date());
-        SimpleDateFormat apiDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()); // API使用的日期格式
 
-        Map<String, ?> allData = prefs.getAll();
-        for (Map.Entry<String, ?> entry : allData.entrySet()) {
-            String key = entry.getKey();
-            if (key.startsWith("video_play_time_") && !key.endsWith("_series_id")
-                    && !key.endsWith("_video_name") && !key.endsWith("_series_name")) {
-
-                String[] parts = key.split("_");
-                if (parts.length >= 5) {
-                    String dateStr = parts[3]; // video_play_time_YYYYMMDD_videoId
-                    String videoId = parts[4];
-
-                    // 只处理昨天及之前的数据
-                    if (dateStr.compareTo(today) < 0) {
-                        try {
-                            // 将 YYYYMMDD 转换为 YYYY-MM-DD 格式
-                            Date date = dateFormat.parse(dateStr);
-                            String apiDateStr = apiDateFormat.format(date);
-
-                            VideoPlayRecord record = new VideoPlayRecord();
-                            record.setUserId(userId);
-                            record.setPlayDate(apiDateStr); // 使用 YYYY-MM-DD 格式
-                            record.setVideoId(videoId);
-                            record.setPlayTime((Integer) entry.getValue());
-                            record.setAdminId(adminId); // 新增：设置adminId
-
-                            // 获取视频相关信息
-                            record.setVideoSeriesId(prefs.getString(key + "_series_id", ""));
-                            record.setVideoName(prefs.getString(key + "_video_name", ""));
-                            record.setVideoSeriesName(prefs.getString(key + "_series_name", ""));
-
-                            historyData.add(record);
-
-                            Log.d(TAG, "找到历史数据 - 日期: " + apiDateStr + ", 视频ID: " + videoId + ", 时长: " + entry.getValue() + "秒");
-                        } catch (ParseException e) {
-                            Log.e(TAG, "日期解析错误: " + dateStr, e);
-                        }
-                    }
-                }
+        // 查找是否有今天同一视频的记录
+        PlayCountRecord existingRecord = null;
+        for (PlayCountRecord record : playRecordsList) {
+            if (today.equals(record.playDate) && videoId.equals(record.videoId)) {
+                existingRecord = record;
+                break;
             }
         }
 
-        Log.d(TAG, "共找到 " + historyData.size() + " 条历史播放数据");
-        return historyData;
+        if (existingRecord != null) {
+            // 增加已有记录的播放次数
+            existingRecord.playCount++;
+            existingRecord.playTime = String.valueOf(existingRecord.playCount);
+            Log.d(TAG, "更新播放记录 - VideoID: " + videoId +
+                    ", 日期: " + today + ", 累计次数: " + existingRecord.playCount);
+        } else {
+            // 创建新的播放记录
+            PlayCountRecord newRecord = new PlayCountRecord(videoId, videoSeriesId,
+                    videoName, videoSeriesName, videoDuration);
+            playRecordsList.add(newRecord);
+            Log.d(TAG, "创建新播放记录 - VideoID: " + videoId +
+                    ", 视频名: " + videoName + ", 日期: " + today);
+        }
+
+        // 保存到本地
+        saveLocalRecords();
+
+        // 调试输出当前所有记录
+        Log.d(TAG, "当前共有 " + playRecordsList.size() + " 条播放记录");
     }
 
     /**
-     * 清除已上报的历史数据（保留今天的数据）
+     * 加载本地保存的播放记录
      */
-    public void clearHistoryData() {
-        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-
-        String today = dateFormat.format(new Date());
-        int deletedCount = 0;
-
-        Map<String, ?> allData = prefs.getAll();
-        for (String key : allData.keySet()) {
-            if (key.startsWith("video_play_time_")) {
-                String[] parts = key.split("_");
-                if (parts.length >= 4) {
-                    String dateStr = parts[3];
-                    // 删除昨天及之前的数据，保留今天的
-                    if (dateStr.compareTo(today) < 0) {
-                        editor.remove(key);
-                        deletedCount++;
-                        Log.d(TAG, "删除历史数据: " + key);
-                    }
-                }
+    private void loadLocalRecords() {
+        try {
+            String json = prefs.getString(KEY_PLAY_RECORDS, "[]");
+            playRecordsList = gson.fromJson(json, new TypeToken<List<PlayCountRecord>>(){}.getType());
+            if (playRecordsList == null) {
+                playRecordsList = new ArrayList<>();
             }
-        }
+            Log.d(TAG, "加载本地播放记录，共 " + playRecordsList.size() + " 条");
 
-        editor.apply();
-        Log.d(TAG, "清理完成，共删除 " + deletedCount + " 条历史数据");
+            // 调试：打印所有加载的记录
+            for (PlayCountRecord record : playRecordsList) {
+                Log.d(TAG, "  - VideoID: " + record.videoId +
+                        ", 视频名: " + record.videoName +
+                        ", 播放次数: " + record.playCount +
+                        ", 日期: " + record.playDate);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "加载本地播放记录失败: " + e.getMessage());
+            playRecordsList = new ArrayList<>();
+        }
     }
 
     /**
-     * 清理超过指定天数的数据
+     * 保存播放记录到本地
      */
-    public void cleanupOldData(int keepDays) {
-        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
+    private void saveLocalRecords() {
+        try {
+            String json = gson.toJson(playRecordsList);
+            prefs.edit().putString(KEY_PLAY_RECORDS, json).apply();
+            Log.d(TAG, "保存 " + playRecordsList.size() + " 条播放记录到本地成功");
+        } catch (Exception e) {
+            Log.e(TAG, "保存播放记录到本地失败: " + e.getMessage());
+        }
+    }
 
-        // 计算截止日期
-        long cutoffTime = System.currentTimeMillis() - (keepDays * 24 * 60 * 60 * 1000L);
-        String cutoffDate = dateFormat.format(new Date(cutoffTime));
+    /**
+     * 获取所有本地播放记录
+     */
+    public List<PlayCountRecord> getAllLocalRecords() {
+        return new ArrayList<>(playRecordsList);
+    }
 
-        Map<String, ?> allData = prefs.getAll();
-        for (String key : allData.keySet()) {
-            if (key.startsWith("video_play_time_")) {
-                String[] parts = key.split("_");
-                if (parts.length >= 4) {
-                    String dateStr = parts[3];
-                    if (dateStr.compareTo(cutoffDate) < 0) {
-                        editor.remove(key);
-                    }
-                }
-            }
+    /**
+     * 上传播放记录到服务器并清除本地记录
+     */
+    public void uploadAndClearRecords() {
+        UserAccount userAccount = UserUtils.getUserAccount(context);
+        String userId = userAccount.getUserId();
+        String adminId = userAccount.getAdminId();
+        if (TextUtils.isEmpty(userId)) {
+            Log.w(TAG, "用户未登录，跳过上传播放记录");
+            return;
         }
 
-        editor.apply();
-        Log.d(TAG, "清理超过 " + keepDays + " 天的旧数据完成");
+        if (playRecordsList.isEmpty()) {
+            Log.d(TAG, "无播放记录需要上传");
+            return;
+        }
+
+        Log.d(TAG, "开始上传播放记录，共 " + playRecordsList.size() + " 条");
+
+        // 调试：打印要上传的所有记录
+        for (PlayCountRecord record : playRecordsList) {
+            Log.d(TAG, "准备上传 - VideoID: " + record.videoId +
+                    ", 视频名: " + record.videoName +
+                    ", 播放次数: " + record.playCount);
+        }
+
+        // 构建上传数据
+        Map<String, Object> uploadData = new HashMap<>();
+        uploadData.put("userId", userId);
+        uploadData.put("adminId", adminId);
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (PlayCountRecord record : playRecordsList) {
+            // 为每条记录设置userId
+            record.userId = userId;
+
+            Map<String, Object> recordMap = new HashMap<>();
+            recordMap.put("playHistoryId", record.playHistoryId);
+            recordMap.put("userId", userId); // 确保userId被设置
+            recordMap.put("videoId", record.videoId);
+            recordMap.put("videoSeriesId", record.videoSeriesId);
+            recordMap.put("videoName", record.videoName);
+            recordMap.put("videoSeriesName", record.videoSeriesName);
+            recordMap.put("playTime", record.playTime); // 播放次数
+            recordMap.put("videoDuration", record.videoDuration);
+            recordMap.put("playDate", record.playDate);
+            recordMap.put("adminId", adminId); // 添加adminId
+
+            records.add(recordMap);
+        }
+        uploadData.put("records", records);
+
+        // 发送到服务器
+        String json = gson.toJson(uploadData);
+        Log.d(TAG, "上传JSON数据: " + json); // 调试：打印完整的上传数据
+
+        RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
+
+        Request request = new Request.Builder()
+                .url(ApiConfig.API_VIDEO_HISTORY_RECORD_SAVE)
+                .post(body)
+                .build();
+
+        OkHttpClient client = new OkHttpClient();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "上传播放记录失败: " + e.getMessage());
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseBody = response.body().string();
+                if (response.isSuccessful()) {
+                    Log.d(TAG, "上传播放记录成功，响应: " + responseBody);
+                    // 上传成功后清除本地记录
+                    clearLocalRecords();
+                } else {
+                    Log.e(TAG, "上传播放记录失败，响应码: " + response.code() +
+                            ", 响应内容: " + responseBody);
+                }
+            }
+        });
     }
+
     /**
-     * 调试方法：打印所有本地播放数据
+     * 清除本地播放记录
+     */
+    private void clearLocalRecords() {
+        Log.d(TAG, "清除前有 " + playRecordsList.size() + " 条记录");
+        playRecordsList.clear();
+        prefs.edit().remove(KEY_PLAY_RECORDS).apply();
+        Log.d(TAG, "清除本地播放记录完成");
+    }
+
+    /**
+     * 调试用：打印所有本地数据
      */
     public void logAllLocalData() {
-        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        Map<String, ?> allData = prefs.getAll();
-
-        Log.d(TAG, "=== 所有本地播放数据 ===");
-        int dataCount = 0;
-        for (Map.Entry<String, ?> entry : allData.entrySet()) {
-            String key = entry.getKey();
-            if (key.startsWith("video_play_time_") && !key.endsWith("_series_id")
-                    && !key.endsWith("_video_name") && !key.endsWith("_series_name")) {
-
-                String[] parts = key.split("_");
-                if (parts.length >= 5) {
-                    String dateStr = parts[3];
-                    String videoId = parts[4];
-                    int playTime = (Integer) entry.getValue();
-
-                    String seriesId = prefs.getString(key + "_series_id", "");
-                    String videoName = prefs.getString(key + "_video_name", "");
-
-                    Log.d(TAG, String.format("数据%d - 日期:%s, 视频ID:%s, 时长:%d秒, 系列:%s, 名称:%s",
-                            ++dataCount, dateStr, videoId, playTime, seriesId, videoName));
-                }
+        Log.d(TAG, "=== 播放记录本地数据 ===");
+        if (playRecordsList.isEmpty()) {
+            Log.d(TAG, "无本地播放记录");
+        } else {
+            Log.d(TAG, "共找到 " + playRecordsList.size() + " 条播放记录：");
+            for (int i = 0; i < playRecordsList.size(); i++) {
+                PlayCountRecord record = playRecordsList.get(i);
+                Log.d(TAG, String.format("[%d] VideoID: %s, 视频名: %s, 系列: %s, " +
+                                "播放次数: %s, 日期: %s, 时长: %s",
+                        i + 1,
+                        record.videoId,
+                        record.videoName,
+                        record.videoSeriesName,
+                        record.playTime,
+                        record.playDate,
+                        record.videoDuration));
             }
         }
-        Log.d(TAG, "共 " + dataCount + " 条播放数据");
         Log.d(TAG, "========================");
+    }
+
+    /**
+     * 调试用：获取记录数量
+     */
+    public int getRecordCount() {
+        return playRecordsList.size();
     }
 }

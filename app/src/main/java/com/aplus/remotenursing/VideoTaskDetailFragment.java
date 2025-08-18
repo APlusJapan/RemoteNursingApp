@@ -29,7 +29,6 @@ import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
 import com.aplus.remotenursing.common.VideoPlayUtils;
-import com.aplus.remotenursing.manager.VideoPlayTimeManager;
 import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
 import com.aplus.remotenursing.manager.PermissionManager;
 import com.aplus.remotenursing.manager.VideoCacheManager;
@@ -97,8 +96,7 @@ public class VideoTaskDetailFragment extends Fragment {
     private Runnable preloadRunnable;
     private final Set<String> preloading = new HashSet<>();
 
-    // 播放时长追踪器
-    private VideoPlayTimeManager playTimeManager;
+    // 播放历史追踪器
     private VideoPlayHistoryManager playHistoryManager;
     private final Gson gson = new Gson();
 
@@ -126,9 +124,11 @@ public class VideoTaskDetailFragment extends Fragment {
             return;
         }
 
-        // 初始化播放时长追踪器
-        playTimeManager = new VideoPlayTimeManager(getContext());
+        // 初始化播放历史追踪器
         playHistoryManager = VideoPlayHistoryManager.getInstance(getContext());
+
+        // 应用启动时尝试上传之前的播放记录
+        playHistoryManager.uploadAndClearRecords();
 
         String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : null;
         String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "视频系列";
@@ -276,83 +276,135 @@ public class VideoTaskDetailFragment extends Fragment {
             }
 
             player.addListener(new Player.Listener() {
+                // 记录跟踪
+                private String lastRecordedVideoId = null;
+                private long lastVideoStartTime = 0;
+                private boolean hasRecordedCurrent = false; // 标记当前视频是否已记录
+
                 @Override
                 public void onPlaybackStateChanged(int playbackState) {
-                    Log.d(TAG, "播放状态改变: " + playbackState + ", isTransitioning: " + isTransitioning);
+                    Log.d(TAG, "播放状态改变: " + playbackState +
+                            ", 当前视频: " + (currentItem != null ? currentItem.getVideoName() : "null") +
+                            ", VideoID: " + (currentItem != null ? currentItem.getVideoId() : "null"));
 
-                    if (playbackState == Player.STATE_ENDED) {
-                        // 防止重复触发
-                        if (isPlayingNext) {
-                            Log.d(TAG, "已在播放下一个，忽略STATE_ENDED");
-                            return;
+                    if (playbackState == Player.STATE_READY) {
+                        // 视频开始播放
+                        lastVideoStartTime = System.currentTimeMillis();
+                        hasRecordedCurrent = false; // 重置记录标志
+                        Log.d(TAG, "视频准备就绪 - VideoID: " +
+                                (currentItem != null ? currentItem.getVideoId() : "null") +
+                                ", 视频名: " + (currentItem != null ? currentItem.getVideoName() : "null"));
+
+                    } else if (playbackState == Player.STATE_ENDED) {
+                        Log.d(TAG, "视频播放结束 - 准备记录");
+
+                        // 播放结束时记录（如果还没记录过）
+                        if (!hasRecordedCurrent) {
+                            recordCurrentVideoPlay();
                         }
 
-                        // 播放结束时结束记录（这里不受isTransitioning影响）
-                        if (playTimeManager != null) {
-                            Log.d(TAG, "视频播放结束，结束播放时长记录");
-                            playTimeManager.endSession();
-                        }
-
-                        // 延迟播放下一个，避免立即重复触发
-                        mainHandler.postDelayed(() -> {
-                            if (!isPlayingNext) {
-                                playNextVideo();
-                            }
-                        }, 500);
-
-                    } else if (playbackState == Player.STATE_READY) {
-                        // 播放准备完成时开始记录（只在真正开始新视频时记录，避免切换过程中重复记录）
-                        if (playTimeManager != null && currentItem != null) {
-                            String videoId = currentItem.getVideoId();
-                            if (TextUtils.isEmpty(videoId)) {
-                                videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
-                            }
-                            String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : "";
-                            String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "";
-
-                            Log.d(TAG, "视频准备就绪，开始播放时长记录 - VideoID: " + videoId);
-                            playTimeManager.startSession(
-                                    videoId,
-                                    videoSeriesId,
-                                    currentItem.getVideoName(),
-                                    videoSeriesName
-                            );
-                        }
-                    }
-                }
-
-                @Override
-                public void onIsPlayingChanged(boolean isPlaying) {
-                    // 播放状态改变时的记录不受isTransitioning影响，确保时长统计准确
-                    if (playTimeManager != null) {
-                        if (isPlaying) {
-                            Log.d(TAG, "开始播放，恢复播放时长记录");
-                            playTimeManager.resumeSession();
-                        } else {
-                            Log.d(TAG, "暂停播放，暂停播放时长记录");
-                            playTimeManager.pauseSession();
+                        // 延迟播放下一个
+                        if (!isPlayingNext) {
+                            mainHandler.postDelayed(() -> {
+                                if (!isPlayingNext) {
+                                    playNextVideo();
+                                }
+                            }, 500);
                         }
                     }
                 }
 
                 @Override
                 public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
-                    Log.d(TAG, "媒体项切换: reason=" + reason + ", isTransitioning=" + isTransitioning);
+                    Log.d(TAG, "媒体项切换: reason=" + reason +
+                            ", 从 " + (currentItem != null ? currentItem.getVideoName() : "null") +
+                            " 切换");
+
+                    // 在切换前记录上一个视频（如果播放时间超过5秒且未记录）
+                    if (currentItem != null && !hasRecordedCurrent && lastVideoStartTime > 0) {
+                        long playDuration = System.currentTimeMillis() - lastVideoStartTime;
+                        if (playDuration > 5000) { // 播放超过5秒才记录
+                            Log.d(TAG, "切换前记录上一个视频，播放时长: " + (playDuration/1000) + "秒");
+                            recordCurrentVideoPlay();
+                        }
+                    }
 
                     int cur = player.getCurrentMediaItemIndex();
                     if (cur != C.INDEX_UNSET && !isTransitioning) {
                         maybeSwapToLocal(cur);
 
                         // 更新当前项
-                        if (videoList != null && cur < videoList.size() && cur != currentVideoIndex) {
-                            Log.d(TAG, "更新当前播放索引: " + currentVideoIndex + " -> " + cur);
+                        if (videoList != null && cur < videoList.size()) {
                             currentVideoIndex = cur;
                             currentItem = videoList.get(cur);
+
+                            Log.d(TAG, "切换到新视频 - Index: " + cur +
+                                    ", VideoID: " + currentItem.getVideoId() +
+                                    ", 视频名: " + currentItem.getVideoName());
+
                             if (adapter != null) {
                                 adapter.setCurrentPlayingItem(currentItem);
                             }
+
+                            // 重置记录状态
+                            hasRecordedCurrent = false;
+                            lastVideoStartTime = System.currentTimeMillis();
                         }
                     }
+                }
+
+                // 记录当前视频播放
+                private void recordCurrentVideoPlay() {
+                    if (playHistoryManager == null || currentItem == null) {
+                        Log.d(TAG, "无法记录：playHistoryManager=" + playHistoryManager +
+                                ", currentItem=" + currentItem);
+                        return;
+                    }
+
+                    String videoId = currentItem.getVideoId();
+                    if (TextUtils.isEmpty(videoId)) {
+                        videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
+                    }
+
+                    // 检查是否已记录过这个视频（避免重复）
+                    if (videoId.equals(lastRecordedVideoId) && hasRecordedCurrent) {
+                        Log.d(TAG, "视频 " + videoId + " 在本次播放中已记录，跳过");
+                        return;
+                    }
+
+                    String videoSeriesId = getArguments() != null ?
+                            getArguments().getString("videoSeriesId") : "";
+                    String videoSeriesName = getArguments() != null ?
+                            getArguments().getString("videoSeriesName") : "";
+                    String videoDuration = currentItem.getVideoDuration();
+
+                    Log.d(TAG, ">>>>>>> 记录视频播放 <<<<<<<");
+                    Log.d(TAG, "  VideoID: " + videoId);
+                    Log.d(TAG, "  视频名: " + currentItem.getVideoName());
+                    Log.d(TAG, "  系列ID: " + videoSeriesId);
+                    Log.d(TAG, "  系列名: " + videoSeriesName);
+                    Log.d(TAG, "  时长: " + videoDuration);
+
+                    playHistoryManager.recordVideoPlay(
+                            videoId,
+                            videoSeriesId,
+                            currentItem.getVideoName(),
+                            videoSeriesName,
+                            videoDuration
+                    );
+
+                    lastRecordedVideoId = videoId;
+                    hasRecordedCurrent = true;
+
+                    // 立即打印所有记录
+                    Log.d(TAG, "===== 记录后的播放历史 =====");
+                    playHistoryManager.logAllLocalData();
+                }
+
+                @Override
+                public void onIsPlayingChanged(boolean isPlaying) {
+                    Log.d(TAG, "播放状态: " + (isPlaying ? "播放中" : "暂停") +
+                            ", 当前视频: " + (currentItem != null ? currentItem.getVideoName() : "null"));
                 }
             });
         }
@@ -469,24 +521,53 @@ public class VideoTaskDetailFragment extends Fragment {
     /** 通过索引切换视频（防死循环版本） */
     private void switchToVideoByIndex(int index) {
         if (player == null || videoList == null || index < 0 || index >= videoList.size()) return;
-        if (index == currentVideoIndex) return; // 相同索引不处理
+        if (index == currentVideoIndex) return;
 
         Log.d(TAG, "switchToVideoByIndex - 从索引 " + currentVideoIndex + " 切换到 " + index);
 
-        // 设置切换标志，防止监听器重复触发
+        // 切换前记录当前视频（如果播放时间足够长）
+        if (currentItem != null && player != null && playHistoryManager != null) {
+            long position = player.getCurrentPosition();
+            if (position > 5000) { // 播放超过5秒
+                String videoId = currentItem.getVideoId();
+                if (TextUtils.isEmpty(videoId)) {
+                    videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
+                }
+
+                Log.d(TAG, "手动切换前记录当前视频 - VideoID: " + videoId +
+                        ", 视频名: " + currentItem.getVideoName() +
+                        ", 播放位置: " + (position/1000) + "秒");
+
+                String videoSeriesId = getArguments() != null ?
+                        getArguments().getString("videoSeriesId") : "";
+                String videoSeriesName = getArguments() != null ?
+                        getArguments().getString("videoSeriesName") : "";
+
+                playHistoryManager.recordVideoPlay(
+                        videoId,
+                        videoSeriesId,
+                        currentItem.getVideoName(),
+                        videoSeriesName,
+                        currentItem.getVideoDuration()
+                );
+
+                // 查看记录状态
+                playHistoryManager.logAllLocalData();
+            }
+        }
+
+        // 设置切换标志
         isTransitioning = true;
         isPlayingNext = false;
-
-        // 结束当前播放时长记录（确保当前视频的播放时长被正确记录）
-        if (playTimeManager != null) {
-            Log.d(TAG, "切换视频前，结束当前视频的播放时长记录");
-            playTimeManager.endSession();
-        }
 
         currentVideoIndex = index;
         currentItem = videoList.get(index);
 
-        // 更新适配器
+        Log.d(TAG, "切换到新视频 - Index: " + index +
+                ", VideoID: " + currentItem.getVideoId() +
+                ", 视频名: " + currentItem.getVideoName());
+
+        // 更新UI
         if (adapter != null) {
             adapter.setCurrentPlayingItem(currentItem);
         }
@@ -498,40 +579,21 @@ public class VideoTaskDetailFragment extends Fragment {
             downloadCurrentVideoWithUi(currentItem);
         }
 
-        // 切换播放器到目标项
+        // 切换播放器
         ensurePlayerPreparedOnce(index);
         if (player.getCurrentMediaItemIndex() != index) {
-            Log.d(TAG, "播放器切换到索引: " + index);
+            Log.d(TAG, "播放器seekTo索引: " + index);
             player.seekTo(index, 0L);
         }
-
         player.setPlayWhenReady(true);
 
-        // 延迟重置切换标志（给播放器足够时间完成切换）
+        // 延迟重置标志
         mainHandler.postDelayed(() -> {
             isTransitioning = false;
             Log.d(TAG, "切换完成，重置isTransitioning标志");
+        }, 1500);
 
-            // 切换完成后，开始新视频的播放时长记录
-            if (playTimeManager != null && currentItem != null && player != null && player.isPlaying()) {
-                String videoId = currentItem.getVideoId();
-                if (TextUtils.isEmpty(videoId)) {
-                    videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
-                }
-                String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : "";
-                String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "";
-
-                Log.d(TAG, "切换完成后，开始新视频的播放时长记录 - VideoID: " + videoId);
-                playTimeManager.startSession(
-                        videoId,
-                        videoSeriesId,
-                        currentItem.getVideoName(),
-                        videoSeriesName
-                );
-            }
-        }, 1500); // 增加延迟时间，确保播放器完全切换完成
-
-        // 纯后台缓存下一个
+        // 后台缓存
         if (isUsingCache) {
             cacheVideoInBackground(currentItem);
         }
@@ -1001,41 +1063,104 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    // 生命周期管理方法：
+    // ---------- 生命周期管理方法 ----------
+
     @Override
     public void onPause() {
         super.onPause();
-        // Fragment暂停时暂停记录
-        if (playTimeManager != null) {
-            Log.d(TAG, "Fragment暂停，暂停播放时长记录");
-            playTimeManager.pauseSession();
+        Log.d(TAG, "Fragment暂停");
+
+        // Fragment暂停时记录当前视频（如果播放时间足够）
+        if (player != null && currentItem != null && playHistoryManager != null) {
+            long currentPosition = player.getCurrentPosition();
+            long duration = player.getDuration();
+
+            // 如果播放进度超过10%或5秒，记录一次
+            if ((duration > 0 && currentPosition > duration * 0.1) || currentPosition > 5000) {
+                String videoId = currentItem.getVideoId();
+                if (TextUtils.isEmpty(videoId)) {
+                    videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
+                }
+
+                Log.d(TAG, "Fragment暂停时记录 - VideoID: " + videoId +
+                        ", 视频名: " + currentItem.getVideoName() +
+                        ", 播放进度: " + (duration > 0 ? (currentPosition * 100 / duration) : 0) + "%");
+
+                String videoSeriesId = getArguments() != null ?
+                        getArguments().getString("videoSeriesId") : "";
+                String videoSeriesName = getArguments() != null ?
+                        getArguments().getString("videoSeriesName") : "";
+
+                playHistoryManager.recordVideoPlay(
+                        videoId,
+                        videoSeriesId,
+                        currentItem.getVideoName(),
+                        videoSeriesName,
+                        currentItem.getVideoDuration()
+                );
+
+                // 查看记录
+                playHistoryManager.logAllLocalData();
+            }
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Fragment恢复时恢复记录（如果播放器正在播放）
-        if (playTimeManager != null && player != null && player.isPlaying()) {
-            Log.d(TAG, "Fragment恢复，恢复播放时长记录");
-            playTimeManager.resumeSession();
-        }
+        Log.d(TAG, "Fragment恢复");
     }
 
     @Override
     public void onDestroyView() {
-        // 销毁时结束记录
-        if (playTimeManager != null) {
-            Log.d(TAG, "Fragment销毁，结束播放时长记录");
-            playTimeManager.endSession();
+        Log.d(TAG, "Fragment销毁");
+
+        // Fragment销毁前，确保记录当前视频
+        if (currentItem != null && playHistoryManager != null && player != null) {
+            // 获取播放位置
+            long position = 0;
+            try {
+                position = player.getCurrentPosition();
+            } catch (Exception e) {
+                Log.e(TAG, "获取播放位置失败: " + e.getMessage());
+            }
+
+            // 如果播放超过5秒，记录
+            if (position > 5000) {
+                String videoId = currentItem.getVideoId();
+                if (TextUtils.isEmpty(videoId)) {
+                    videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
+                }
+
+                Log.d(TAG, "Fragment销毁前最后记录 - VideoID: " + videoId +
+                        ", 视频名: " + currentItem.getVideoName() +
+                        ", 播放位置: " + (position/1000) + "秒");
+
+                String videoSeriesId = getArguments() != null ?
+                        getArguments().getString("videoSeriesId") : "";
+                String videoSeriesName = getArguments() != null ?
+                        getArguments().getString("videoSeriesName") : "";
+
+                playHistoryManager.recordVideoPlay(
+                        videoId,
+                        videoSeriesId,
+                        currentItem.getVideoName(),
+                        videoSeriesName,
+                        currentItem.getVideoDuration()
+                );
+            }
         }
 
-        // 调试 - 打印所有本地数据
+        // 最终调试输出
         if (playHistoryManager != null) {
-            Log.d(TAG, "Fragment销毁，打印本地播放历史数据");
+            Log.d(TAG, "========== Fragment销毁，最终播放历史 ==========");
             playHistoryManager.logAllLocalData();
+            int count = playHistoryManager.getRecordCount();
+            Log.d(TAG, "总记录数: " + count);
+            Log.d(TAG, "==============================================");
         }
 
+        // 清理资源
         super.onDestroyView();
         cancelPreload();
         if (player != null) {
@@ -1044,7 +1169,7 @@ public class VideoTaskDetailFragment extends Fragment {
             playerPrepared = false;
         }
 
-        // 重置所有标志位
+        // 重置标志
         isTransitioning = false;
         isPlayingNext = false;
     }
