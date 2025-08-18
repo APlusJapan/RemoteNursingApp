@@ -28,11 +28,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
-// [CHANGED] 统一 videoId 生成与 MediaItem 构建相关工具
 import com.aplus.remotenursing.common.VideoPlayUtils;
 import com.aplus.remotenursing.manager.VideoPlayTimeManager;
 import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
-
 import com.aplus.remotenursing.manager.PermissionManager;
 import com.aplus.remotenursing.manager.VideoCacheManager;
 import com.aplus.remotenursing.models.VideoTaskDetail;
@@ -64,6 +62,7 @@ import okhttp3.Response;
 public class VideoTaskDetailFragment extends Fragment {
 
     private static final int REQ_FULLSCREEN = 1001;
+    private static final String TAG = "VideoTaskDetailFragment";
 
     // 播放相关
     private PlayerView playerView;
@@ -91,7 +90,6 @@ public class VideoTaskDetailFragment extends Fragment {
 
     // 媒体列表（与播放器解耦）
     private final List<MediaItem> mediaItems = new ArrayList<>();
-    // [CHANGED] 用"vid-from-url"作为 key
     private final Map<String, Integer> id2Index = new HashMap<>();
 
     // 预加载与延迟任务
@@ -99,10 +97,14 @@ public class VideoTaskDetailFragment extends Fragment {
     private Runnable preloadRunnable;
     private final Set<String> preloading = new HashSet<>();
 
-    // 新增：播放时长追踪器
+    // 播放时长追踪器
     private VideoPlayTimeManager playTimeManager;
-    private VideoPlayHistoryManager playHistoryManager; // 新增：用于调试
+    private VideoPlayHistoryManager playHistoryManager;
     private final Gson gson = new Gson();
+
+    // 防止死循环的标志位
+    private boolean isTransitioning = false;
+    private boolean isPlayingNext = false;
 
     @Nullable
     @Override
@@ -124,10 +126,8 @@ public class VideoTaskDetailFragment extends Fragment {
             return;
         }
 
-        // 新增：初始化播放时长追踪器
+        // 初始化播放时长追踪器
         playTimeManager = new VideoPlayTimeManager(getContext());
-
-        // 新增：初始化播放历史管理器（用于调试）
         playHistoryManager = VideoPlayHistoryManager.getInstance(getContext());
 
         String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : null;
@@ -164,11 +164,11 @@ public class VideoTaskDetailFragment extends Fragment {
             // 5) 只在首次准备：把整列 mediaItems 喂进去并开始播放
             ensurePlayerPreparedOnce(currentVideoIndex);
 
-            // —— 进度条联动：首次进入时就检查并联动当前视频的缓存状态/下载进度 ——
+            // 进度条联动：首次进入时就检查并联动当前视频的缓存状态/下载进度
             if (currentItem != null) {
                 updateCacheStatus(currentItem);
                 if (isUsingCache) {
-                    downloadCurrentVideoWithUi(currentItem); // 未缓存则显示并更新进度
+                    downloadCurrentVideoWithUi(currentItem);
                 }
             }
 
@@ -182,15 +182,18 @@ public class VideoTaskDetailFragment extends Fragment {
         rvOther = view.findViewById(R.id.rv_other_videos);
         rvOther.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new VideoTaskDetailAdapter(new ArrayList<>(), item -> {
-            // 列表点击：通过索引切换，不重新 prepare
-            currentVideoIndex = videoList.indexOf(item);
-            if (currentVideoIndex < 0) return;
-            currentItem = item;
-            if (adapter != null) {
-                adapter.setCurrentPlayingItem(currentItem);
+            // 防止重复点击导致的死循环
+            if (isTransitioning) {
+                Log.d(TAG, "正在切换中，忽略点击");
+                return;
             }
-            scrollToCurrentVideo();
-            playVideoByIndex(currentVideoIndex);
+
+            // 列表点击：通过索引切换，不重新 prepare
+            int newIndex = videoList.indexOf(item);
+            if (newIndex < 0 || newIndex == currentVideoIndex) return;
+
+            Log.d(TAG, "列表点击切换到索引: " + newIndex);
+            switchToVideoByIndex(newIndex);
         });
         rvOther.setAdapter(adapter);
 
@@ -204,7 +207,7 @@ public class VideoTaskDetailFragment extends Fragment {
         try {
             MediaItem mi = player.getMediaItemAt(index);
             Uri u = (mi != null && mi.localConfiguration != null) ? mi.localConfiguration.uri : null;
-            android.util.Log.d("VideoCache", "当前播放URI: " + (u == null ? "null" : u.toString()));
+            Log.d("VideoCache", "当前播放URI: " + (u == null ? "null" : u.toString()));
         } catch (Throwable ignore) {}
     }
 
@@ -253,7 +256,7 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    /** 初始化或复用播放器（不要在这里 release 旧实例） */
+    /** 初始化或复用播放器 */
     private void initExoPlayer(View view) {
         playerView = view.findViewById(R.id.player_view);
         if (player == null) {
@@ -272,32 +275,34 @@ public class VideoTaskDetailFragment extends Fragment {
                 Log.w("VideoPlayer", "设置音频属性失败: " + e.getMessage());
             }
 
-            // 修改：完善播放器监听器
             player.addListener(new Player.Listener() {
                 @Override
                 public void onPlaybackStateChanged(int playbackState) {
-                    String stateString = "";
-                    switch (playbackState) {
-                        case Player.STATE_IDLE: stateString = "IDLE"; break;
-                        case Player.STATE_BUFFERING: stateString = "BUFFERING"; break;
-                        case Player.STATE_READY: stateString = "READY"; break;
-                        case Player.STATE_ENDED: stateString = "ENDED"; break;
-                    }
-                    Log.d("VideoPlayTimeManager", "播放状态变化: " + stateString);
+                    Log.d(TAG, "播放状态改变: " + playbackState + ", isTransitioning: " + isTransitioning);
 
                     if (playbackState == Player.STATE_ENDED) {
-                        // 播放结束时结束记录
+                        // 防止重复触发
+                        if (isPlayingNext) {
+                            Log.d(TAG, "已在播放下一个，忽略STATE_ENDED");
+                            return;
+                        }
+
+                        // 播放结束时结束记录（这里不受isTransitioning影响）
                         if (playTimeManager != null) {
-                            Log.d("VideoPlayTimeManager", "视频播放结束，结束记录");
+                            Log.d(TAG, "视频播放结束，结束播放时长记录");
                             playTimeManager.endSession();
                         }
-                        // 简化：直接调用下一个视频，不使用延迟（参考全屏播放）
-                        playNextVideoSimple();
+
+                        // 延迟播放下一个，避免立即重复触发
+                        mainHandler.postDelayed(() -> {
+                            if (!isPlayingNext) {
+                                playNextVideo();
+                            }
+                        }, 500);
 
                     } else if (playbackState == Player.STATE_READY) {
-                        // 播放准备完成时开始记录
+                        // 播放准备完成时开始记录（只在真正开始新视频时记录，避免切换过程中重复记录）
                         if (playTimeManager != null && currentItem != null) {
-                            // 修改：优先使用数据库中的真实videoId
                             String videoId = currentItem.getVideoId();
                             if (TextUtils.isEmpty(videoId)) {
                                 videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
@@ -305,8 +310,7 @@ public class VideoTaskDetailFragment extends Fragment {
                             String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : "";
                             String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "";
 
-                            Log.d("VideoPlayTimeManager", "★ 开始记录视频 - ID: " + videoId + ", 名称: " + currentItem.getVideoName());
-
+                            Log.d(TAG, "视频准备就绪，开始播放时长记录 - VideoID: " + videoId);
                             playTimeManager.startSession(
                                     videoId,
                                     videoSeriesId,
@@ -319,44 +323,34 @@ public class VideoTaskDetailFragment extends Fragment {
 
                 @Override
                 public void onIsPlayingChanged(boolean isPlaying) {
-                    // 播放状态改变时的处理
-                    Log.d("VideoPlayTimeManager", "播放状态改变: " + (isPlaying ? "播放中" : "暂停"));
+                    // 播放状态改变时的记录不受isTransitioning影响，确保时长统计准确
                     if (playTimeManager != null) {
                         if (isPlaying) {
+                            Log.d(TAG, "开始播放，恢复播放时长记录");
                             playTimeManager.resumeSession();
                         } else {
+                            Log.d(TAG, "暂停播放，暂停播放时长记录");
                             playTimeManager.pauseSession();
                         }
                     }
                 }
 
-                // 修改：视频切换时的处理
                 @Override
                 public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
+                    Log.d(TAG, "媒体项切换: reason=" + reason + ", isTransitioning=" + isTransitioning);
+
                     int cur = player.getCurrentMediaItemIndex();
-                    Log.d("VideoPlayTimeManager", "视频切换到索引: " + cur);
-                    if (cur != C.INDEX_UNSET) {
+                    if (cur != C.INDEX_UNSET && !isTransitioning) {
                         maybeSwapToLocal(cur);
 
-                        // 新增：切换视频时重新开始记录
-                        if (playTimeManager != null && videoList != null && cur < videoList.size()) {
-                            VideoTaskDetail newItem = videoList.get(cur);
-                            // 修改：优先使用数据库中的真实videoId
-                            String videoId = newItem.getVideoId();
-                            if (TextUtils.isEmpty(videoId)) {
-                                videoId = VideoPlayUtils.videoIdFromUrl(newItem.getVideoURL());
+                        // 更新当前项
+                        if (videoList != null && cur < videoList.size() && cur != currentVideoIndex) {
+                            Log.d(TAG, "更新当前播放索引: " + currentVideoIndex + " -> " + cur);
+                            currentVideoIndex = cur;
+                            currentItem = videoList.get(cur);
+                            if (adapter != null) {
+                                adapter.setCurrentPlayingItem(currentItem);
                             }
-                            String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : "";
-                            String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "";
-
-                            Log.d("VideoPlayTimeManager", "★ 切换视频记录 - ID: " + videoId + ", 名称: " + newItem.getVideoName());
-
-                            playTimeManager.startSession(
-                                    videoId,
-                                    videoSeriesId,
-                                    newItem.getVideoName(),
-                                    videoSeriesName
-                            );
                         }
                     }
                 }
@@ -365,7 +359,6 @@ public class VideoTaskDetailFragment extends Fragment {
         playerView.setPlayer(player);
 
         // 全屏按钮
-        // 全屏按钮（替换原有 onClick 逻辑）
         View fs = view.findViewById(R.id.btn_fullscreen);
         if (fs != null) {
             fs.setOnClickListener(v -> {
@@ -374,55 +367,51 @@ public class VideoTaskDetailFragment extends Fragment {
                 long pos = Math.max(0L, player.getCurrentPosition());
                 boolean playReady = player.getPlayWhenReady();
 
-                // 尽量从"正在播放"的 MediaItem 里拿到原始 URL 与 videoId（tag 优先）
+                // 获取当前播放的URL和videoId
                 String url = null;
                 String vid = null;
 
                 MediaItem mi = player.getCurrentMediaItem();
                 if (mi != null && mi.localConfiguration != null) {
                     Object tag = mi.localConfiguration.tag;
-                    if (tag instanceof com.aplus.remotenursing.models.VideoTaskDetail) {
-                        // 列表页里我们把 VideoTaskDetail 放到了 tag 里
+                    if (tag instanceof VideoTaskDetail) {
                         VideoTaskDetail d = (VideoTaskDetail) tag;
                         url = d.getVideoURL();
                         vid = d.getVideoId();
                     } else if (tag instanceof VideoFullscreenPlayerActivity.VideoTag) {
-                        // 兼容全屏页返回后再次进入的场景
                         VideoFullscreenPlayerActivity.VideoTag t = (VideoFullscreenPlayerActivity.VideoTag) tag;
                         url = t.url;
                         vid = t.id;
                     }
 
-                    // tag 拿不到 URL 时，退到当前 MediaItem 的 uri
                     if (TextUtils.isEmpty(url)) {
                         Uri u = mi.localConfiguration.uri;
                         if (u != null) url = u.toString();
                     }
                 }
 
-                // 再次兜底：用 currentItem（有时回到页面后 tag 可能还没就位）
                 if (TextUtils.isEmpty(url) && currentItem != null) {
                     url = currentItem.getVideoURL();
                     vid = currentItem.getVideoId();
                 }
 
-                // 最后兜底：url 还拿不到就不给进全屏，提示一下
                 if (TextUtils.isEmpty(url)) {
                     Toast.makeText(requireContext(), "当前视频地址为空，稍后再试", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
-                // 统一 videoId：没有服务端 id 时用我们规则生成，避免重复缓存
                 if (TextUtils.isEmpty(vid)) {
-                    vid = com.aplus.remotenursing.common.VideoPlayUtils.videoIdFromUrl(url);
+                    vid = VideoPlayUtils.videoIdFromUrl(url);
                 }
 
-                // 为避免页面来回切换的声音冲突，这里先暂停再进入全屏
-                try { player.pause(); } catch (Throwable ignore) {}
+                // 暂停播放避免冲突
+                try {
+                    player.pause();
+                } catch (Throwable ignore) {}
 
                 Intent it = new Intent(requireContext(), VideoFullscreenPlayerActivity.class)
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_URL, url)
-                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_VIDEO_ID, vid) // 关键：把 id 一并传过去
+                        .putExtra(VideoFullscreenPlayerActivity.EXTRA_VIDEO_ID, vid)
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_POS, pos)
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_START_PLAYREADY, playReady)
                         .putExtra(VideoFullscreenPlayerActivity.EXTRA_VIDEO_SERIES_ID,
@@ -439,14 +428,13 @@ public class VideoTaskDetailFragment extends Fragment {
 
     // ---------- 播放列表构建 & 切换 ----------
 
-    /** 优先使用本地缓存路径构建 MediaItems；并维护 vid-from-url -> index 的映射 */
+    /** 优先使用本地缓存路径构建 MediaItems */
     private void buildMediaItems(List<VideoTaskDetail> list) {
         mediaItems.clear();
         id2Index.clear();
         for (int i = 0; i < list.size(); i++) {
             VideoTaskDetail d = list.get(i);
             String url = d.getVideoURL();
-            // 修改：优先使用数据库中的真实videoId
             String vid = d.getVideoId();
             if (TextUtils.isEmpty(vid)) {
                 vid = VideoPlayUtils.videoIdFromUrl(url);
@@ -467,7 +455,7 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    /** 首次准备：一次性把列表喂给 player；其后仅 seekTo(index) */
+    /** 首次准备：一次性把列表喂给 player */
     private void ensurePlayerPreparedOnce(int startIndex) {
         if (player == null) return;
         if (!playerPrepared) {
@@ -478,30 +466,70 @@ public class VideoTaskDetailFragment extends Fragment {
         player.setPlayWhenReady(true);
     }
 
-    /** 通过索引播放（不重建、不重复 prepare） */
-    private void playVideoByIndex(int index) {
+    /** 通过索引切换视频（防死循环版本） */
+    private void switchToVideoByIndex(int index) {
         if (player == null || videoList == null || index < 0 || index >= videoList.size()) return;
+        if (index == currentVideoIndex) return; // 相同索引不处理
 
-        Log.d("VideoPlayTimeManager", "playVideoByIndex - 索引: " + index);
+        Log.d(TAG, "switchToVideoByIndex - 从索引 " + currentVideoIndex + " 切换到 " + index);
 
+        // 设置切换标志，防止监听器重复触发
+        isTransitioning = true;
+        isPlayingNext = false;
+
+        // 结束当前播放时长记录（确保当前视频的播放时长被正确记录）
+        if (playTimeManager != null) {
+            Log.d(TAG, "切换视频前，结束当前视频的播放时长记录");
+            playTimeManager.endSession();
+        }
+
+        currentVideoIndex = index;
         currentItem = videoList.get(index);
 
-        // 更新 UI 上的"缓存状态"提示，并在未缓存时联动进度条下载
+        // 更新适配器
+        if (adapter != null) {
+            adapter.setCurrentPlayingItem(currentItem);
+        }
+        scrollToCurrentVideo();
+
+        // 更新缓存状态
         updateCacheStatus(currentItem);
         if (isUsingCache) {
             downloadCurrentVideoWithUi(currentItem);
         }
 
-        // 切换到目标项
+        // 切换播放器到目标项
         ensurePlayerPreparedOnce(index);
         if (player.getCurrentMediaItemIndex() != index) {
-            Log.d("VideoPlayTimeManager", "切换播放器到索引: " + index);
+            Log.d(TAG, "播放器切换到索引: " + index);
             player.seekTo(index, 0L);
-            logPlayingUri(index); // 看到是 file:// 开头就说明已走本地
         }
 
-        Log.d("VideoPlayTimeManager", "设置播放器开始播放");
         player.setPlayWhenReady(true);
+
+        // 延迟重置切换标志（给播放器足够时间完成切换）
+        mainHandler.postDelayed(() -> {
+            isTransitioning = false;
+            Log.d(TAG, "切换完成，重置isTransitioning标志");
+
+            // 切换完成后，开始新视频的播放时长记录
+            if (playTimeManager != null && currentItem != null && player != null && player.isPlaying()) {
+                String videoId = currentItem.getVideoId();
+                if (TextUtils.isEmpty(videoId)) {
+                    videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
+                }
+                String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : "";
+                String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "";
+
+                Log.d(TAG, "切换完成后，开始新视频的播放时长记录 - VideoID: " + videoId);
+                playTimeManager.startSession(
+                        videoId,
+                        videoSeriesId,
+                        currentItem.getVideoName(),
+                        videoSeriesName
+                );
+            }
+        }, 1500); // 增加延迟时间，确保播放器完全切换完成
 
         // 纯后台缓存下一个
         if (isUsingCache) {
@@ -509,27 +537,40 @@ public class VideoTaskDetailFragment extends Fragment {
         }
     }
 
-    /** 播放下一个（循环） - 参考全屏播放的简单逻辑 */
-    private void playNextVideoSimple() {
-        if (videoList == null || videoList.isEmpty()) return;
-
-        Log.d("VideoPlayTimeManager", "播放下一个视频 - 当前索引: " + currentVideoIndex + ", 列表大小: " + videoList.size());
-
-        // 简化逻辑，参考全屏播放
-        if (currentVideoIndex >= videoList.size() - 1) {
-            currentVideoIndex = 0;
-        } else {
-            currentVideoIndex++;
+    /** 播放下一个视频（防死循环版本） */
+    private void playNextVideo() {
+        if (isPlayingNext) {
+            Log.d(TAG, "playNextVideo - 已在播放下一个，返回");
+            return;
         }
-        currentItem = videoList.get(currentVideoIndex);
 
-        Log.d("VideoPlayTimeManager", "切换到视频 - 新索引: " + currentVideoIndex +
-                ", 视频ID: " + currentItem.getVideoId() +
-                ", 名称: " + currentItem.getVideoName());
+        if (videoList == null || videoList.isEmpty()) {
+            Log.d(TAG, "playNextVideo - 视频列表为空");
+            return;
+        }
 
-        if (adapter != null) adapter.setCurrentPlayingItem(currentItem);
-        scrollToCurrentVideo();
-        playVideoByIndex(currentVideoIndex);
+        Log.d(TAG, "playNextVideo - 开始播放下一个视频");
+        isPlayingNext = true;
+
+        // 计算下一个索引
+        int nextIndex;
+        if (currentVideoIndex >= videoList.size() - 1) {
+            nextIndex = 0; // 循环到第一个
+        } else {
+            nextIndex = currentVideoIndex + 1;
+        }
+
+        Log.d(TAG, "playNextVideo - 下一个索引: " + nextIndex);
+
+        // 延迟执行切换，避免与STATE_ENDED重复触发
+        mainHandler.postDelayed(() -> {
+            switchToVideoByIndex(nextIndex);
+            // 延迟重置标志
+            mainHandler.postDelayed(() -> {
+                isPlayingNext = false;
+                Log.d(TAG, "playNextVideo - 重置isPlayingNext标志");
+            }, 1000);
+        }, 200);
     }
 
     // ---------- 预加载（纯后台，不碰 player） ----------
@@ -552,7 +593,6 @@ public class VideoTaskDetailFragment extends Fragment {
         int nextIndex = (currentVideoIndex + 1) % videoList.size();
         VideoTaskDetail nextVideo = videoList.get(nextIndex);
 
-        // 修改：优先使用数据库中的真实videoId
         String url = nextVideo.getVideoURL();
         String vid = nextVideo.getVideoId();
         if (TextUtils.isEmpty(vid)) {
@@ -570,7 +610,6 @@ public class VideoTaskDetailFragment extends Fragment {
 
     private void cacheVideoInBackground(VideoTaskDetail item) {
         if (cacheManager == null || item == null) return;
-        // 修改：优先使用数据库中的真实videoId
         final String url = item.getVideoURL();
         String vid = item.getVideoId();
         if (TextUtils.isEmpty(vid)) {
@@ -594,7 +633,6 @@ public class VideoTaskDetailFragment extends Fragment {
                             preloading.remove(id);
                             mainHandler.post(() -> {
                                 updateCacheInfo();
-                                // 下载成功后，如该条在播放列表中，尝试原位热切
                                 Integer idx = id2Index.get(id);
                                 if (idx != null) maybeSwapToLocal(idx);
                             });
@@ -609,11 +647,10 @@ public class VideoTaskDetailFragment extends Fragment {
 
     // ---------- UI：缓存状态/按钮/进度条联动 ----------
 
-    /** 带 UI 联动地下载当前视频：未缓存则显示进度，成功后更新状态与缓存大小并尝试热切 */
+    /** 带 UI 联动地下载当前视频 */
     private void downloadCurrentVideoWithUi(@NonNull VideoTaskDetail item) {
         if (!isUsingCache || cacheManager == null) return;
 
-        // 修改：优先使用数据库中的真实videoId
         final String url = item.getVideoURL();
         String vid = item.getVideoId();
         if (TextUtils.isEmpty(vid)) {
@@ -626,7 +663,6 @@ public class VideoTaskDetailFragment extends Fragment {
         if (local != null) {
             hideDownloadProgress();
             if (btnCacheStatus != null) btnCacheStatus.setText("已缓存");
-            // 当前条目如在播放，直接尝试热切
             Integer idx = id2Index.get(videoId);
             if (idx != null) maybeSwapToLocal(idx);
             return;
@@ -648,7 +684,6 @@ public class VideoTaskDetailFragment extends Fragment {
                     hideDownloadProgress();
                     if (btnCacheStatus != null) btnCacheStatus.setText("已缓存");
                     updateCacheInfo();
-                    // 成功后对对应 index 做一次热切
                     Integer idx = id2Index.get(id);
                     if (idx != null) maybeSwapToLocal(idx);
                 });
@@ -671,7 +706,6 @@ public class VideoTaskDetailFragment extends Fragment {
             return;
         }
         try {
-            // 修改：优先使用数据库中的真实videoId
             String url = item.getVideoURL();
             String vid = item.getVideoId();
             if (TextUtils.isEmpty(vid)) {
@@ -711,7 +745,6 @@ public class VideoTaskDetailFragment extends Fragment {
 
     private void showCacheInfo() {
         if (currentItem == null) return;
-        // 修改：优先使用数据库中的真实videoId
         String vid = currentItem.getVideoId();
         if (TextUtils.isEmpty(vid)) {
             vid = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
@@ -877,7 +910,6 @@ public class VideoTaskDetailFragment extends Fragment {
 
         VideoTaskDetail d = videoList.get(index);
         String url = d.getVideoURL();
-        // 修改：优先使用数据库中的真实videoId
         String vid = d.getVideoId();
         if (TextUtils.isEmpty(vid)) {
             vid = VideoPlayUtils.videoIdFromUrl(url);
@@ -888,7 +920,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
         Uri want = Uri.fromFile(new File(local));
 
-        // 取出当前 player 中该位置的 MediaItem 的 uri（若已准备）
+        // 取出当前 player 中该位置的 MediaItem 的 uri
         MediaItem cur = null;
         try {
             if (player.getMediaItemCount() > index) {
@@ -908,7 +940,7 @@ public class VideoTaskDetailFragment extends Fragment {
                 .build();
 
         if (playerPrepared) {
-            // 播放器已准备：用 remove+add 的方式原位替换，并在替换当前项时恢复进度/状态
+            // 播放器已准备：用 remove+add 的方式原位替换
             int curIdx = player.getCurrentMediaItemIndex();
             long position = 0L;
             boolean restore = (curIdx == index);
@@ -925,13 +957,13 @@ public class VideoTaskDetailFragment extends Fragment {
                 player.setPlayWhenReady(wasPlaying);
             }
         } else {
-            // 还没 prepare：改掉我们维护的 mediaItems，后续 setMediaItems 会生效
+            // 还没 prepare：改掉我们维护的 mediaItems
             if (index >= 0 && index < mediaItems.size()) {
                 mediaItems.set(index, newItem);
             }
         }
 
-        android.util.Log.i("VideoCache", "切换为本地播放: " + d.getVideoName() + " -> " + local);
+        Log.i("VideoCache", "切换为本地播放: " + d.getVideoName() + " -> " + local);
     }
 
     // ---------- 全屏返回 ----------
@@ -952,7 +984,6 @@ public class VideoTaskDetailFragment extends Fragment {
             }
 
             if (player != null) {
-                // 不再 setMediaItem/prepare，直接 seekTo 到返回位置
                 ensurePlayerPreparedOnce(currentVideoIndex);
                 if (player.getCurrentMediaItemIndex() != currentVideoIndex) {
                     player.seekTo(currentVideoIndex, pos);
@@ -962,7 +993,7 @@ public class VideoTaskDetailFragment extends Fragment {
                 player.setPlayWhenReady(playReady);
             }
 
-            // 回来后也联动一次进度条（如果还未缓存）
+            // 回来后也联动一次进度条
             if (currentItem != null && isUsingCache) {
                 updateCacheStatus(currentItem);
                 downloadCurrentVideoWithUi(currentItem);
@@ -976,6 +1007,7 @@ public class VideoTaskDetailFragment extends Fragment {
         super.onPause();
         // Fragment暂停时暂停记录
         if (playTimeManager != null) {
+            Log.d(TAG, "Fragment暂停，暂停播放时长记录");
             playTimeManager.pauseSession();
         }
     }
@@ -985,6 +1017,7 @@ public class VideoTaskDetailFragment extends Fragment {
         super.onResume();
         // Fragment恢复时恢复记录（如果播放器正在播放）
         if (playTimeManager != null && player != null && player.isPlaying()) {
+            Log.d(TAG, "Fragment恢复，恢复播放时长记录");
             playTimeManager.resumeSession();
         }
     }
@@ -993,11 +1026,13 @@ public class VideoTaskDetailFragment extends Fragment {
     public void onDestroyView() {
         // 销毁时结束记录
         if (playTimeManager != null) {
+            Log.d(TAG, "Fragment销毁，结束播放时长记录");
             playTimeManager.endSession();
         }
 
-        // 新增：调试 - 打印所有本地数据
+        // 调试 - 打印所有本地数据
         if (playHistoryManager != null) {
+            Log.d(TAG, "Fragment销毁，打印本地播放历史数据");
             playHistoryManager.logAllLocalData();
         }
 
@@ -1008,5 +1043,9 @@ public class VideoTaskDetailFragment extends Fragment {
             player = null;
             playerPrepared = false;
         }
+
+        // 重置所有标志位
+        isTransitioning = false;
+        isPlayingNext = false;
     }
 }
