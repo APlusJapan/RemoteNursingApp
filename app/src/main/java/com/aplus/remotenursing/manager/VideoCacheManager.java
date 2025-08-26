@@ -1,3 +1,4 @@
+// 文件：com/aplus/remotenursing/manager/VideoCacheManager.java
 package com.aplus.remotenursing.manager;
 
 import android.content.Context;
@@ -19,44 +20,51 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.net.ssl.SSLException;
+
 /**
- * 视频缓存管理器（.part 临时文件 + 原子重命名；支持断点续传；命中缓存直接返回）
+ * 视频缓存管理器
+ * - .part 临时文件
+ * - .staging 占用时旁路暂存
+ * - 可断点续传
+ * - 命中缓存直接返回
  */
 public class VideoCacheManager {
     private static final String TAG = "VideoCacheManager";
+    private static final String VCM_VERSION = "VCM-20250825-r4";
+
     private static final String CACHE_DIR_NAME = "video_cache";
-    private static final String VIDEO_INFO_SUFFIX = ".info";
+    private static final String SUFFIX_INFO    = ".info";
+    private static final String SUFFIX_PART    = ".part";
+    private static final String SUFFIX_STAGING = ".staging";
+
     private static final int CONNECT_TIMEOUT = 15000; // ms
-    private static final int READ_TIMEOUT = 30000;    // ms
-    private static final int BUFFER_SIZE = 8192;
+    private static final int READ_TIMEOUT    = 30000; // ms
+    private static final int BUFFER_SIZE     = 8192;
 
     private final Context context;
     private File cacheDir;
-    // 用“文件名”作为 key，避免相同 videoId 不同 URL 的冲突
     private final ConcurrentHashMap<String, DownloadTask> downloadingTasks = new ConcurrentHashMap<>();
     private static volatile VideoCacheManager instance;
 
     private VideoCacheManager(Context context) {
         this.context = context.getApplicationContext();
+        Log.i(TAG, "VideoCacheManager version = " + VCM_VERSION);
         initCacheDir();
     }
 
     public static synchronized VideoCacheManager getInstance(Context context) {
-        if (instance == null) {
-            instance = new VideoCacheManager(context);
-        }
+        if (instance == null) instance = new VideoCacheManager(context);
         return instance;
     }
 
-    /** 初始化缓存目录（/Android/data/<pkg>/files/Movies/video_cache） */
+    /** 初始化缓存目录：/Android/data/<pkg>/files/Movies/video_cache */
     private void initCacheDir() {
         File externalDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         if (externalDir == null) {
-            // 极端情况下返回 null，退回到内部 files 目录
             externalDir = context.getFilesDir();
             Log.w(TAG, "getExternalFilesDir 返回 null，退回内部存储");
         }
-
         cacheDir = new File(externalDir, CACHE_DIR_NAME);
         if (!cacheDir.exists() && !cacheDir.mkdirs()) {
             Log.e(TAG, "无法创建缓存目录: " + cacheDir.getAbsolutePath());
@@ -66,42 +74,72 @@ public class VideoCacheManager {
                 + " 可写=" + cacheDir.canWrite());
     }
 
-    /**
-     * 获取视频的本地缓存路径（若有效返回绝对路径，否则返回 null）
-     */
+    /** 归一化 URL：去 query/fragment */
+    private static String canonicalizeUrl(String url) {
+        if (url == null) return null;
+        int i = url.indexOf('#'); if (i >= 0) url = url.substring(0, i);
+        int j = url.indexOf('?'); if (j >= 0) url = url.substring(0, j);
+        return url;
+    }
+
+    /** 获取本地缓存路径；内部会尝试把 .staging 提升为最终文件 */
     public String getLocalVideoPath(String videoId, String videoUrl) {
         if (videoId == null || videoUrl == null || cacheDir == null) return null;
 
         String fileName = generateCacheFileName(videoId, videoUrl);
-        File cacheFile = new File(cacheDir, fileName);
-        File infoFile  = new File(cacheDir, fileName + VIDEO_INFO_SUFFIX);
+        File finalFile  = new File(cacheDir, fileName);
+        File infoFile   = new File(cacheDir, fileName + SUFFIX_INFO);
+        File staging    = new File(cacheDir, fileName + SUFFIX_STAGING);
 
-        if (cacheFile.exists() && infoFile.exists()) {
-            if (isCacheValid(videoId, videoUrl, cacheFile, infoFile)) {
-                return cacheFile.getAbsolutePath();
+        // 若存在 staging，尝试提升为最终文件
+        tryPromoteStagingIfPossible(videoId, videoUrl, finalFile, infoFile, staging);
+
+        if (finalFile.exists() && infoFile.exists()) {
+            if (isCacheValid(videoId, videoUrl, finalFile, infoFile)) {
+                return finalFile.getAbsolutePath();
             } else {
-                // 失效则清理
-                safeDelete(cacheFile);
+                safeDelete(finalFile);
                 safeDelete(infoFile);
+            }
+        }
+
+        // 兼容老命名
+        String legacy = generateCacheFileNameLegacy(videoId, videoUrl);
+        if (!legacy.equals(fileName)) {
+            File legacyFile = new File(cacheDir, legacy);
+            File legacyInfo = new File(cacheDir, legacy + SUFFIX_INFO);
+            if (legacyFile.exists() && legacyInfo.exists()) {
+                if (isCacheValidLegacy(videoId, videoUrl, legacyFile, legacyInfo)) {
+                    return legacyFile.getAbsolutePath();
+                } else {
+                    safeDelete(legacyFile);
+                    safeDelete(legacyInfo);
+                }
             }
         }
         return null;
     }
 
-    /**
-     * 下载并缓存视频（命中缓存直接回调成功；支持断点续传；写到 .part 完成后 rename）
-     */
+    /** 主动尝试把 .staging 立即提升为最终 .mp4（适用于你手动切到下一条之后） */
+    public boolean tryPromoteNow(String videoId, String videoUrl) {
+        String fileName = generateCacheFileName(videoId, videoUrl);
+        File finalFile  = new File(cacheDir, fileName);
+        File infoFile   = new File(cacheDir, fileName + SUFFIX_INFO);
+        File staging    = new File(cacheDir, fileName + SUFFIX_STAGING);
+        return tryPromoteStagingIfPossible(videoId, videoUrl, finalFile, infoFile, staging);
+    }
+
+    /** 下载并缓存（命中缓存直接回调成功） */
     public void downloadAndCacheVideo(String videoId, String videoUrl, DownloadCallback callback) {
         if (videoId == null || videoUrl == null) {
             if (callback != null) callback.onError(videoId, "VideoID或URL为空");
             return;
         }
 
-        // 命中缓存即返回
-        String cachedPath = getLocalVideoPath(videoId, videoUrl);
-        if (cachedPath != null) {
-            Log.d(TAG, "已命中缓存，跳过下载: " + videoId);
-            if (callback != null) callback.onSuccess(videoId, cachedPath);
+        // 命中缓存
+        String cached = getLocalVideoPath(videoId, videoUrl);
+        if (cached != null) {
+            if (callback != null) callback.onSuccess(videoId, cached);
             return;
         }
 
@@ -110,22 +148,55 @@ public class VideoCacheManager {
             Log.d(TAG, "该文件已在下载中: " + taskKey);
             return;
         }
-
         DownloadTask task = new DownloadTask(videoId, videoUrl, callback, taskKey);
         downloadingTasks.put(taskKey, task);
         task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
-    /** 校验缓存有效性：id/url 一致、文件存在且大小>0（可选比对 info 里记录的大小） */
+    /** 强制重新下载（删除现有缓存与片段） */
+    public void downloadAndCacheVideoForce(String videoId, String videoUrl, DownloadCallback callback) {
+        try { deleteLocalVideo(videoId, videoUrl); } catch (Throwable ignore) {}
+        downloadAndCacheVideo(videoId, videoUrl, callback);
+    }
+
+    /** 删除本地缓存（含 .mp4/.info/.part/.staging） */
+    public boolean deleteLocalVideo(String videoId, String videoUrl) {
+        boolean deleted = false;
+        String name = generateCacheFileName(videoId, videoUrl);
+        File f = new File(cacheDir, name);
+        File info = new File(cacheDir, name + SUFFIX_INFO);
+        File part = new File(cacheDir, name + SUFFIX_PART);
+        File staging = new File(cacheDir, name + SUFFIX_STAGING);
+        if (f.exists())       deleted |= f.delete();
+        if (info.exists())    deleted |= info.delete();
+        if (part.exists())    deleted |= part.delete();
+        if (staging.exists()) deleted |= staging.delete();
+
+        // 兼容老命名
+        String legacy = generateCacheFileNameLegacy(videoId, videoUrl);
+        if (!legacy.equals(name)) {
+            File lf = new File(cacheDir, legacy);
+            File linfo = new File(cacheDir, legacy + SUFFIX_INFO);
+            File lpart = new File(cacheDir, legacy + SUFFIX_PART);
+            File lstaging = new File(cacheDir, legacy + SUFFIX_STAGING);
+            if (lf.exists())       deleted |= lf.delete();
+            if (linfo.exists())    deleted |= linfo.delete();
+            if (lpart.exists())    deleted |= lpart.delete();
+            if (lstaging.exists()) deleted |= lstaging.delete();
+        }
+        return deleted;
+    }
+
+    /** 校验缓存有效性 */
     private boolean isCacheValid(String videoId, String videoUrl, File cacheFile, File infoFile) {
         try (BufferedReader br = new BufferedReader(new FileReader(infoFile))) {
-            String lineId  = br.readLine(); // 1: videoId
-            String lineUrl = br.readLine(); // 2: url
-            String lineTs  = br.readLine(); // 3: timestamp (optional)
-            String lineSz  = br.readLine(); // 4: fileSize  (optional)
+            String lineId  = br.readLine();
+            String lineUrl = br.readLine();
+            String lineTs  = br.readLine();
+            String lineSz  = br.readLine();
 
             boolean idOk  = videoId.equals(lineId);
-            boolean urlOk = videoUrl.equals(lineUrl);
+            boolean urlOk = canonicalizeUrl(videoUrl).equals(canonicalizeUrl(lineUrl));
             boolean fileOk = cacheFile.exists() && cacheFile.length() > 0;
 
             if (!idOk || !urlOk || !fileOk) return false;
@@ -143,8 +214,49 @@ public class VideoCacheManager {
         }
     }
 
-    /** 生成缓存文件名：<videoId>_<md5(videoId_url)>.mp4 */
+    /** 兼容老 info 校验 */
+    private boolean isCacheValidLegacy(String videoId, String videoUrl, File cacheFile, File infoFile) {
+        try (BufferedReader br = new BufferedReader(new FileReader(infoFile))) {
+            String lineId  = br.readLine();
+            String lineUrl = br.readLine();
+            String lineTs  = br.readLine();
+            String lineSz  = br.readLine();
+
+            boolean idOk  = videoId.equals(lineId);
+            boolean urlOk = videoUrl.equals(lineUrl);
+            boolean fileOk = cacheFile.exists() && cacheFile.length() > 0;
+
+            if (!idOk || !urlOk || !fileOk) return false;
+
+            if (lineSz != null) {
+                try {
+                    long recorded = Long.parseLong(lineSz.trim());
+                    if (recorded > 0 && recorded != cacheFile.length()) return false;
+                } catch (Exception ignore) {}
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 新规则文件名：<videoId>_<md5(videoId + "_" + canonicalUrl)>.mp4 */
     private String generateCacheFileName(String videoId, String videoUrl) {
+        String can = canonicalizeUrl(videoUrl);
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest((videoId + "_" + can).getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return videoId + "_" + sb + ".mp4";
+        } catch (Exception e) {
+            Log.e(TAG, "MD5生成失败，使用简化hash", e);
+            return videoId + "_" + Math.abs(can.hashCode()) + ".mp4";
+        }
+    }
+
+    /** 旧规则（兼容读取） */
+    private String generateCacheFileNameLegacy(String videoId, String videoUrl) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] digest = md.digest((videoId + "_" + videoUrl).getBytes());
@@ -152,18 +264,17 @@ public class VideoCacheManager {
             for (byte b : digest) sb.append(String.format("%02x", b));
             return videoId + "_" + sb + ".mp4";
         } catch (Exception e) {
-            Log.e(TAG, "MD5生成失败，使用简单hash", e);
             return videoId + "_" + Math.abs(videoUrl.hashCode()) + ".mp4";
         }
     }
 
-    /** 保存视频信息到 .info：videoId / url / timestamp / fileSize */
-    private void saveVideoInfo(String videoId, String videoUrl, String fileName, long fileSize) {
-        File infoFile = new File(cacheDir, fileName + VIDEO_INFO_SUFFIX);
+    /** 保存 .info（videoId / canonicalUrl / timestamp / fileSize） */
+    private void saveVideoInfo(String videoId, String videoUrl, String baseName, long fileSize) {
+        File infoFile = new File(cacheDir, baseName + SUFFIX_INFO);
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(infoFile);
-            String info = videoId + "\n" + videoUrl + "\n" + System.currentTimeMillis() + "\n" + fileSize;
+            String info = videoId + "\n" + canonicalizeUrl(videoUrl) + "\n" + System.currentTimeMillis() + "\n" + fileSize;
             fos.write(info.getBytes());
             fos.flush();
         } catch (Exception e) {
@@ -173,7 +284,7 @@ public class VideoCacheManager {
         }
     }
 
-    /** 清理缓存目录下的所有文件 */
+    /** 清空缓存目录 */
     public void clearCache() {
         if (cacheDir == null || !cacheDir.exists()) return;
         File[] files = cacheDir.listFiles();
@@ -186,9 +297,7 @@ public class VideoCacheManager {
         long size = 0;
         if (cacheDir != null && cacheDir.exists()) {
             File[] files = cacheDir.listFiles();
-            if (files != null) {
-                for (File f : files) size += f.length();
-            }
+            if (files != null) for (File f : files) size += f.length();
         }
         return size;
     }
@@ -198,7 +307,7 @@ public class VideoCacheManager {
         private final String videoId;
         private final String videoUrl;
         private final DownloadCallback callback;
-        private final String taskKey; // 文件名
+        private final String taskKey; // 目标基础名（含 .mp4）
         private String localPath;
 
         DownloadTask(String videoId, String videoUrl, DownloadCallback callback, String taskKey) {
@@ -219,101 +328,130 @@ public class VideoCacheManager {
             InputStream in = null;
             OutputStream out = null;
 
+            final int maxRetries = 3;          // 自动重试次数
+            int attempt = 0;
+            long backoffMs = 800;              // 指数回退起点
+            Exception lastErr = null;
+
             try {
-                // 再次短路：若此时已有缓存（可能别的任务刚下完）
+                // 若别的线程刚下完，直接命中
                 String cached = getLocalVideoPath(videoId, videoUrl);
                 if (cached != null) {
                     localPath = cached;
                     return null;
                 }
 
-                String fileName = taskKey; // 已经是生成好的文件名
-                File finalFile = new File(cacheDir, fileName);
-                File partFile  = new File(cacheDir, fileName + ".part");
+                final String baseName = taskKey; // 新规则生成的最终文件名（带 .mp4）
+                final File finalFile = new File(cacheDir, baseName);
+                File partFile = new File(cacheDir, baseName + SUFFIX_PART);
 
-                long existing = partFile.exists() ? partFile.length() : 0L;
+                while (attempt <= maxRetries && !isCancelled()) {
+                    attempt++;
 
-                URL url = new URL(videoUrl);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setConnectTimeout(CONNECT_TIMEOUT);
-                connection.setReadTimeout(READ_TIMEOUT);
-                connection.setRequestMethod("GET");
+                    try {
+                        long existing = partFile.exists() ? partFile.length() : 0L;
 
-                if (existing > 0) {
-                    // 断点续传
-                    connection.setRequestProperty("Range", "bytes=" + existing + "-");
-                }
-                connection.connect();
+                        URL url = new URL(videoUrl);
+                        connection = openWithRetry(url, existing);
 
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HttpURLConnection.HTTP_OK
-                        && responseCode != HttpURLConnection.HTTP_PARTIAL) {
-                    return "下载失败: HTTP " + responseCode;
-                }
-
-                // 若服务器不支持续传（给了 200），但我们有 .part，则从头下：清空旧 part
-                boolean append = (responseCode == HttpURLConnection.HTTP_PARTIAL) && (existing > 0);
-                if (!append && partFile.exists()) {
-                    // 200 或者没有 Range，则重下
-                    safeDelete(partFile);
-                    existing = 0L;
-                }
-
-                // 计算总大小（兼容老版本 API，避免 getContentLengthLong）
-                long totalSize = resolveContentLength(connection, responseCode, existing);
-
-                in = new BufferedInputStream(connection.getInputStream(), BUFFER_SIZE);
-                out = new BufferedOutputStream(new FileOutputStream(partFile, append), BUFFER_SIZE);
-
-                byte[] buffer = new byte[BUFFER_SIZE];
-                long downloaded = existing;
-                long lastPublish = System.currentTimeMillis();
-
-                while (true) {
-                    if (isCancelled()) return "下载已取消";
-                    int read = in.read(buffer);
-                    if (read == -1) break;
-
-                    out.write(buffer, 0, read);
-                    downloaded += read;
-
-                    if (totalSize > 0) {
-                        int progress = (int) (downloaded * 100 / totalSize);
-                        long now = System.currentTimeMillis();
-                        if (now - lastPublish >= 200) { // 200ms 节流
-                            publishProgress(progress);
-                            lastPublish = now;
+                        int code = connection.getResponseCode();
+                        if (code != HttpURLConnection.HTTP_OK
+                                && code != HttpURLConnection.HTTP_PARTIAL) {
+                            return "下载失败: HTTP " + code;
                         }
+
+                        boolean append = (code == HttpURLConnection.HTTP_PARTIAL) && (existing > 0);
+                        if (!append && partFile.exists()) {
+                            safeDelete(partFile);
+                            existing = 0L;
+                        }
+
+                        long totalSize = resolveContentLength(connection, code, existing);
+
+                        in = new BufferedInputStream(connection.getInputStream(), BUFFER_SIZE);
+                        out = new BufferedOutputStream(new FileOutputStream(partFile, append), BUFFER_SIZE);
+
+                        byte[] buffer = new byte[BUFFER_SIZE];
+                        long downloaded = existing;
+                        long lastPublish = System.currentTimeMillis();
+
+                        while (!isCancelled()) {
+                            int read = in.read(buffer);
+                            if (read == -1) break;
+
+                            out.write(buffer, 0, read);
+                            downloaded += read;
+
+                            if (totalSize > 0) {
+                                int progress = (int) (downloaded * 100 / totalSize);
+                                long now = System.currentTimeMillis();
+                                if (now - lastPublish >= 200) {
+                                    publishProgress(progress);
+                                    lastPublish = now;
+                                }
+                            }
+                        }
+
+                        out.flush();
+
+                        // —— 收尾：把 .part 提升到最终或 .staging ——
+                        PromoteResult pr = promotePartToFinalOrStaging(partFile, finalFile);
+                        if (pr.status == PromoteStatus.FAILED) {
+                            return "重命名缓存文件失败";
+                        }
+
+                        if (pr.status == PromoteStatus.FINAL_READY) {
+                            long finalSize = finalFile.length();
+                            saveVideoInfo(videoId, videoUrl, baseName, finalSize);
+                            localPath = finalFile.getAbsolutePath();
+                            publishProgress(100);
+                            return null;
+                        }
+
+                        // STAGED：被占用（例如正在播放），不当成失败；沿用旧文件播放
+                        if (finalFile.exists() && finalFile.length() > 0) {
+                            localPath = finalFile.getAbsolutePath();
+                            Log.w(TAG, "目标被占用，已暂存为 staging，稍后自动提升: " + baseName + SUFFIX_STAGING);
+                            publishProgress(100);
+                            return null;
+                        } else {
+                            return "目标占用且无旧文件可用";
+                        }
+
+                    } catch (Exception e) {
+                        lastErr = e;
+
+                        // 网络类异常：保留 .part，准备重试（断点续传）
+                        closeQuiet(out);
+                        closeQuiet(in);
+                        if (connection != null) connection.disconnect();
+
+                        if (attempt <= maxRetries &&
+                                (e instanceof java.net.SocketTimeoutException
+                                        || e instanceof java.net.SocketException
+                                        || e instanceof java.io.EOFException
+                                        || e instanceof SSLException)) {
+                            try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                            backoffMs = Math.min(backoffMs * 2, 5000);
+                            Log.w(TAG, "下载中断，第 " + attempt + " 次重试即将开始: " + e.getMessage());
+                            continue;
+                        }
+
+                        // 非可重试或已用尽次数
+                        Log.e(TAG, "下载视频失败: " + videoId, e);
+                        return "下载失败: " + e.getMessage();
+
+                    } finally {
+                        closeQuiet(out);
+                        closeQuiet(in);
+                        if (connection != null) connection.disconnect();
                     }
                 }
 
-                out.flush();
-                closeQuiet(out);
-                closeQuiet(in);
-                if (connection != null) connection.disconnect();
+                return "下载失败: " + (lastErr != null ? lastErr.getMessage() : "未知错误");
 
-                // 原子替换：.part -> .mp4
-                if (finalFile.exists() && !finalFile.delete()) {
-                    return "无法替换旧的缓存文件";
-                }
-                if (!partFile.renameTo(finalFile)) {
-                    return "重命名缓存文件失败";
-                }
-
-                long finalSize = finalFile.length();
-                saveVideoInfo(videoId, videoUrl, fileName, finalSize);
-                localPath = finalFile.getAbsolutePath();
-                // 再补发 100%
-                publishProgress(100);
-                return null;
-
-            } catch (Exception e) {
-                Log.e(TAG, "下载视频失败: " + videoId, e);
-                return "下载失败: " + e.getMessage();
             } finally {
-                closeQuiet(out);
-                closeQuiet(in);
-                if (connection != null) connection.disconnect();
+                // no-op
             }
         }
 
@@ -343,14 +481,137 @@ public class VideoCacheManager {
         }
     }
 
-    // ---------- 辅助方法 ----------
+    // ===== 提升/移动相关 =====
 
-    /** 兼容解析总长度（避免 API 24 的 getContentLengthLong） */
-    private static long resolveContentLength(HttpURLConnection conn, int responseCode, long existing) {
+    private enum PromoteStatus { FINAL_READY, STAGED, FAILED }
+
+    private static class PromoteResult {
+        final PromoteStatus status;
+        final File stagingFile;
+        PromoteResult(PromoteStatus s, File f) { status = s; stagingFile = f; }
+        static PromoteResult okFinal()  { return new PromoteResult(PromoteStatus.FINAL_READY, null); }
+        static PromoteResult okStaged(File f) { return new PromoteResult(PromoteStatus.STAGED, f); }
+        static PromoteResult fail()     { return new PromoteResult(PromoteStatus.FAILED, null); }
+    }
+
+    /** 将 .part 提升为最终文件；若目标被占用，改为 .staging 暂存 */
+    private PromoteResult promotePartToFinalOrStaging(File partFile, File finalFile) {
+        if (partFile == null || !partFile.exists()) return PromoteResult.fail();
+
+        // 若目标文件不存在或可以删除，则直接“移动/复制兜底”
+        if (!finalFile.exists() || finalFile.delete()) {
+            boolean moved = moveWithRetry(partFile, finalFile);
+            return moved ? PromoteResult.okFinal() : PromoteResult.fail();
+        }
+
+        // 目标存在且删除失败 -> 认为被占用：改名为 .staging
+        File staging = new File(finalFile.getParentFile(), finalFile.getName() + SUFFIX_STAGING);
+        if (staging.exists() && !staging.delete()) {
+            staging = new File(finalFile.getParentFile(),
+                    finalFile.getName() + "." + System.currentTimeMillis() + SUFFIX_STAGING);
+        }
+        boolean staged = moveWithRetry(partFile, staging);
+        return staged ? PromoteResult.okStaged(staging) : PromoteResult.fail();
+    }
+
+    /** 如果存在 .staging，尝试提升为最终文件（成功则补写 .info） */
+    private boolean tryPromoteStagingIfPossible(String videoId, String videoUrl,
+                                                File finalFile, File infoFile, File staging) {
+        if (!staging.exists()) return false;
+
+        // 若目标不存在或可删除 -> 尝试移动 staging → final
+        if (!finalFile.exists() || finalFile.delete()) {
+            if (moveWithRetry(staging, finalFile)) {
+                long finalSize = finalFile.length();
+                saveVideoInfo(videoId, videoUrl, finalFile.getName(), finalSize);
+                Log.i(TAG, "已将 staging 提升为最终文件: " + finalFile.getName());
+                return true;
+            } else {
+                Log.w(TAG, "staging 提升失败（稍后重试）: " + finalFile.getName());
+                return false;
+            }
+        } else {
+            // 目标仍被占用，保持 staging，等下次再试
+            Log.d(TAG, "目标仍被占用，保持 staging: " + finalFile.getName());
+            return false;
+        }
+    }
+
+    /** 可靠移动：先多次 renameTo，失败再复制兜底（并删除源） */
+    private static boolean moveWithRetry(File src, File dst) {
+        if (src == null || dst == null || !src.exists()) return false;
+
+        File parent = dst.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+
+        // 多次 renameTo（最多 6 次，每次间隔 100ms）
+        for (int i = 0; i < 6; i++) {
+            if (src.renameTo(dst)) return true;
+            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            try { System.gc(); } catch (Throwable ignore) {}
+        }
+
+        // 复制兜底
+        FileInputStream fis = null;
+        FileOutputStream fos = null;
         try {
-            if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
-                // Content-Range: bytes <start>-<end>/<total>
-                String range = conn.getHeaderField("Content-Range");
+            fis = new FileInputStream(src);
+            fos = new FileOutputStream(dst, false);
+            byte[] buf = new byte[BUFFER_SIZE];
+            int r;
+            while ((r = fis.read(buf)) != -1) {
+                fos.write(buf, 0, r);
+            }
+            fos.flush();
+            try { fos.getFD().sync(); } catch (Throwable ignore) {}
+        } catch (Exception e) {
+            Log.e(TAG, "moveWithRetry: 复制兜底失败: " + e.getMessage());
+            return false;
+        } finally {
+            closeQuiet(fis);
+            closeQuiet(fos);
+        }
+        boolean del = src.delete();
+        if (!del) Log.w(TAG, "moveWithRetry: 复制后删除源失败: " + src.getAbsolutePath());
+        return true;
+    }
+
+    // ===== 网络与工具 =====
+
+    /** 带重试 + 退避 的连接打开（支持断点续传） */
+    private HttpURLConnection openWithRetry(URL url, long resumeFrom) throws Exception {
+        int attempt = 0;
+        long backoff = 600;
+        while (true) {
+            attempt++;
+            HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            c.setInstanceFollowRedirects(true);
+            c.setConnectTimeout(CONNECT_TIMEOUT + 10000);
+            c.setReadTimeout(READ_TIMEOUT + 10000);
+            c.setRequestMethod("GET");
+            c.setRequestProperty("User-Agent", "RN-VideoCache/1.1");
+            c.setRequestProperty("Accept-Encoding", "identity"); // 争取拿到 Content-Length
+            if (resumeFrom > 0) c.setRequestProperty("Range", "bytes=" + resumeFrom + "-");
+            c.setRequestProperty("Cache-Control", "no-cache");
+            c.setUseCaches(false);
+            try {
+                c.connect();
+                return c;
+            } catch (Exception e) {
+                try { c.disconnect(); } catch (Throwable ignore) {}
+                if (attempt >= 3) throw e;
+                try { Thread.sleep(backoff); } catch (InterruptedException ignored) {}
+                backoff = Math.min(backoff * 2, 4000);
+                Log.w(TAG, "openWithRetry: 第 " + attempt + " 次连接失败，重试… 原因: " + e.getMessage());
+            }
+        }
+    }
+
+    /** 解析总长度（兼容 HTTP 200/206） */
+    private static long resolveContentLength(HttpURLConnection conn, int code, long existing) {
+        try {
+            if (code == HttpURLConnection.HTTP_PARTIAL) {
+                String range = conn.getHeaderField("Content-Range"); // bytes start-end/total
                 if (range != null) {
                     int slash = range.lastIndexOf('/');
                     if (slash >= 0 && slash + 1 < range.length()) {
@@ -359,33 +620,26 @@ public class VideoCacheManager {
                     }
                 }
             } else {
-                // 200 场景：优先 Content-Length 头
                 String cl = conn.getHeaderField("Content-Length");
-                if (cl != null) {
-                    return Long.parseLong(cl.trim());
-                }
-                // 退化为 getContentLength（int）
+                if (cl != null) return Long.parseLong(cl.trim());
                 int len = conn.getContentLength();
                 if (len > 0) return (long) len;
             }
         } catch (Exception ignore) {}
-        // 未知总长度（如分块传输），返回 -1 表示无法计算进度
         return -1L;
     }
 
     private static void closeQuiet(InputStream is) {
         try { if (is != null) is.close(); } catch (Exception ignore) {}
     }
-
     private static void closeQuiet(OutputStream os) {
         try { if (os != null) os.close(); } catch (Exception ignore) {}
     }
-
     private static void safeDelete(File f) {
         try { if (f != null && f.exists()) f.delete(); } catch (Exception ignore) {}
     }
 
-    /** 下载回调接口 */
+    /** 回调接口 */
     public interface DownloadCallback {
         void onStart(String videoId);
         void onProgress(String videoId, int progress);

@@ -1,3 +1,4 @@
+
 package com.aplus.remotenursing;
 
 import android.app.Activity;
@@ -7,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,10 +20,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -29,9 +31,9 @@ import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
 import com.aplus.remotenursing.common.VideoPlayUtils;
-import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
 import com.aplus.remotenursing.manager.PermissionManager;
 import com.aplus.remotenursing.manager.VideoCacheManager;
+import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
 import com.aplus.remotenursing.models.VideoTaskDetail;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
@@ -42,6 +44,7 @@ import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,8 +57,10 @@ import java.util.Set;
 
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.MediaType;            // [ADD]
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;         // [ADD]
 import okhttp3.Response;
 
 public class VideoTaskDetailFragment extends Fragment {
@@ -104,6 +109,31 @@ public class VideoTaskDetailFragment extends Fragment {
     private boolean isTransitioning = false;
     private boolean isPlayingNext = false;
 
+    // ====== [ADD] END阈值 + 去重用跨回调标志 ======
+    private long lastReadyStartMs = 0L;             // 本条进入 READY 的时刻（用于过滤伪 END，可留作调试）
+    private boolean hasRecordedForThisItem = false; // 本条是否已记过（跨回调/手动切换去重）
+    // ============================================
+
+    // ====== [ADD] Q-Ack 旁路更新相关 ======
+    private String userIdArg;                  // 当前用户
+    private String videoSeriesIdArg;           // 当前视频系列ID（从参数传入）
+    private final OkHttpClient httpForUpdates = new OkHttpClient(); // 统一复用
+    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    // —— 更新接口返回的模型（最小字段）——
+    private static class UpdateNotice {
+        long notice_id;
+        String video_id;
+        String download_url;
+        Long file_size;
+        String md5;
+        String memo;
+    }
+    private static class UpdateResponseX {
+        List<UpdateNotice> notices;
+    }
+    // ====================================
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -123,6 +153,7 @@ public class VideoTaskDetailFragment extends Fragment {
                     .commit();
             return;
         }
+        this.userIdArg = userId; // [ADD] 记录到字段，后台更新用
 
         // 初始化播放历史追踪器
         playHistoryManager = VideoPlayHistoryManager.getInstance(getContext());
@@ -131,6 +162,7 @@ public class VideoTaskDetailFragment extends Fragment {
         playHistoryManager.uploadAndClearRecords();
 
         String videoSeriesId = getArguments() != null ? getArguments().getString("videoSeriesId") : null;
+        this.videoSeriesIdArg = videoSeriesId; // [ADD] 记录到字段（后台更新用）
         String videoSeriesName = getArguments() != null ? getArguments().getString("videoSeriesName") : "视频系列";
 
         // 1) 初始化 UI
@@ -174,6 +206,9 @@ public class VideoTaskDetailFragment extends Fragment {
 
             // 6) 延迟预加载（纯后台，不触碰 player）
             schedulePreloadNextVideo();
+
+            // 7) [ADD] 旁路：后台检查是否有未ACK的更新 → 静默刷新缓存 → ACK
+            checkAndRefreshVideoCacheInBackground();
         });
     }
 
@@ -291,6 +326,11 @@ public class VideoTaskDetailFragment extends Fragment {
                         // 视频开始播放
                         lastVideoStartTime = System.currentTimeMillis();
                         hasRecordedCurrent = false; // 重置记录标志
+
+                        // [ADD] 记录 READY 时刻 & 跨回调去重复位
+                        lastReadyStartMs = SystemClock.elapsedRealtime();
+                        hasRecordedForThisItem = false;
+
                         Log.d(TAG, "视频准备就绪 - VideoID: " +
                                 (currentItem != null ? currentItem.getVideoId() : "null") +
                                 ", 视频名: " + (currentItem != null ? currentItem.getVideoName() : "null"));
@@ -298,13 +338,16 @@ public class VideoTaskDetailFragment extends Fragment {
                     } else if (playbackState == Player.STATE_ENDED) {
                         Log.d(TAG, "视频播放结束 - 准备记录");
 
-                        // 播放结束时记录（如果还没记录过）
-                        if (!hasRecordedCurrent) {
-                            recordCurrentVideoPlay();
+                        // [ADD] 结束时加阈值 + 去重
+                        if (!hasRecordedCurrent && playedEnoughToCount()) {
+                            recordCurrentVideoPlay();                // 内部会把 hasRecordedCurrent 置位
+                            hasRecordedForThisItem = true;           // 跨回调去重
+                        } else {
+                            Log.d(TAG, "忽略过早的 END（<5s 或 <10%），可能是替换 MediaItem 触发的");
                         }
 
-                        // 延迟播放下一个
-                        if (!isPlayingNext) {
+                        // [ADD] 只有“有效播放”才自动播下一条
+                        if (playedEnoughToCount() && !isPlayingNext) {
                             mainHandler.postDelayed(() -> {
                                 if (!isPlayingNext) {
                                     playNextVideo();
@@ -320,12 +363,13 @@ public class VideoTaskDetailFragment extends Fragment {
                             ", 从 " + (currentItem != null ? currentItem.getVideoName() : "null") +
                             " 切换");
 
-                    // 在切换前记录上一个视频（如果播放时间超过5秒且未记录）
+                    // [ADD] 在切换前记录上一个视频（阈值 + 去重）
                     if (currentItem != null && !hasRecordedCurrent && lastVideoStartTime > 0) {
                         long playDuration = System.currentTimeMillis() - lastVideoStartTime;
                         if (playDuration > 5000) { // 播放超过5秒才记录
                             Log.d(TAG, "切换前记录上一个视频，播放时长: " + (playDuration/1000) + "秒");
                             recordCurrentVideoPlay();
+                            hasRecordedForThisItem = true; // 跨回调去重
                         }
                     }
 
@@ -395,6 +439,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
                     lastRecordedVideoId = videoId;
                     hasRecordedCurrent = true;
+                    hasRecordedForThisItem = true; // [ADD] 跨回调去重
 
                     // 立即打印所有记录
                     Log.d(TAG, "===== 记录后的播放历史 =====");
@@ -525,10 +570,12 @@ public class VideoTaskDetailFragment extends Fragment {
 
         Log.d(TAG, "switchToVideoByIndex - 从索引 " + currentVideoIndex + " 切换到 " + index);
 
-        // 切换前记录当前视频（如果播放时间足够长）
+        // [MODIFY] 切换前记录当前视频（阈值 + 去重 + 避免 END 后重复记）
         if (currentItem != null && player != null && playHistoryManager != null) {
+            int state = player.getPlaybackState();
             long position = player.getCurrentPosition();
-            if (position > 5000) { // 播放超过5秒
+
+            if (state != Player.STATE_ENDED && !hasRecordedForThisItem && position > 5000) { // >5s 才算有效
                 String videoId = currentItem.getVideoId();
                 if (TextUtils.isEmpty(videoId)) {
                     videoId = VideoPlayUtils.videoIdFromUrl(currentItem.getVideoURL());
@@ -553,6 +600,9 @@ public class VideoTaskDetailFragment extends Fragment {
 
                 // 查看记录状态
                 playHistoryManager.logAllLocalData();
+
+                // [ADD] 跨回调去重置位，避免后续 ENDED/其它位置再次记录
+                hasRecordedForThisItem = true;
             }
         }
 
@@ -587,6 +637,10 @@ public class VideoTaskDetailFragment extends Fragment {
         }
         player.setPlayWhenReady(true);
 
+        // 新条目开始播放时，复位跨回调去重标志
+        hasRecordedForThisItem = false;
+        lastReadyStartMs = SystemClock.elapsedRealtime();
+
         // 延迟重置标志
         mainHandler.postDelayed(() -> {
             isTransitioning = false;
@@ -597,6 +651,17 @@ public class VideoTaskDetailFragment extends Fragment {
         if (isUsingCache) {
             cacheVideoInBackground(currentItem);
         }
+
+        // [ADD] 切换到新视频后，也尝试旁路更新该新视频的缓存
+        checkAndRefreshVideoCacheInBackground();
+    }
+
+    // [ADD] 统一阈值：>5s 或 >10% 才算一次有效观看
+    private boolean playedEnoughToCount() {
+        if (player == null) return false;
+        long pos = Math.max(0L, player.getCurrentPosition());
+        long dur = Math.max(0L, player.getDuration());
+        return pos >= 5000 || (dur > 0 && pos >= dur / 10);
     }
 
     /** 播放下一个视频（防死循环版本） */
@@ -709,7 +774,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
     // ---------- UI：缓存状态/按钮/进度条联动 ----------
 
-    /** 带 UI 联动地下载当前视频 */
+    /** 带 UI 联动地下载当前视频（若是当前正在播放且要覆盖，则先跳到下一条，再促成升级） */
     private void downloadCurrentVideoWithUi(@NonNull VideoTaskDetail item) {
         if (!isUsingCache || cacheManager == null) return;
 
@@ -752,13 +817,76 @@ public class VideoTaskDetailFragment extends Fragment {
             }
             @Override public void onError(String id, String error) {
                 Log.w("VideoCache", "下载失败: " + error);
+
+                // 仅在“目标被占用/重命名失败”时，采取跳转下一条策略
+                boolean maybeInUse = error != null && (error.contains("重命名缓存文件失败")
+                        || error.contains("占用") || error.contains("in use") || error.contains("rename"));
+
+                if (maybeInUse) {
+                    Integer idxObj = id2Index.get(id);
+                    if (idxObj != null) {
+                        // ★ 关键：任何 player.* 调用切回主线程
+                        withPlayerOnMain(() -> {
+                            if (player == null) return;
+                            int idx = idxObj;
+                            boolean isCurrent = (player.getCurrentMediaItemIndex() == idx);
+                            if (isCurrent) {
+                                int next = (idx + 1) % (videoList == null ? 1 : videoList.size());
+                                mainHandler.post(() -> showShortToast("视频正在更新缓存，已临时播放下一条…"));
+                                switchToVideoByIndex(next);
+
+                                // 切走后改用智能退避重试 promote
+                                scheduleTryPromoteWithBackoff(videoId, url, idx);
+                            }
+                        });
+                    }
+                }
+
                 mainHandler.post(() -> {
                     hideDownloadProgress();
                     if (btnCacheStatus != null) btnCacheStatus.setText("未缓存");
-                    Toast.makeText(requireContext(), "缓存失败，请稍后重试", Toast.LENGTH_SHORT).show();
+                    if (!maybeInUse) {
+                        Toast.makeText(requireContext(), "缓存失败，请稍后重试", Toast.LENGTH_SHORT).show();
+                    }
                 });
             }
         });
+    }
+    /** 智能重试 tryPromoteNow：仅在该 videoId 不在 preloading 集合时尝试；
+     *  没成功即按 600ms / 1500ms / 3000ms 做退避重试；成功则 maybeSwapToLocal(idx)。
+     */
+    private void scheduleTryPromoteWithBackoff(@NonNull String videoId,
+                                               @NonNull String url,
+                                               int indexIfKnown) {
+        long[] delays = new long[]{600, 1500, 3000};
+        scheduleTryPromoteWithBackoffInternal(videoId, url, indexIfKnown, delays, 0);
+    }
+
+    private void scheduleTryPromoteWithBackoffInternal(@NonNull String videoId,
+                                                       @NonNull String url,
+                                                       int indexIfKnown,
+                                                       @NonNull long[] delays,
+                                                       int attempt) {
+        if (attempt >= delays.length) return;
+        long delay = delays[attempt];
+        mainHandler.postDelayed(() -> {
+            // 若仍在预加载，跳过本次尝试，直接进入下一轮退避
+            if (preloading.contains(videoId)) {
+                Log.i("VideoCache", "promote skipped (still preloading): " + videoId + ", attempt=" + (attempt + 1));
+                scheduleTryPromoteWithBackoffInternal(videoId, url, indexIfKnown, delays, attempt + 1);
+                return;
+            }
+            boolean promoted = (cacheManager != null) && cacheManager.tryPromoteNow(videoId, url);
+            Log.i("VideoCache", "tryPromoteNow attempt#" + (attempt + 1) + " after " + delay + "ms: " + promoted);
+            if (promoted) {
+                if (indexIfKnown >= 0) {
+                    updateCacheInfo();
+                    maybeSwapToLocal(indexIfKnown);
+                }
+            } else {
+                scheduleTryPromoteWithBackoffInternal(videoId, url, indexIfKnown, delays, attempt + 1);
+            }
+        }, delay);
     }
 
     private void updateCacheStatus(VideoTaskDetail item) {
@@ -930,22 +1058,30 @@ public class VideoTaskDetailFragment extends Fragment {
     }
 
     private void fetchVideoList(String userId, String videoSeriesId, VideoListCallback callback) {
-        OkHttpClient client = new OkHttpClient();
+        OkHttpClient client = httpForUpdates; // 复用
         String url = ApiConfig.API_VIDEO_DETAIL_BY_SERIES_ID + videoSeriesId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
                 e.printStackTrace();
-                if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(null));
+                Activity act = getActivity();
+                if (act != null) act.runOnUiThread(() -> callback.onResult(null));
             }
-            @Override public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful()) {
-                    String json = response.body().string();
+            @Override public void onResponse(Call call, Response response) {
+                try (Response resp = response) { // 确保关闭
+                    Activity act = getActivity();
+                    if (!resp.isSuccessful() || resp.body() == null) {
+                        if (act != null) act.runOnUiThread(() -> callback.onResult(null));
+                        return;
+                    }
+                    String json = resp.body().string();
                     List<VideoTaskDetail> list =
                             gson.fromJson(json, new TypeToken<List<VideoTaskDetail>>(){}.getType());
-                    if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(list));
-                } else {
-                    if (getActivity() != null) getActivity().runOnUiThread(() -> callback.onResult(null));
+                    if (act != null) act.runOnUiThread(() -> callback.onResult(list));
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                    Activity act = getActivity();
+                    if (act != null) act.runOnUiThread(() -> callback.onResult(null));
                 }
             }
         });
@@ -1173,4 +1309,166 @@ public class VideoTaskDetailFragment extends Fragment {
         isTransitioning = false;
         isPlayingNext = false;
     }
+
+    // ===================== [ADD] ExoPlayer 线程封装工具 =====================
+    private Handler playerHandler() {
+        if (player != null && player.getApplicationLooper() != null) {
+            return new Handler(player.getApplicationLooper());
+        }
+        return mainHandler; // 兜底：主线程
+    }
+
+    private void withPlayerOnMain(@NonNull Runnable r) {
+        Handler h = playerHandler();
+        if (Looper.myLooper() == h.getLooper()) {
+            r.run();
+        } else {
+            h.post(r);
+        }
+    }
+
+    private boolean canTouchUiOrPlayer() {
+        return isAdded()
+                && getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)
+                && player != null;
+    }
+    // =====================================================================
+
+    // ===================== [ADD] Q-Ack 旁路更新实现 =====================
+
+    /** 旁路：后台检查“未ACK”的更新 → 如有则静默下载覆盖 → ACK 回执
+     *  若正好是“当前播放的视频”，则先切到下一条释放占用，再进行覆盖，并尝试立即提升 .staging
+     */
+    private void checkAndRefreshVideoCacheInBackground() {
+        if (!isUsingCache || cacheManager == null) return;
+        if (videoSeriesIdArg == null || currentItem == null) return;
+
+        final String curUrl = currentItem.getVideoURL();
+        final String curVid = !TextUtils.isEmpty(currentItem.getVideoId())
+                ? currentItem.getVideoId()
+                : VideoPlayUtils.videoIdFromUrl(curUrl);
+
+        final String seriesId = videoSeriesIdArg;
+        final String userId = userIdArg;
+
+        final String updatesUrl = ApiConfig.API_VIDEO_UPDATES_RECEIPT
+                + "?series_id=" + Uri.encode(seriesId)
+                + "&video_id="  + Uri.encode(curVid)
+                + "&user_id="   + Uri.encode(userId);
+
+        Request req = new Request.Builder().url(updatesUrl).get().build();
+        httpForUpdates.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.w(TAG, "检查更新失败: " + e.getMessage());
+            }
+
+            @Override public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response resp = response) { // 确保关闭
+                    if (!resp.isSuccessful() || resp.body() == null) {
+                        Log.w(TAG, "检查更新返回非成功状态码: " + resp.code());
+                        return;
+                    }
+                    UpdateResponseX ur = gson.fromJson(resp.body().charStream(), UpdateResponseX.class);
+                    if (ur == null || ur.notices == null || ur.notices.isEmpty()) {
+                        Log.d(TAG, "无未ACK更新");
+                        return;
+                    }
+                    final UpdateNotice n = ur.notices.get(0);
+                    final String forceUrl = n.download_url;
+                    final String videoIdForCache = curVid;
+                    Log.i(TAG, "检测到未ACK更新: notice_id=" + n.notice_id
+                            + ", targetVideoId=" + videoIdForCache
+                            + ", will refresh in background");
+                    Integer idxObj = id2Index.get(videoIdForCache);
+                    final int idx = (idxObj == null ? -1 : idxObj);
+
+                    // ★★★ 关键：所有 player.* 操作切回到 ExoPlayer 的应用线程/主线程
+                    withPlayerOnMain(() -> {
+                        if (!canTouchUiOrPlayer()) {
+                            // Fragment/Player 暂不可用，直接后台强刷
+                            forceRefreshVideoCache(videoIdForCache, forceUrl, idx, n, userId);
+                            return;
+                        }
+
+                        boolean isCurrent = (idx >= 0 && playerPrepared && player.getCurrentMediaItemIndex() == idx);
+                        if (isCurrent) {
+                            int next = (idx + 1) % (videoList == null ? 1 : videoList.size());
+                            showShortToast("检测到此视频有更新，已临时切到下一条，后台更新中…");
+                            switchToVideoByIndex(next);
+
+                            // 切走后稍等再开始强制刷新
+                            mainHandler.postDelayed(() ->
+                                            forceRefreshVideoCache(videoIdForCache, forceUrl, idx, n, userId),
+                                    700
+                            );
+                        } else {
+                            // 当前未播放该条，直接后台强刷
+                            forceRefreshVideoCache(videoIdForCache, forceUrl, idx, n, userId);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    // 提取的强制刷新逻辑（下载 → 尝试提升 → ACK → UI小收尾）
+    private void forceRefreshVideoCache(String videoIdForCache,
+                                        String forceUrl,
+                                        int idx,
+                                        @NonNull UpdateNotice n,
+                                        @NonNull String userId) {
+        if (!isUsingCache || cacheManager == null) return;
+
+        cacheManager.downloadAndCacheVideoForce(videoIdForCache, forceUrl,
+                new VideoCacheManager.DownloadCallback() {
+                    @Override public void onStart(String id) {}
+
+                    @Override public void onProgress(String id, int progress) {}
+
+                    @Override public void onSuccess(String id, String localPath) {
+                        Log.i(TAG, "旁路更新完成(可能已落到 .staging)");
+                        // 统一使用智能退避 promote，并在成功后 maybeSwapToLocal(idx)
+                        scheduleTryPromoteWithBackoff(videoIdForCache, forceUrl, idx);
+
+                        // 成功与否都回 ACK（服务端可据 status 判定）
+                        ackUpdate(ApiConfig.API_VIDEO_UPDATES_RECEIPT, n.notice_id, userId, videoIdForCache, true, null);
+                    }
+
+                    @Override public void onError(String id, String error) {
+                        Log.w(TAG, "旁路更新下载失败: " + error);
+                        ackUpdate(ApiConfig.API_VIDEO_UPDATES_RECEIPT, n.notice_id, userId, videoIdForCache, false, "download_or_verify_failed");
+                    }
+                });
+    }
+
+    /** 回执 ACK：POST /api/videos/updates/{noticeId}/ack */
+    private void ackUpdate(String apiRoot, long noticeId, String userId, String videoId, boolean success, @Nullable String failReason) {
+        try {
+            String ackUrl = apiRoot + "/" + noticeId + "/ack";
+            String payload = "{\"user_id\":\""+userId+"\",\"video_id\":\""+videoId+"\","
+                    + "\"status\":\""+(success?"success":"failed")+"\","
+                    + "\"fail_reason\":\""+(failReason==null?"":failReason.replace("\"","'"))+"\"}";
+            RequestBody body = RequestBody.create(payload, JSON);
+            Request req = new Request.Builder().url(ackUrl).post(body).build();
+            httpForUpdates.newCall(req).enqueue(new Callback() {
+                @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    Log.w(TAG, "ACK 上报失败: " + e.getMessage());
+                }
+                @Override public void onResponse(@NonNull Call call, @NonNull Response response) {
+                    Log.d(TAG, "ACK 上报完成，code=" + response.code());
+                    response.close();
+                }
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "ACK 构造/发送异常: " + t.getMessage());
+        }
+    }
+
+    private void showShortToast(String msg) {
+        try {
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignore) {}
+    }
+
+    // =================== [END] Q-Ack 旁路更新实现 ===================
 }

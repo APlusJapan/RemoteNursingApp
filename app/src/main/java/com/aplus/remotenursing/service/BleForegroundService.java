@@ -24,8 +24,8 @@ import com.aplus.remotenursing.R;
  */
 public class BleForegroundService extends Service {
 
-    public static final String ACTION_START = "com.aplus.remotenursing.ble.action.START";
-    public static final String ACTION_STOP  = "com.aplus.remotenursing.ble.action.STOP";
+    public static final String ACTION_START = "com.aplus.remotenursing.service.BleForegroundService.START";
+    public static final String ACTION_STOP  = "com.aplus.remotenursing.service.BleForegroundService.STOP";
 
     // 通知渠道与 ID
     private static final String CHANNEL_ID = "rn_ble";
@@ -45,8 +45,11 @@ public class BleForegroundService extends Service {
     /** 便捷停止 */
     public static void stop(Context context) {
         Intent i = new Intent(context, BleForegroundService.class).setAction(ACTION_STOP);
-        // 已在前台时直接发 startService 即可触发 onStartCommand 走停止分支
-        context.startService(i);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(i);
+        } else {
+            context.startService(i);
+        }
     }
 
     @Override

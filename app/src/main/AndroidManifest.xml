@@ -13,7 +13,8 @@
     <!-- Android 12+ 新蓝牙权限（如果需要 BLE 扫描/连接） -->
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"/>
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <!-- 如需 BLE 广播再加：BLUETOOTH_ADVERTISE -->
     <!-- <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" /> -->
@@ -43,7 +44,7 @@
         android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
         tools:targetApi="34" />
 
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33"/>
 
     <application
         android:allowBackup="true"
@@ -55,9 +56,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RemoteNursing"
         android:networkSecurityConfig="@xml/network_security_config"
+        android:enableOnBackInvokedCallback="true"
         tools:targetApi="33">
         <service
-            android:name=".ble.BleForegroundService"
+            android:name=".service.BleForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|dataSync" />
         <activity

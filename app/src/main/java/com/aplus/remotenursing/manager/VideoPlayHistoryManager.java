@@ -183,61 +183,81 @@ public class VideoPlayHistoryManager {
     /**
      * 上传播放记录到服务器并清除本地记录
      */
+    /**
+     * 只上传“到昨天为止”的播放记录；今天的记录保留在本地。
+     * 上传成功后，仅删除已上传的记录，并持久化剩余记录。
+     */
     public void uploadAndClearRecords() {
         UserAccount userAccount = UserUtils.getUserAccount(context);
-        String userId = userAccount.getUserId();
-        String adminId = userAccount.getAdminId();
+        String userId = (userAccount != null) ? userAccount.getUserId() : null;
+        String adminId = (userAccount != null) ? userAccount.getAdminId() : null;
+
         if (TextUtils.isEmpty(userId)) {
             Log.w(TAG, "用户未登录，跳过上传播放记录");
             return;
         }
-
         if (playRecordsList.isEmpty()) {
             Log.d(TAG, "无播放记录需要上传");
             return;
         }
 
-        Log.d(TAG, "开始上传播放记录，共 " + playRecordsList.size() + " 条");
+        // 计算“今天”的 yyyy-MM-dd（本地时区）。如果你希望固定中国时区，可取消注释 timeZone 设置。
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        // sdf.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai")); // 固定中国时区（可选）
+        final String today = sdf.format(new Date());
 
-        // 调试：打印要上传的所有记录
-        for (PlayCountRecord record : playRecordsList) {
-            Log.d(TAG, "准备上传 - VideoID: " + record.videoId +
-                    ", 视频名: " + record.videoName +
-                    ", 播放次数: " + record.playCount);
+        // 按“早于今天”过滤：只上传这些；其余（含今天/未来）保留
+        final List<PlayCountRecord> toUpload = new ArrayList<>();
+        final List<PlayCountRecord> toKeep = new ArrayList<>();
+
+        for (PlayCountRecord r : playRecordsList) {
+            String d = r.playDate;
+            // 记录没有日期，视为需要上传（避免永久积压）
+            if (TextUtils.isEmpty(d)) {
+                toUpload.add(r);
+            } else if (d.compareTo(today) < 0) { // yyyy-MM-dd 同格式可直接字典序比较
+                toUpload.add(r);
+            } else {
+                toKeep.add(r); // 今天及以后 → 保留
+            }
         }
 
-        // 构建上传数据
+        if (toUpload.isEmpty()) {
+            Log.d(TAG, "没有早于今天的记录需要上传（今天的记录将保留到明天）");
+            return;
+        }
+
+        Log.d(TAG, "开始上传播放记录：总数=" + playRecordsList.size()
+                + "，上传（<今天）=" + toUpload.size()
+                + "，保留（>=今天）=" + toKeep.size());
+
+        // 组装上传数据（仅 toUpload）
         Map<String, Object> uploadData = new HashMap<>();
         uploadData.put("userId", userId);
         uploadData.put("adminId", adminId);
 
         List<Map<String, Object>> records = new ArrayList<>();
-        for (PlayCountRecord record : playRecordsList) {
-            // 为每条记录设置userId
-            record.userId = userId;
-
-            Map<String, Object> recordMap = new HashMap<>();
-            recordMap.put("playHistoryId", record.playHistoryId);
-            recordMap.put("userId", userId); // 确保userId被设置
-            recordMap.put("videoId", record.videoId);
-            recordMap.put("videoSeriesId", record.videoSeriesId);
-            recordMap.put("videoName", record.videoName);
-            recordMap.put("videoSeriesName", record.videoSeriesName);
-            recordMap.put("playTime", record.playTime); // 播放次数
-            recordMap.put("videoDuration", record.videoDuration);
-            recordMap.put("playDate", record.playDate);
-            recordMap.put("adminId", adminId); // 添加adminId
-
-            records.add(recordMap);
+        for (PlayCountRecord r : toUpload) {
+            r.userId = userId; // 保底写入
+            Map<String, Object> row = new HashMap<>();
+            row.put("playHistoryId", r.playHistoryId);
+            row.put("userId", userId);
+            row.put("videoId", r.videoId);
+            row.put("videoSeriesId", r.videoSeriesId);
+            row.put("videoName", r.videoName);
+            row.put("videoSeriesName", r.videoSeriesName);
+            row.put("playTime", r.playTime);
+            row.put("videoDuration", r.videoDuration);
+            row.put("playDate", r.playDate);
+            row.put("adminId", adminId);
+            records.add(row);
         }
         uploadData.put("records", records);
 
-        // 发送到服务器
         String json = gson.toJson(uploadData);
-        Log.d(TAG, "上传JSON数据: " + json); // 调试：打印完整的上传数据
+        Log.d(TAG, "上传JSON数据（仅<今天）: " + json);
 
         RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
-
         Request request = new Request.Builder()
                 .url(ApiConfig.API_VIDEO_HISTORY_RECORD_SAVE)
                 .post(body)
@@ -245,25 +265,26 @@ public class VideoPlayHistoryManager {
 
         OkHttpClient client = new OkHttpClient();
         client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
+            @Override public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "上传播放记录失败: " + e.getMessage());
+                // 失败时不清理，留待下次再传
             }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String responseBody = response.body().string();
+            @Override public void onResponse(Call call, Response response) throws IOException {
+                String resp = response.body() != null ? response.body().string() : "";
                 if (response.isSuccessful()) {
-                    Log.d(TAG, "上传播放记录成功，响应: " + responseBody);
-                    // 上传成功后清除本地记录
-                    clearLocalRecords();
+                    Log.d(TAG, "上传播放记录成功，响应: " + resp);
+                    // 只清理已上传的，保留今天及以后
+                    playRecordsList = toKeep;
+                    saveLocalRecords(); // 持久化剩余记录
+                    Log.d(TAG, "清理已上传的<今天记录。剩余本地记录数: " + playRecordsList.size());
                 } else {
-                    Log.e(TAG, "上传播放记录失败，响应码: " + response.code() +
-                            ", 响应内容: " + responseBody);
+                    Log.e(TAG, "上传播放记录失败，HTTP " + response.code() + "，响应: " + resp);
+                    // 失败时不清理，留待下次再传
                 }
             }
         });
     }
+
 
     /**
      * 清除本地播放记录
