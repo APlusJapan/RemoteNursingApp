@@ -15,6 +15,8 @@ public class UserAccount {
     @SerializedName(value = "adminId", alternate = {"admin_id"})
     private String adminId;
 
+    private String teamId;
+    private String projectId;
     public UserAccount() {}
 
     // ---- Getter & Setter (全部用驼峰风格，和字段保持一致) ----
@@ -29,4 +31,8 @@ public class UserAccount {
 
     public String getAdminId() { return adminId; }
     public void setAdminId(String adminId) { this.adminId = adminId; }
+    public String getProjectId() { return projectId; }
+    public void setProjectId(String projectId) { this.projectId = projectId; }
+    public String getTeamId() { return teamId; }
+    public void setTeamId(String teamId) { this.teamId = teamId; }
 }
