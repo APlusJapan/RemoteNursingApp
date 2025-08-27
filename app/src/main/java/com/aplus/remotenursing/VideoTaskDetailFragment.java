@@ -502,10 +502,18 @@ public class VideoTaskDetailFragment extends Fragment {
 
     /** 通过索引切换视频（防死循环版本） */
     private void switchToVideoByIndex(int index) {
-        if (player == null || videoList == null || index < 0 || index >= videoList.size()) return;
-        if (index == currentVideoIndex) return;
+        if (player == null || videoList == null || index < 0 || index >= videoList.size()) {
+            Log.w(TAG, "(小屏模式)switchToVideoByIndex 参数无效: index=" + index + ", videoListSize=" + (videoList == null ? "null" : videoList.size()));
+            return;
+        }
+        if (index == currentVideoIndex) {
+            Log.d(TAG, "(小屏模式)switchToVideoByIndex 索引未变: " + index);
+            return;
+        }
 
-        Log.d(TAG, "switchToVideoByIndex - 从索引 " + currentVideoIndex + " 切换到 " + index);
+        Log.i(TAG, "(小屏模式)switchToVideoByIndex - 从索引 " + currentVideoIndex + " 切换到 " + index);
+        Log.i(TAG, "  切换前视频: " + (currentItem != null ? currentItem.getVideoName() : "null"));
+        Log.i(TAG, "  切换后视频: " + videoList.get(index).getVideoName());
 
         // 切换前记录当前视频（阈值 + 去重 + 避免 END 后重复记）
         if (currentItem != null && player != null) {
@@ -971,28 +979,44 @@ public class VideoTaskDetailFragment extends Fragment {
             boolean playReady = data.getBooleanExtra(VideoFullscreenPlayerActivity.EXTRA_END_PLAYREADY, true);
             int returnedIndex = data.getIntExtra(VideoFullscreenPlayerActivity.EXTRA_CURRENT_VIDEO_INDEX, currentVideoIndex);
 
+            Log.d(TAG, "全屏返回 - returnedIndex: " + returnedIndex + ", 当前index: " + currentVideoIndex + ", pos: " + pos);
+
+            // 更新小屏的当前视频信息
             if (videoList != null && returnedIndex >= 0 && returnedIndex < videoList.size()) {
+                // 关键修复：先更新currentVideoIndex，再更新currentItem
                 currentVideoIndex = returnedIndex;
                 currentItem = videoList.get(currentVideoIndex);
-                if (adapter != null) adapter.setCurrentPlayingItem(currentItem);
+
+                Log.d(TAG, "更新小屏状态 - 新index: " + currentVideoIndex + ", 视频名: " + currentItem.getVideoName());
+
+                if (adapter != null) {
+                    adapter.setCurrentPlayingItem(currentItem);
+                }
                 scrollToCurrentVideo();
+
+                // 更新缓存状态显示
+                updateCacheStatus(currentItem);
             }
 
             if (player != null) {
+                // 确保播放器已准备
                 ensurePlayerPreparedOnce(currentVideoIndex);
-                if (player.getCurrentMediaItemIndex() != currentVideoIndex) {
-                    player.seekTo(currentVideoIndex, pos);
-                } else {
-                    player.seekTo(pos);
-                }
+
+                // 关键修复：直接跳转到正确的索引位置
+                Log.d(TAG, "播放器跳转到index: " + currentVideoIndex + ", position: " + pos);
+                player.seekTo(currentVideoIndex, pos);
                 player.setPlayWhenReady(playReady);
+
+                // 重置播放统计（因为是从全屏返回，相当于重新开始）
+                playbackManager.resetPlaybackStats();
             }
 
-            // 回来后也联动一次进度条
+            // 回来后联动进度条
             if (currentItem != null && isUsingCache) {
-                updateCacheStatus(currentItem);
                 downloadCurrentVideoWithUi(currentItem);
             }
+
+            Log.d(TAG, "全屏返回处理完成");
         }
     }
 

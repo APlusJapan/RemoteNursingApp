@@ -3,7 +3,8 @@ package com.aplus.remotenursing;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.SystemClock;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -20,9 +21,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
 import com.aplus.remotenursing.common.VideoPlayUtils;
-import com.aplus.remotenursing.manager.VideoCacheManager;
-import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
+import com.aplus.remotenursing.manager.VideoPlaybackManager;
 import com.aplus.remotenursing.models.VideoTaskDetail;
+import com.aplus.remotenursing.models.UserAccount;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
@@ -33,7 +34,10 @@ import com.google.gson.reflect.TypeToken;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -42,7 +46,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * 全屏播放器（对齐 VideoTaskDetailFragment 的统计/上传策略）
+ * 全屏播放器（使用VideoPlaybackManager统一管理）
  */
 public class VideoFullscreenPlayerActivity extends AppCompatActivity {
 
@@ -56,47 +60,43 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
 
     public static final String EXTRA_VIDEO_SERIES_ID     = "video_series_id";
     public static final String EXTRA_CURRENT_VIDEO_INDEX = "current_video_index";
-    public static final String EXTRA_VIDEO_ID            = "video_id"; // 首条显式ID
+    public static final String EXTRA_VIDEO_ID            = "video_id"; // 首条显示ID
 
     private PlayerView playerView;
     private ExoPlayer  player;
     private TextView   btnExitFs;
 
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     private List<VideoTaskDetail> videoList;
     private int currentVideoIndex = 0;
     private String videoSeriesId;
+    private String videoSeriesName;
 
     private final Gson gson = new Gson();
-    private VideoCacheManager cacheManager;
 
     // 首条 intent 参数
     private String initialUrlFromIntent;
     private String initialVideoIdFromIntent;
 
-    // 播放历史
-    private VideoPlayHistoryManager playHistoryManager;
-    private long    lastReadyStartMs = 0L;          // 本条 READY 的时间点（用于阈值/调试）
-    private long    lastVideoStartWall = 0L;        // 当前条开始播放的 wall time
-    private boolean hasRecordedForThisItem = false; // 本条是否已按阈值成功上报过
+    // 统一管理器
+    private VideoPlaybackManager playbackManager;
+    private final Map<String, Integer> id2Index = new HashMap<>();
 
-    // 便于拼接 recordVideoPlay 的字段（尽量从列表取，不行再兜底）
-    private String  currentVideoId;
-    private String  currentVideoTitle;
-    private String  currentVideoDuration; // 形如 "00:10:23" 或你后台习惯的格式（直接透传）
-    private String  currentSeriesId;      // = videoSeriesId
-    private String  currentSeriesName;    // 若模型没给，传空串即可
+    // 播放列表管理
+    private final List<MediaItem> mediaItems = new ArrayList<>();
+    private boolean playerPrepared = false;
 
     private boolean keepScreenOnApplied;
-
     private final OkHttpClient http = new OkHttpClient();
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        cacheManager = VideoCacheManager.getInstance(getApplicationContext());
-        playHistoryManager = VideoPlayHistoryManager.getInstance(getApplicationContext());
-        Log.d(TAG, "onCreate: cacheManager/init ok");
+        // 初始化统一管理器
+        playbackManager = VideoPlaybackManager.getInstance(getApplicationContext());
+        Log.d(TAG, "onCreate: VideoPlaybackManager initialized");
 
         // 沉浸式
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
@@ -115,8 +115,13 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
         boolean playWhenReady = it.getBooleanExtra(EXTRA_START_PLAYREADY, true);
 
         videoSeriesId = it.getStringExtra(EXTRA_VIDEO_SERIES_ID);
-        currentSeriesId = videoSeriesId; // 直接带给历史管理器
         currentVideoIndex = it.getIntExtra(EXTRA_CURRENT_VIDEO_INDEX, 0);
+
+        Log.i(TAG, "onCreate 初始参数:");
+        Log.i(TAG, "  - initialVideoId: " + initialVideoIdFromIntent);
+        Log.i(TAG, "  - initialUrl: " + url);
+        Log.i(TAG, "  - videoSeriesId: " + videoSeriesId);
+        Log.i(TAG, "  - currentVideoIndex: " + currentVideoIndex);
 
         if (TextUtils.isEmpty(url)) {
             Log.e(TAG, "首条URL为空，直接 finish");
@@ -141,48 +146,73 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
             @Override public void onIsPlayingChanged(boolean isPlaying) {
                 Log.d(TAG, "onIsPlayingChanged=" + isPlaying);
                 setKeepScreenOn(isPlaying);
-                if (isPlaying) {
-                    // 首次开始这条
-                    if (lastVideoStartWall == 0L) {
-                        lastVideoStartWall = System.currentTimeMillis();
-                        Log.d(TAG, "开始计时本条播放 wallTime=" + lastVideoStartWall);
-                    }
-                }
             }
 
             @Override public void onPlaybackStateChanged(int state) {
-                Log.d(TAG, "onPlaybackStateChanged state=" + state);
+                String stateName = "";
+                switch (state) {
+                    case Player.STATE_IDLE: stateName = "IDLE"; break;
+                    case Player.STATE_BUFFERING: stateName = "BUFFERING"; break;
+                    case Player.STATE_READY: stateName = "READY"; break;
+                    case Player.STATE_ENDED: stateName = "ENDED"; break;
+                }
+
+                Log.d(TAG, "onPlaybackStateChanged: " + stateName + " (state=" + state + ")");
+                Log.d(TAG, "  - currentVideoIndex: " + currentVideoIndex);
+                Log.d(TAG, "  - playerCurrentIndex: " + player.getCurrentMediaItemIndex());
+
                 if (state == Player.STATE_READY) {
-                    lastReadyStartMs = SystemClock.elapsedRealtime();
-                    // 每次进入 READY 视为“新一条/切回一条”的开始
-                    lastVideoStartWall = System.currentTimeMillis();
-                    hasRecordedForThisItem = false;
+                    playbackManager.resetPlaybackStats();
                     logPlayingUri(player.getCurrentMediaItemIndex());
+
+                    // 播放列表模式下确保索引同步
+                    int playerIndex = player.getCurrentMediaItemIndex();
+                    if (playerPrepared && playerIndex >= 0 && playerIndex != currentVideoIndex) {
+                        Log.w(TAG, "STATE_READY 时索引不同步！currentVideoIndex=" + currentVideoIndex + ", playerIndex=" + playerIndex + " - 同步索引");
+                        currentVideoIndex = playerIndex;
+                    }
                 } else if (state == Player.STATE_ENDED) {
                     Log.d(TAG, "STATE_ENDED 触发");
-                    // 结束时满足阈值即记一次（带去重）
+                    // 结束时记录
                     maybeRecordCurrentByThreshold("ended");
-                    // 自动下一条（保持与你小屏一致）
-                    playNextVideo();
+                    // 自动下一条
+                    playNextVideoInPlaylist();
                     setKeepScreenOn(false);
                 }
             }
 
             @Override public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
-                Log.d(TAG, "onMediaItemTransition reason=" + reason);
-                // 切换前的那条：若已播放足够，也记录一次
+                String reasonName = "";
+                switch (reason) {
+                    case Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT: reasonName = "REPEAT"; break;
+                    case Player.MEDIA_ITEM_TRANSITION_REASON_AUTO: reasonName = "AUTO"; break;
+                    case Player.MEDIA_ITEM_TRANSITION_REASON_SEEK: reasonName = "SEEK"; break;
+                    case Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED: reasonName = "PLAYLIST_CHANGED"; break;
+                }
+
+                Log.d(TAG, "onMediaItemTransition: " + reasonName + " (reason=" + reason + ")");
+                Log.d(TAG, "  - 切换前 currentVideoIndex: " + currentVideoIndex);
+
+                // 切换前记录
                 maybeRecordCurrentByThreshold("transition");
-                // 新条：尝试命中本地缓存
+
+                // 播放列表模式下的索引更新
                 int cur = player.getCurrentMediaItemIndex();
-                if (cur != C.INDEX_UNSET) {
+                Log.d(TAG, "  - 切换后 playerCurrentIndex: " + cur);
+
+                if (cur != C.INDEX_UNSET && playerPrepared) {
+                    // 关键修复：只在非PLAYLIST_CHANGED时更新索引
+                    if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                        currentVideoIndex = cur;
+                        Log.d(TAG, "  - 更新后 currentVideoIndex: " + currentVideoIndex);
+                    } else {
+                        Log.d(TAG, "  - PLAYLIST_CHANGED事件，保持 currentVideoIndex: " + currentVideoIndex);
+                    }
+
                     maybeSwapToLocal(cur);
                 }
-                // 重置跨回调标志
-                hasRecordedForThisItem = false;
-                lastReadyStartMs = SystemClock.elapsedRealtime();
-                lastVideoStartWall = System.currentTimeMillis();
 
-                // 同步当前条的描述字段（用于 recordVideoPlay）
+                playbackManager.resetPlaybackStats();
                 syncCurrentMetaFromListOrTag();
             }
         });
@@ -191,7 +221,7 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
         if (!TextUtils.isEmpty(videoSeriesId)) {
             loadVideoListAndPlay(url, pos, playWhenReady);
         } else {
-            playVideo(url, /*explicitId*/ null, pos, playWhenReady);
+            playVideoSingle(url, null, pos, playWhenReady);
         }
 
         btnExitFs.setOnClickListener(v -> exitWithResultAndFinish());
@@ -236,12 +266,12 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
         http.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "拉取列表失败: " + e.getMessage());
-                runOnUiThread(() -> playVideo(initialUrl, /*explicitId*/ null, pos, playWhenReady));
+                runOnUiThread(() -> playVideoSingle(initialUrl, null, pos, playWhenReady));
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
                 if (!response.isSuccessful() || response.body() == null) {
                     Log.e(TAG, "拉取列表返回非200");
-                    runOnUiThread(() -> playVideo(initialUrl, /*explicitId*/ null, pos, playWhenReady));
+                    runOnUiThread(() -> playVideoSingle(initialUrl, null, pos, playWhenReady));
                     return;
                 }
                 String json = response.body().string();
@@ -250,17 +280,118 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     videoList = list;
                     Log.d(TAG, "列表条数: " + (videoList == null ? 0 : videoList.size()));
-                    playVideo(initialUrl, /*explicitId*/ null, pos, playWhenReady);
+
+                    // 建立索引映射并设置到管理器
+                    buildIndexMapping();
+                    playbackManager.setIndexMapping(id2Index);
+
+                    // 根据 initialVideoIdFromIntent 找到正确的起始索引
+                    if (!TextUtils.isEmpty(initialVideoIdFromIntent)) {
+                        Integer foundIndex = id2Index.get(initialVideoIdFromIntent);
+                        if (foundIndex != null) {
+                            currentVideoIndex = foundIndex;
+                            Log.i(TAG, "根据 videoId 找到起始索引: " + currentVideoIndex + " (id=" + initialVideoIdFromIntent + ")");
+                        }
+                    }
+
+                    // 构建播放列表
+                    buildMediaItems();
+
+                    // 处理视频更新
+                    processVideoUpdates();
+
+                    // 使用播放列表模式
+                    playVideoWithPlaylist(pos, playWhenReady);
                 });
             }
         });
     }
 
-    private void playVideo(String videoUrl, long pos, boolean playWhenReady) {
-        playVideo(videoUrl, /*explicitId*/ null, pos, playWhenReady);
+    private void buildIndexMapping() {
+        id2Index.clear();
+        if (videoList != null) {
+            for (int i = 0; i < videoList.size(); i++) {
+                VideoTaskDetail d = videoList.get(i);
+                String vid = !TextUtils.isEmpty(d.getVideoId())
+                        ? d.getVideoId()
+                        : VideoPlayUtils.videoIdFromUrl(d.getVideoURL());
+                id2Index.put(vid, i);
+            }
+        }
     }
 
-    private void playVideo(String videoUrl, @Nullable String explicitVideoId, long pos, boolean playWhenReady) {
+    // 构建MediaItems列表
+    private void buildMediaItems() {
+        mediaItems.clear();
+        if (videoList == null) return;
+
+        Log.d(TAG, "buildMediaItems - 开始构建媒体项，视频数量: " + videoList.size());
+
+        for (int i = 0; i < videoList.size(); i++) {
+            VideoTaskDetail d = videoList.get(i);
+            String url = d.getVideoURL();
+            String vid = d.getVideoId();
+            if (TextUtils.isEmpty(vid)) {
+                vid = VideoPlayUtils.videoIdFromUrl(url);
+            }
+
+            Log.d(TAG, "处理视频 [" + i + "]: " + d.getVideoName());
+            Log.d(TAG, "  - VideoID: " + vid);
+            Log.d(TAG, "  - 原始URL: " + url);
+
+            Uri uri = playbackManager.buildPlayableUri(url, vid);
+
+            // 检查是否使用了缓存
+            String scheme = uri.getScheme();
+            boolean isLocalFile = "file".equalsIgnoreCase(scheme);
+            Log.d(TAG, "  - 播放URI: " + uri.toString());
+            Log.d(TAG, "  - 使用缓存: " + (isLocalFile ? "是" : "否"));
+
+            MediaItem mi = new MediaItem.Builder()
+                    .setUri(uri)
+                    .setMediaId(vid)
+                    .setTag(new VideoTag(vid, url))
+                    .build();
+            mediaItems.add(mi);
+        }
+
+        Log.d(TAG, "buildMediaItems - 完成，创建了 " + mediaItems.size() + " 个媒体项");
+    }
+
+    // 使用播放列表模式播放
+    private void playVideoWithPlaylist(long pos, boolean playWhenReady) {
+        if (player == null || mediaItems.isEmpty()) return;
+
+        Log.d(TAG, "使用播放列表模式，起始索引: " + currentVideoIndex);
+
+        // 设置播放列表
+        player.setMediaItems(mediaItems, currentVideoIndex, pos);
+        player.prepare();
+        playerPrepared = true;
+        player.setPlayWhenReady(playWhenReady);
+
+        // 尝试替换为本地缓存
+        maybeSwapToLocal(currentVideoIndex);
+
+        // 后台缓存当前视频
+        if (videoList != null && currentVideoIndex < videoList.size()) {
+            VideoTaskDetail current = videoList.get(currentVideoIndex);
+            if (current != null) {
+                playbackManager.cacheVideoInBackground(current);
+            }
+        }
+
+        // 预取下一条
+        prefetchNextInSeries();
+
+        // 重置统计标志
+        playbackManager.resetPlaybackStats();
+
+        Log.d(TAG, "播放列表设置完成");
+    }
+
+    // 保留原有的单视频播放方法（用于fallback）
+    private void playVideoSingle(String videoUrl, @Nullable String explicitVideoId, long pos, boolean playWhenReady) {
         if (player == null || TextUtils.isEmpty(videoUrl)) return;
 
         // 选 videoId：显式 → 首条匹配 → 由URL推断
@@ -270,30 +401,11 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
                 ? initialVideoIdFromIntent
                 : VideoPlayUtils.videoIdFromUrl(videoUrl));
 
-        // 同步当前元数据（用于 recordVideoPlay）
-        currentVideoId = videoId;
-        currentSeriesId = videoSeriesId;
-        currentSeriesName = ""; // 模型不一定有系列名字段，先置空
-        currentVideoTitle = null;
-        currentVideoDuration = null;
-
-        if (videoList != null) {
-            for (int i = 0; i < videoList.size(); i++) {
-                VideoTaskDetail v = videoList.get(i);
-                if (v == null) continue;
-                String id = !TextUtils.isEmpty(v.getVideoId()) ? v.getVideoId() : VideoPlayUtils.videoIdFromUrl(v.getVideoURL());
-                if (TextUtils.equals(id, videoId) || TextUtils.equals(v.getVideoURL(), videoUrl)) {
-                    currentVideoTitle    = safeGetName(v);
-                    currentVideoDuration = safeGetDuration(v);
-                    currentVideoIndex    = i;
-                    Log.d(TAG, "匹配到列表项 index=" + i + ", title=" + currentVideoTitle + ", duration=" + currentVideoDuration);
-                    break;
-                }
-            }
-        }
-
         // 本地优先
-        Uri playable = resolvePlayableUri(videoUrl, videoId);
+        Uri playable = playbackManager.buildPlayableUri(videoUrl, videoId);
+
+        // 记录播放信息
+        logVideoPlayInfo(videoId, videoUrl, playable);
 
         MediaItem item = new MediaItem.Builder()
                 .setUri(playable)
@@ -302,37 +414,125 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
                 .build();
 
         player.setMediaItem(item);
-        maybeSwapToLocal(0);
         player.prepare();
+        playerPrepared = true;
         player.seekTo(pos);
         player.setPlayWhenReady(playWhenReady);
 
-        // 如果是网络资源，后台缓存当前 + 预取下一条
+        // 如果是网络资源，后台缓存
         if (isNetworkUri(playable)) {
-            VideoCacheManager.getInstance(this).downloadAndCacheVideo(
-                    videoId, videoUrl, new VideoCacheManager.DownloadCallback() {
-                        @Override public void onStart(String id) { Log.d("VideoCache", "开始缓存当前: " + id); }
-                        @Override public void onProgress(String id, int progress) { /* 降噪 */ }
-                        @Override public void onSuccess(String id, String localPath) {
-                            Log.d("VideoCache", "当前缓存完成: " + id + " -> " + localPath);
-                            int cur = player.getCurrentMediaItemIndex();
-                            if (cur != C.INDEX_UNSET) maybeSwapToLocal(cur);
-                        }
-                        @Override public void onError(String id, String error) {
-                            Log.w("VideoCache", "当前缓存失败: " + error);
-                        }
-                    }
-            );
+            playbackManager.cacheVideoInBackground(findVideoDetailById(videoId));
         }
 
         prefetchNextInSeries();
+        playbackManager.resetPlaybackStats();
 
-        // 新条开始：复位统计标志/时间
-        hasRecordedForThisItem = false;
-        lastReadyStartMs = SystemClock.elapsedRealtime();
-        lastVideoStartWall = System.currentTimeMillis();
+        Log.d(TAG, "单视频播放: id=" + videoId + ", url=" + videoUrl + ", pos=" + pos + ", play=" + playWhenReady);
+    }
 
-        Log.d(TAG, "开始播放: id=" + videoId + ", url=" + videoUrl + ", pos=" + pos + ", play=" + playWhenReady);
+    // 兼容原有的playVideo方法调用
+    private void playVideo(String videoUrl, @Nullable String explicitVideoId, long pos, boolean playWhenReady) {
+        // 如果是播放列表模式，使用播放列表
+        if (playerPrepared && !mediaItems.isEmpty()) {
+            // 播放列表已准备，直接seek到位置
+            player.seekTo(pos);
+            player.setPlayWhenReady(playWhenReady);
+        } else {
+            // 单视频模式
+            playVideoSingle(videoUrl, explicitVideoId, pos, playWhenReady);
+        }
+    }
+
+    private void processVideoUpdates() {
+        // 获取用户账户信息并处理视频更新
+        try {
+            UserAccount userAccount = UserUtils.getUserAccount(this);
+            if (userAccount == null || videoSeriesId == null || videoList == null) {
+                Log.d(TAG, "跳过视频更新：用户信息或视频列表缺失");
+                return;
+            }
+
+            String userId = userAccount.getUserId();
+            String projectId = userAccount.getProjectId();
+            String teamId = userAccount.getTeamId();
+
+            Log.d(TAG, "全屏播放器开始获取视频更新列表 - userId: " + userId +
+                    ", projectId: " + projectId +
+                    ", teamId: " + teamId +
+                    ", seriesId: " + videoSeriesId);
+
+            // 一次性从后台获取待更新视频列表并处理
+            playbackManager.fetchAndCachePendingUpdates(videoSeriesId, userId, projectId, teamId, () -> {
+                Log.d(TAG, "全屏播放器：待更新视频列表获取完成，开始处理更新");
+
+                playbackManager.processVideoUpdatesInBackground(videoList, userId,
+                        new VideoPlaybackManager.UpdateProgressCallback() {
+                            @Override
+                            public boolean isCurrentlyPlaying(int index) {
+                                return player != null && player.getCurrentMediaItemIndex() == index;
+                            }
+
+                            @Override
+                            public void onShowUpdateMessage(String message) {
+                                runOnUiThread(() -> {
+                                    // 可以显示Toast或其他提示
+                                    Log.d(TAG, "更新提示: " + message);
+                                });
+                            }
+
+                            @Override
+                            public void onSwitchToNext(int currentIndex) {
+                                runOnUiThread(() -> {
+                                    int next = (currentIndex + 1) % videoList.size();
+                                    switchToVideoByIndex(next);
+                                });
+                            }
+
+                            @Override
+                            public VideoPlaybackManager.DownloadProgressCallback asDownloadProgressCallback() {
+                                return new VideoPlaybackManager.DownloadProgressCallback() {
+                                    @Override public void onShowProgress() {}
+                                    @Override public void onHideProgress() {}
+                                    @Override public void onProgressUpdate(int progress) {}
+                                    @Override public void onStatusUpdate(String status) {}
+                                    @Override public void onCacheInfoUpdate() {}
+                                    @Override public void onSwapToLocal(Integer index) {
+                                        if (index != null) {
+                                            runOnUiThread(() -> maybeSwapToLocal(index));
+                                        }
+                                    }
+                                    @Override public void onSwitchToNext(int currentIndex) {}
+                                    @Override public void onShowShortToast(String message) {}
+                                };
+                            }
+                        }
+                );
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "处理视频更新异常: " + e.getMessage());
+        }
+    }
+
+    private void logVideoPlayInfo(String videoId, String videoUrl, Uri playable) {
+        String scheme = playable.getScheme();
+        boolean isLocalFile = "file".equalsIgnoreCase(scheme);
+        Log.d(TAG, "播放视频信息:");
+        Log.d(TAG, "  - VideoID: " + videoId);
+        Log.d(TAG, "  - 原始URL: " + videoUrl);
+        Log.d(TAG, "  - 播放URI: " + playable.toString());
+        Log.d(TAG, "  - 使用缓存: " + (isLocalFile ? "是" : "否"));
+    }
+
+    private VideoTaskDetail findVideoDetailById(String videoId) {
+        if (videoList == null) return null;
+        for (VideoTaskDetail v : videoList) {
+            String id = !TextUtils.isEmpty(v.getVideoId()) ? v.getVideoId() : VideoPlayUtils.videoIdFromUrl(v.getVideoURL());
+            if (TextUtils.equals(id, videoId)) {
+                return v;
+            }
+        }
+        return null;
     }
 
     private void prefetchNextInSeries() {
@@ -341,168 +541,114 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
         VideoTaskDetail next = videoList.get(nextIndex);
         if (next == null || TextUtils.isEmpty(next.getVideoURL())) return;
 
-        String nextUrl = next.getVideoURL();
-        String nextId  = !TextUtils.isEmpty(next.getVideoId()) ? next.getVideoId() : VideoPlayUtils.videoIdFromUrl(nextUrl);
-
-        Log.d("VideoCache", "预取下一条: index=" + nextIndex + ", id=" + nextId);
-        VideoCacheManager.getInstance(this).downloadAndCacheVideo(nextId, nextUrl, new VideoCacheManager.DownloadCallback() {
-            @Override public void onStart(String id) {}
-            @Override public void onProgress(String id, int progress) {}
-            @Override public void onSuccess(String id, String localPath) { Log.d("VideoCache", "下一条缓存完成: " + localPath); }
-            @Override public void onError(String id, String error) { Log.w("VideoCache", "下一条缓存失败: " + error); }
-        });
+        Log.d(TAG, "预取下一条: index=" + nextIndex + ", name=" + next.getVideoName());
+        playbackManager.cacheVideoInBackground(next);
     }
 
-    private void playNextVideo() {
-        if (videoList == null || videoList.isEmpty()) return;
+    // 播放列表中播放下一个视频方法
+    private void playNextVideoInPlaylist() {
+        if (!playerPrepared || videoList == null || videoList.isEmpty()) return;
+
         int next = (currentVideoIndex >= videoList.size() - 1) ? 0 : (currentVideoIndex + 1);
+        Log.d(TAG, "playNextVideoInPlaylist: " + currentVideoIndex + " -> " + next);
+
         VideoTaskDetail v = videoList.get(next);
         if (v != null && !TextUtils.isEmpty(v.getVideoURL())) {
+            // 更新索引
             currentVideoIndex = next;
-            playVideo(v.getVideoURL(), v.getVideoId(), 0L, true);
+            Log.i(TAG, "播放列表中播放下一个: " + v.getVideoName() + " (index=" + currentVideoIndex + ")");
+
+            // 直接跳转到对应索引
+            player.seekTo(currentVideoIndex, 0L);
+            player.setPlayWhenReady(true);
+        }
+    }
+
+    // 切换到指定索引方法
+    private void switchToVideoByIndex(int index) {
+        if (!playerPrepared || videoList == null || index < 0 || index >= videoList.size()){
+            Log.w(TAG, "switchToVideoByIndex 参数无效: index=" + index + ", playerPrepared=" + playerPrepared);
+            return;
+        }
+
+        VideoTaskDetail v = videoList.get(index);
+        if (index == currentVideoIndex) {
+            Log.d(TAG, "switchToVideoByIndex 索引未变: " + index);
+            return;
+        }
+
+        Log.i(TAG, "switchToVideoByIndex: " + currentVideoIndex + " -> " + index);
+        Log.i(TAG, "切换到视频: " + v.getVideoName() + " (ID: " + v.getVideoId() + ")");
+
+        if (v != null && !TextUtils.isEmpty(v.getVideoURL())) {
+            // 更新索引
+            currentVideoIndex = index;
+
+            // 直接跳转到对应索引
+            player.seekTo(currentVideoIndex, 0L);
+            player.setPlayWhenReady(true);
         }
     }
 
     // -------- 统计：阈值 + 多时机去重（与小屏一致） --------
 
-    /** >5s 或 >10% 才算一次有效观看 */
+    /** 统一阈值：>5s 或 >10% 才算一次有效观看 */
     private boolean playedEnoughToCount() {
-        if (player == null) return false;
-        long pos = Math.max(0L, player.getCurrentPosition());
-        long dur = Math.max(0L, player.getDuration());
-        boolean ok = pos >= 5000 || (dur > 0 && pos >= (dur / 10));
-        Log.d(TAG, "playedEnough? pos=" + pos + ", dur=" + dur + " => " + ok);
-        return ok;
+        return playbackManager.playedEnoughToCount(player);
     }
 
     /** 在 END/切换/退出/暂停 等时机调用：满足阈值才记一次；同一条只记一次 */
     private void maybeRecordCurrentByThreshold(String scene) {
         if (player == null) return;
-        if (hasRecordedForThisItem) {
-            Log.d(TAG, "maybeRecordCurrentByThreshold - 已记录过本条，scene=" + scene);
-            return;
-        }
-        if (!playedEnoughToCount()) {
-            Log.d(TAG, "maybeRecordCurrentByThreshold - 未达阈值，scene=" + scene);
-            return;
-        }
 
-        syncCurrentMetaFromListOrTag();
+        VideoTaskDetail currentItem = getCurrentVideoDetail();
+        if (currentItem == null) return;
 
-        String uid = UserUtils.loadUserId(this);
-        if (TextUtils.isEmpty(uid)) {
-            Log.w(TAG, "未登录，跳过统计 scene=" + scene);
-            return;
-        }
+        playbackManager.maybeRecordCurrentVideoPlay(
+                player, currentItem, videoSeriesId, videoSeriesName, scene
+        );
+    }
 
-        String vid = currentVideoId;
-        if (TextUtils.isEmpty(vid)) {
-            // 尝试兜底从当前 MediaItem 取
-            MediaItem mi = player.getCurrentMediaItem();
-            if (mi != null) {
-                if (!TextUtils.isEmpty(mi.mediaId)) vid = mi.mediaId;
-                if (TextUtils.isEmpty(vid) && mi.localConfiguration != null) {
-                    Uri u = mi.localConfiguration.uri;
-                    if (u != null) vid = VideoPlayUtils.videoIdFromUrl(u.toString());
-                }
-            }
-        }
-        if (TextUtils.isEmpty(vid)) {
-            Log.w(TAG, "找不到当前 videoId，放弃记录 scene=" + scene);
-            return;
-        }
-
-        String videoName     = (currentVideoTitle == null ? "" : currentVideoTitle);
-        String videoDuration = (currentVideoDuration == null ? "" : currentVideoDuration);
-        String seriesId      = (currentSeriesId == null ? "" : currentSeriesId);
-        String seriesName    = (currentSeriesName == null ? "" : currentSeriesName);
-
-        Log.d(TAG, ">>>>>>> 记录视频播放 (" + scene + ") <<<<<<<");
-        Log.d(TAG, "  videoId=" + vid);
-        Log.d(TAG, "  videoName=" + videoName);
-        Log.d(TAG, "  seriesId=" + seriesId);
-        Log.d(TAG, "  seriesName=" + seriesName);
-        Log.d(TAG, "  duration=" + videoDuration);
+    private VideoTaskDetail getCurrentVideoDetail() {
+        if (videoList == null) return null;
 
         try {
-            playHistoryManager.recordVideoPlay(
-                    vid,
-                    seriesId,
-                    videoName,
-                    seriesName,
-                    videoDuration
-            );
-            hasRecordedForThisItem = true;
-            Log.d(TAG, "记录完成，打印本地记录快照：");
-            playHistoryManager.logAllLocalData();
-        } catch (Throwable t) {
-            Log.e(TAG, "记录异常: " + t.getMessage());
+            int curIdx = player.getCurrentMediaItemIndex();
+            if (curIdx >= 0 && curIdx < videoList.size()) {
+                return videoList.get(curIdx);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "获取当前视频详情失败: " + e.getMessage());
         }
+
+        return null;
     }
 
     /** 同步当前条的 meta 信息（从列表或 mediaItem.tag） */
     private void syncCurrentMetaFromListOrTag() {
         try {
             int curIdx = player.getCurrentMediaItemIndex();
-            MediaItem mi = player.getCurrentMediaItem();
-            String vid = null, url = null;
 
-            if (mi != null) {
-                if (!TextUtils.isEmpty(mi.mediaId)) vid = mi.mediaId;
-                if (mi.localConfiguration != null) {
-                    Uri u = mi.localConfiguration.uri;
-                    url = u == null ? null : u.toString();
-                }
-                Object tag = (mi.localConfiguration != null) ? mi.localConfiguration.tag : null;
-                if (tag instanceof VideoTag) {
-                    vid = ((VideoTag) tag).id;
-                    url = ((VideoTag) tag).url;
-                } else if (tag instanceof VideoTaskDetail) {
-                    VideoTaskDetail d = (VideoTaskDetail) tag;
-                    vid = !TextUtils.isEmpty(d.getVideoId()) ? d.getVideoId() : VideoPlayUtils.videoIdFromUrl(d.getVideoURL());
-                    url = d.getVideoURL();
-                    currentVideoTitle    = safeGetName(d);
-                    currentVideoDuration = safeGetDuration(d);
-                }
-            }
-            if (TextUtils.isEmpty(vid) && !TextUtils.isEmpty(url)) vid = VideoPlayUtils.videoIdFromUrl(url);
-
-            // 从列表对齐标题/时长
             if (videoList != null && curIdx >= 0 && curIdx < videoList.size()) {
                 VideoTaskDetail d = videoList.get(curIdx);
                 if (d != null) {
-                    if (TextUtils.isEmpty(vid)) {
-                        String idFromList = !TextUtils.isEmpty(d.getVideoId()) ? d.getVideoId() : VideoPlayUtils.videoIdFromUrl(d.getVideoURL());
-                        vid = idFromList;
+                    // 确保索引同步
+                    if (currentVideoIndex != curIdx && playerPrepared) {
+                        Log.w(TAG, "syncCurrentMetaFromListOrTag 索引不同步！currentVideoIndex=" + currentVideoIndex + ", playerIndex=" + curIdx);
+                        currentVideoIndex = curIdx;
                     }
-                    currentVideoTitle    = safeGetName(d);
-                    currentVideoDuration = safeGetDuration(d);
-                    currentVideoIndex    = curIdx;
+
+                    Log.d(TAG, "同步视频信息: index=" + curIdx + ", name=" + d.getVideoName() + ", id=" + d.getVideoId());
                 }
             }
-
-            currentVideoId = vid;
-            currentSeriesId = videoSeriesId; // 已在 onCreate 拿到
-        } catch (Throwable ignore) {}
-    }
-
-    private String safeGetName(VideoTaskDetail v) {
-        try { return v.getVideoName(); } catch (Throwable t) { return ""; }
-    }
-    private String safeGetDuration(VideoTaskDetail v) {
-        try { return v.getVideoDuration(); } catch (Throwable t) { return ""; }
+        } catch (Throwable e) {
+            Log.e(TAG, "syncCurrentMetaFromListOrTag 异常: " + e.getMessage());
+        }
     }
 
     // -------- 缓存：命中/替换/预取 --------
     private Uri resolvePlayableUri(String videoUrl, String videoId) {
-        try {
-            String local = VideoCacheManager.getInstance(this).getLocalVideoPath(videoId, videoUrl);
-            if (!TextUtils.isEmpty(local)) {
-                Log.d("VideoCache", "命中本地缓存: " + local);
-                return Uri.fromFile(new File(local));
-            }
-        } catch (Throwable ignore) {}
-        return Uri.parse(videoUrl);
+        return playbackManager.buildPlayableUri(videoUrl, videoId);
     }
 
     private boolean isNetworkUri(Uri uri) {
@@ -512,33 +658,32 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private void maybeSwapToLocal(int index) {
-        if (player == null || index < 0 || index >= player.getMediaItemCount()) return;
+        if (player == null || videoList == null || index < 0 || index >= videoList.size()) return;
 
-        MediaItem cur = player.getMediaItemAt(index);
+        VideoTaskDetail d = videoList.get(index);
+        String url = d.getVideoURL();
+        String vid = !TextUtils.isEmpty(d.getVideoId()) ? d.getVideoId() : VideoPlayUtils.videoIdFromUrl(url);
+
+        String localPath = playbackManager.getLocalVideoPath(vid, url);
+        if (TextUtils.isEmpty(localPath)) {
+            Log.d(TAG, "暂未缓存，无需替换 index=" + index);
+            return;
+        }
+
+        MediaItem cur = null;
+        try {
+            if (player.getMediaItemCount() > index) {
+                cur = player.getMediaItemAt(index);
+            }
+        } catch (Throwable ignore) {}
+
         if (cur == null || cur.localConfiguration == null) return;
 
         Uri uri = cur.localConfiguration.uri;
         if (uri == null) return;
-        if ("file".equalsIgnoreCase(uri.getScheme())) return;
+        if ("file".equalsIgnoreCase(uri.getScheme())) return; // 已经是本地
 
-        String wantVideoId;
-        String wantUrl = uri.toString();
-        Object tagObj = cur.localConfiguration.tag;
-        if (tagObj instanceof VideoTag) {
-            wantVideoId = ((VideoTag) tagObj).id;
-            wantUrl     = ((VideoTag) tagObj).url;
-        } else {
-            wantVideoId = VideoPlayUtils.videoIdFromUrl(wantUrl);
-        }
-
-        String localPath = VideoCacheManager.getInstance(getApplicationContext())
-                .getLocalVideoPath(wantVideoId, wantUrl);
-        if (TextUtils.isEmpty(localPath)) {
-            Log.d("VideoCache", "暂未缓存，无需替换 index=" + index);
-            return;
-        }
-
-        Uri localUri = Uri.fromFile(new File(localPath));
+        Uri localUri = Uri.parse("file://" + localPath);
         MediaItem localItem = cur.buildUpon().setUri(localUri).build();
 
         boolean isCurrent = index == player.getCurrentMediaItemIndex();
@@ -553,14 +698,14 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
             player.setPlayWhenReady(playReady);
         }
 
-        Log.i("VideoCache", "切换为本地播放 index=" + index + " -> " + localUri);
+        Log.i(TAG, "切换为本地播放 index=" + index + " -> " + localUri);
     }
 
     private void logPlayingUri(int index) {
         try {
             MediaItem mi = player.getMediaItemAt(index);
             Uri u = (mi != null && mi.localConfiguration != null) ? mi.localConfiguration.uri : null;
-            Log.d("VideoCache", "当前播放URI: " + (u == null ? "null" : u.toString()));
+            Log.d(TAG, "当前播放URI: " + (u == null ? "null" : u.toString()));
         } catch (Throwable ignore) {}
     }
 
@@ -573,12 +718,30 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
         long curPos = player != null ? player.getCurrentPosition() : 0L;
         boolean playWhenReady = player != null && player.getPlayWhenReady();
 
+        // 获取当前播放的视频信息用于调试
+        String currentVideoName = "unknown";
+        String currentVideoId = "unknown";
+        if (videoList != null && currentVideoIndex >= 0 && currentVideoIndex < videoList.size()) {
+            VideoTaskDetail current = videoList.get(currentVideoIndex);
+            if (current != null) {
+                currentVideoName = current.getVideoName();
+                currentVideoId = current.getVideoId();
+            }
+        }
+
+        Log.i(TAG, "exitWithResultAndFinish 详细信息:");
+        Log.i(TAG, "  - currentVideoIndex: " + currentVideoIndex);
+        Log.i(TAG, "  - currentVideoName: " + currentVideoName);
+        Log.i(TAG, "  - currentVideoId: " + currentVideoId);
+        Log.i(TAG, "  - playerCurrentIndex: " + (player != null ? player.getCurrentMediaItemIndex() : "null"));
+        Log.i(TAG, "  - position: " + curPos);
+        Log.i(TAG, "  - playWhenReady: " + playWhenReady);
+
         Intent data = new Intent()
                 .putExtra(EXTRA_END_POS, curPos)
                 .putExtra(EXTRA_END_PLAYREADY, playWhenReady)
                 .putExtra(EXTRA_CURRENT_VIDEO_INDEX, currentVideoIndex);
 
-        Log.d(TAG, "exitWithResult: pos=" + curPos + ", play=" + playWhenReady + ", index=" + currentVideoIndex);
         setResult(RESULT_OK, data);
         finish();
     }
@@ -587,10 +750,10 @@ public class VideoFullscreenPlayerActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         applyFullscreen();
-        // 与小屏对齐：进入前台时上传“到昨天为止”的记录
+        // 与小屏对齐：进入前台时上传"到昨天为止"的记录
         try {
             Log.d(TAG, "onResume -> uploadAndClearRecords()");
-            playHistoryManager.uploadAndClearRecords();
+            playbackManager.uploadAndClearRecords();
         } catch (Throwable t) {
             Log.w(TAG, "uploadAndClearRecords 异常: " + t.getMessage());
         }
