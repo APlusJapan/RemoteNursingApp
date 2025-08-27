@@ -14,8 +14,9 @@ public class UserAccount {
 
     @SerializedName(value = "adminId", alternate = {"admin_id"})
     private String adminId;
-
+    @SerializedName(value = "teamId", alternate = {"team_id"})
     private String teamId;
+    @SerializedName(value = "projectId", alternate = {"project_id"})
     private String projectId;
     public UserAccount() {}
 
