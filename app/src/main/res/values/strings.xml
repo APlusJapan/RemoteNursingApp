@@ -47,6 +47,9 @@
     <string name="error_password_format">密码至少6位</string>
     <string name="error_username_not_exist">用户名或手机号不存在，请注册</string>
     <string name="error_username_exist">用户名已存在</string>
+    <string name="error_login_data_fail">登录失败，数据异常</string>
+    <string name="error_login_network_fail">网络错误</string>
+    <string name="success_login">登录成功！</string>
 
     <string name="checkup_heart_rate_low">心率偏低</string>
     <string name="checkup_heart_rate_high">心率偏高</string>

@@ -1,20 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
+    android:layout_width="300dp"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="24dp"
-    android:gravity="center">
+    android:orientation="vertical"
+    android:padding="40dp"
+    android:gravity="center"
+    android:background="@drawable/loading_dialog_bg">
 
     <ProgressBar
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
         android:indeterminate="true" />
 
     <TextView
         android:id="@+id/tv_loading"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:text="正在加载，请稍后"
-        android:textSize="16sp" />
+        android:layout_marginTop="28dp"
+        android:text="请稍候..."
+        android:textSize="28sp"
+        android:textColor="#2196F3"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textAlignment="center" />
+
 </LinearLayout>

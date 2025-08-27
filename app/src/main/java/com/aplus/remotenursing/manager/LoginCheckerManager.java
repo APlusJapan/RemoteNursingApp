@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.AppCompatActivity;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.R;
 import com.aplus.remotenursing.UserLoginFragment;
 
@@ -19,7 +19,7 @@ public class LoginCheckerManager {
         String userJson = sp.getString("data", null);
         boolean isLoggedIn = userJson != null && !userJson.isEmpty();
         if (!isLoggedIn) {
-            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(context, "请先登录");
             // 跳转到登录页面
             fragment.requireActivity().getSupportFragmentManager()
                     .beginTransaction()
@@ -37,7 +37,7 @@ public class LoginCheckerManager {
         String userJson = sp.getString("data", null);
         boolean isLoggedIn = userJson != null && !userJson.isEmpty();
         if (!isLoggedIn) {
-            Toast.makeText(activity, "请先登录", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(activity, "请先登录");
             activity.getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new UserLoginFragment())

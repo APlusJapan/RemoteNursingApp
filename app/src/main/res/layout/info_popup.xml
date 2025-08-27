@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/popup_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minWidth="300dp"
+    android:maxWidth="350dp"
+    android:padding="20dp">
+
+    <!-- 关闭按钮：右上角 -->
+    <Button
+        android:id="@+id/btn_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:minWidth="80dp"
+        android:minHeight="44dp"
+        android:text="关闭"
+        android:textColor="@android:color/white"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:background="@drawable/elderly_close_button"
+        android:padding="12dp" />
+
+    <!-- 消息内容：左边，居上居左，避开关闭按钮 -->
+    <TextView
+        android:id="@+id/tv_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:layout_toStartOf="@id/btn_close"
+        android:layout_marginEnd="12dp"
+        android:textColor="@android:color/white"
+        android:textSize="22sp"
+        android:lineSpacingExtra="6dp"
+        android:textStyle="bold"
+        android:gravity="start|top" />
+
+</RelativeLayout>

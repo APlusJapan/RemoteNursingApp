@@ -13,6 +13,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.aplus.remotenursing.common.InfoPopup;
 
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
@@ -100,15 +101,15 @@ public class UserAccountRegisterFragment extends Fragment {
         String password = etPassword.getText().toString();
         String confirm = etPasswordConfirm.getText().toString();
         if (!loginName.matches("^1\\d{10}$")) {
-            Toast.makeText(requireContext(), "请输入有效的手机号", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "请输入有效的手机号");
             return;
         }
         if (password.length() < 6) {
-            Toast.makeText(requireContext(), "密码至少6位", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "密码至少6位");
             return;
         }
         if (!password.equals(confirm)) {
-            Toast.makeText(requireContext(), "两次输入密码不一致", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "两次输入密码不一致");
             return;
         }
         showLoading();
@@ -134,7 +135,7 @@ public class UserAccountRegisterFragment extends Fragment {
                 if (!isAdded()) return;
                 requireActivity().runOnUiThread(() -> {
                     hideLoading();
-                    Toast.makeText(requireContext(), "网络错误", Toast.LENGTH_SHORT).show();
+                    InfoPopup.showError(requireContext(), "网络错误");
                 });
             }
             @Override
@@ -146,7 +147,7 @@ public class UserAccountRegisterFragment extends Fragment {
                     if (userAccount == null || userAccount.getUserId() == null || userAccount.getUserId().isEmpty()) {
                         requireActivity().runOnUiThread(() -> {
                             hideLoading();
-                            Toast.makeText(requireContext(), "注册失败，数据异常", Toast.LENGTH_SHORT).show();
+                            InfoPopup.showError(requireContext(), "注册失败，数据异常");
                         });
                         return;
                     }
@@ -168,14 +169,14 @@ public class UserAccountRegisterFragment extends Fragment {
                             // 延迟切tab，避免UI卡顿
                             main.getWindow().getDecorView().postDelayed(() -> {
                                 main.switchToTab(R.id.navigation_myInfo);
-                                Toast.makeText(main, "注册成功，已登录！", Toast.LENGTH_SHORT).show();
+                                InfoPopup.showSuccess(main, "注册成功，已登录！");
                             }, 100);
                         }
                     });
                 } else {
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
-                        Toast.makeText(requireContext(), "该账号已存在", Toast.LENGTH_SHORT).show();
+                        InfoPopup.showError(requireContext(), "该账号已存在");
                     });
                 }
             }

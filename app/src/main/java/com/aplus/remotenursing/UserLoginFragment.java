@@ -14,7 +14,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
@@ -79,8 +79,10 @@ public class UserLoginFragment extends Fragment {
 
     private void showLoading() {
         if (progressDialog == null) {
+            View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_loading, null);
+            // 移除.setMessage()，它会覆盖自定义布局
             progressDialog = new AlertDialog.Builder(requireContext())
-                    .setMessage("请稍候...")
+                    .setView(view)
                     .setCancelable(false)
                     .create();
         }
@@ -97,7 +99,7 @@ public class UserLoginFragment extends Fragment {
         String loginName = etLoginname.getText().toString().trim();
         String password = etPassword.getText().toString();
         if (password.length() < 6) {
-            Toast.makeText(requireContext(), getString(R.string.error_password_format), Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), getString(R.string.error_password_format));
             return;
         }
         showLoading();
@@ -116,7 +118,7 @@ public class UserLoginFragment extends Fragment {
                 if (!isAdded()) return;
                 requireActivity().runOnUiThread(() -> {
                     hideLoading();
-                    Toast.makeText(requireContext(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    InfoPopup.showError(requireContext(), getString(R.string.error_login_network_fail));
                     Log.d("Login", "网络错误: " + e.getMessage());
                 });
             }
@@ -130,7 +132,7 @@ public class UserLoginFragment extends Fragment {
                     if (userAccount == null || userAccount.getUserId() == null || userAccount.getUserId().isEmpty()) {
                         requireActivity().runOnUiThread(() -> {
                             hideLoading();
-                            Toast.makeText(requireContext(), "登录失败，数据异常", Toast.LENGTH_SHORT).show();
+                            InfoPopup.showError(requireContext(), getString(R.string.error_login_data_fail));
                         });
                         return;
                     }
@@ -147,6 +149,9 @@ public class UserLoginFragment extends Fragment {
                         // 先缓存当前Activity
                         MainActivity main = (MainActivity) getActivity();
 
+                        // 提前获取字符串，避免Fragment detach后无法获取
+                        String successMessage = getString(R.string.success_login);
+
                         // 先pop（回到主界面）
                         requireActivity().getSupportFragmentManager().popBackStackImmediate(null, 0);
 
@@ -156,14 +161,14 @@ public class UserLoginFragment extends Fragment {
                         if (main != null) {
                             main.getWindow().getDecorView().postDelayed(() -> {
                                 main.switchToTab(R.id.navigation_myInfo);
-                                Toast.makeText(main, "登录成功！", Toast.LENGTH_SHORT).show();
+                                InfoPopup.showSuccess(main, successMessage);
                             }, 100);
                         }
                     });
                 } else {
                     requireActivity().runOnUiThread(() -> {
                         hideLoading();
-                        Toast.makeText(requireContext(), getString(R.string.error_username_not_exist), Toast.LENGTH_SHORT).show();
+                        InfoPopup.showError(requireContext(), getString(R.string.error_username_not_exist));
                     });
                 }
             }

@@ -22,6 +22,8 @@ import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.manager.CodeMasterManager;
+import com.aplus.remotenursing.models.CodeItem;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.veepoo.protocol.VPOperateManager;
@@ -44,7 +46,9 @@ import com.aplus.remotenursing.common.UserUtils;
  * 体检流程 + 结果上传
  */
 public class SmartwatchCheckupFragment extends Fragment {
-    private static final String TARGET_NAME = "F57L";
+
+//    private static final String TARGET_NAME = "F57L";
+
     private static final int REQUEST_LOCATION = 1;
     private enum CheckupStatus { BEFORE, IN_PROGRESS, FINISHED }
     private CheckupStatus checkupStatus = CheckupStatus.BEFORE;
@@ -86,6 +90,11 @@ public class SmartwatchCheckupFragment extends Fragment {
     // ====== 新增：上传相关 ======
     private final OkHttpClient http = new OkHttpClient();
     private final Gson gson = new Gson();
+
+    // 拉取码表的 manager
+    private final List<String> smartwatchNameWhiteList = new ArrayList<>();
+    private CodeMasterManager codeManager;
+    private volatile boolean watchListLoaded = false;
 
     // ====== 后台"标准"模型（保持与你现有解析一致）======
     public static class CheckupStandard {
@@ -211,6 +220,27 @@ public class SmartwatchCheckupFragment extends Fragment {
         tvMeasureStatus = root.findViewById(R.id.tv_measure_status);
         tvStatus = root.findViewById(R.id.tv_measure_status);
 
+        // 初始化 manager
+        codeManager = new CodeMasterManager();
+        codeManager.fetchCodeList("SMARTWATCH_TYPE", new CodeMasterManager.CodeListCallback() {
+            @Override public void onSuccess(List<CodeItem> list) {
+                // 仅收集 value 作为“手表型号显示名”（如需用 code 也参与匹配，可同时加入）
+                smartwatchNameWhiteList.clear();
+                for (CodeItem item : list) {
+                    if (item.getValue() != null && !item.getValue().trim().isEmpty()) {
+                        smartwatchNameWhiteList.add(item.getValue().trim());
+                    }
+                }
+                watchListLoaded = true;
+                log("SMARTWATCH_TYPE 白名单: " + smartwatchNameWhiteList);
+            }
+            @Override public void onFailure(Throwable t) {
+                log("SMARTWATCH_TYPE 白名单获取失败");
+                // 拉取失败时保留空列表，后续匹配将自然不命中（即相当于旧逻辑里的TARGET_NAME都不符合）
+                watchListLoaded = true;
+            }
+        });
+
         uiHandler = new Handler(Looper.getMainLooper());
         mgr = VPOperateManager.getInstance();
         mgr.init(requireContext());
@@ -307,7 +337,10 @@ public class SmartwatchCheckupFragment extends Fragment {
         @Override
         public void onScanResult(int cbType, @NonNull ScanResult res) {
             String name = res.getDevice().getName();
-            if (name != null && name.contains(TARGET_NAME)) {
+            if (TextUtils.isEmpty(name) && res.getScanRecord() != null) {
+                name = res.getScanRecord().getDeviceName(); // 兜底从广告里取一次
+            }
+            if (name != null && isInSmartwatchWhiteList(name)) {
                 scanner.stopScan(this);
                 isScanning = false;
                 targetMac = res.getDevice().getAddress();
@@ -320,6 +353,40 @@ public class SmartwatchCheckupFragment extends Fragment {
             }
         }
     };
+
+    /** 判断设备名是否在码表白名单中（忽略大小写；支持等于或前缀匹配，适配有版本后缀的广播名） */
+    /**
+     * 白名单判断：
+     * - 白名单未加载完成 → 不拦截（返回 true），避免“还没拿到表就把设备全挡了”
+     * - 白名单已加载但为空 → 不命中（返回 false）
+     * - 忽略大小写，用 contains；兼容设备名包含型号在中间/后缀
+     */
+    private boolean isInSmartwatchWhiteList(String deviceName) {
+        if (TextUtils.isEmpty(deviceName)) return false;
+
+        // 白名单还在网络加载中 → 不拦截，保持原有体验
+        if (!watchListLoaded) {
+            log("白名单未加载完成，暂不过滤：" + deviceName);
+            return true;
+        }
+
+        // 白名单加载完成但为空 → 视为无可匹配项
+        if (smartwatchNameWhiteList.isEmpty()) {
+            log("白名单已加载但为空，直接不命中：" + deviceName);
+            return false;
+        }
+
+        String low = deviceName.trim().toLowerCase(Locale.US);
+        for (String allow : smartwatchNameWhiteList) {
+            if (TextUtils.isEmpty(allow)) continue;
+            String allowLow = allow.trim().toLowerCase(Locale.US);
+            if (low.contains(allowLow)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     private void syncOnce() {
         if (!mgr.isCurrentDeviceConnected()) {

@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.adapters.VideoTaskDetailAdapter;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.models.UserAccount;
@@ -116,7 +117,7 @@ public class VideoTaskDetailFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) {
-            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "请先登录");
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new UserLoginFragment())
@@ -416,7 +417,7 @@ public class VideoTaskDetailFragment extends Fragment {
                 }
 
                 if (TextUtils.isEmpty(url)) {
-                    Toast.makeText(requireContext(), "当前视频地址为空，稍后再试", Toast.LENGTH_SHORT).show();
+                    InfoPopup.showError(requireContext(), "当前视频地址为空，稍后再试");
                     return;
                 }
 
@@ -735,7 +736,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
     private void preloadAllVideos() {
         if (!isUsingCache || videoList == null) {
-            Toast.makeText(requireContext(), "缓存功能不可用", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "缓存功能不可用");
             return;
         }
         new AlertDialog.Builder(requireContext())
@@ -743,7 +744,7 @@ public class VideoTaskDetailFragment extends Fragment {
                 .setMessage(String.format("将预加载 %d 个视频，可能需要较长时间和消耗流量，确定继续吗？", videoList.size()))
                 .setPositiveButton("确定", (dialog, which) -> {
                     playbackManager.preloadAllVideos(videoList, () -> {
-                        Toast.makeText(requireContext(), "开始后台预加载", Toast.LENGTH_SHORT).show();
+                        InfoPopup.showSuccess(requireContext(), "开始后台预加载");
                     });
                 })
                 .setNegativeButton("取消", null)
@@ -783,7 +784,7 @@ public class VideoTaskDetailFragment extends Fragment {
                     updateCacheInfo();
                     if (currentItem != null) updateCacheStatus(currentItem);
                     hideDownloadProgress();
-                    Toast.makeText(requireContext(), "缓存已清理", Toast.LENGTH_SHORT).show();
+                    InfoPopup.showSuccess(requireContext(), "缓存已清理");
                 })
                 .setNegativeButton("取消", null)
                 .show();
@@ -902,7 +903,7 @@ public class VideoTaskDetailFragment extends Fragment {
             initCacheManager();
         } else {
             Log.d("VideoCache", "权限授予失败");
-            Toast.makeText(requireContext(), "需要存储权限才能缓存视频", Toast.LENGTH_LONG).show();
+            InfoPopup.showError(requireContext(), "需要存储权限才能缓存视频");
         }
     }
 
@@ -1219,7 +1220,7 @@ public class VideoTaskDetailFragment extends Fragment {
 
     private void showShortToast(String msg) {
         try {
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), msg);
         } catch (Throwable ignore) {}
     }
 }

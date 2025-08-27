@@ -13,7 +13,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.manager.LoginCheckerManager;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
@@ -67,7 +67,7 @@ public class MyInfoFragment extends Fragment {
         btnLogin.setOnClickListener(v -> openLogin());
         btnLogout.setOnClickListener(v -> {
             UserUtils.logout(requireContext());
-            Toast.makeText(getContext(), "已退出登录", Toast.LENGTH_SHORT).show();
+            InfoPopup.showSuccess(getContext(), "已退出登录");
             showNotLoggedIn();
         });
 

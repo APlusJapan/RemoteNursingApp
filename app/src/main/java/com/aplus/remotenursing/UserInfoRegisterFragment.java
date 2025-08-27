@@ -14,7 +14,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.models.UserInfo;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
@@ -69,7 +69,7 @@ public class UserInfoRegisterFragment extends Fragment {
             if (!isRequesting) // 正在请求时不允许pop
                 requireActivity().getSupportFragmentManager().popBackStack();
             else
-                showToastSafe("操作进行中，请稍候");
+                showErrorSafe("操作进行中，请稍候");
         });
 
         etName = view.findViewById(R.id.et_name);
@@ -164,11 +164,11 @@ public class UserInfoRegisterFragment extends Fragment {
 
     private boolean checkInput(UserInfo info) {
         if (info.getUserName() == null || info.getUserName().trim().isEmpty()) {
-            showToastSafe("请填写姓名");
+            showErrorSafe("请填写姓名");
             return false;
         }
         if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
-            showToastSafe("请填写手机号");
+            showErrorSafe("请填写手机号");
             return false;
         }
         return true;
@@ -214,7 +214,7 @@ public class UserInfoRegisterFragment extends Fragment {
                                 Log.d("UserInfoDebug", "will call fillUserInfo");
                                 fillUserInfo(finalInfo);
                             } else {
-                                showToastSafe("未查到用户信息（" + response.code() + "）");
+                                showErrorSafe("未查到用户信息（" + response.code() + "）");
                             }
                         });
                     }
@@ -276,7 +276,7 @@ public class UserInfoRegisterFragment extends Fragment {
             public void onFailure(Call call, IOException e) {
                 runUiSafe(() -> {
                     hideLoading();
-                    showToastSafe("保存失败，请检查网络");
+                    showErrorSafe("保存失败，请检查网络");
                 });
             }
             @Override
@@ -317,7 +317,7 @@ public class UserInfoRegisterFragment extends Fragment {
             public void onFailure(Call call, IOException e) {
                 runUiSafe(() -> {
                     hideLoading();
-                    showToastSafe("保存失败，请检查网络");
+                    showErrorSafe("保存失败，请检查网络");
                 });
             }
             @Override
@@ -325,14 +325,14 @@ public class UserInfoRegisterFragment extends Fragment {
                 runUiSafe(() -> {
                     hideLoading();
                     if (response.isSuccessful()) {
-                        showToastSafe("信息保存成功");
+                        showSuccessSafe("信息保存成功");
                         if (isAdded() && getActivity() != null) {
                             while (getActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
                                 getActivity().getSupportFragmentManager().popBackStackImmediate();
                             }
                         }
                     } else {
-                        showToastSafe("服务器错误，保存失败");
+                        showErrorSafe("服务器错误，保存失败");
                     }
                 });
             }
@@ -364,7 +364,11 @@ public class UserInfoRegisterFragment extends Fragment {
         });
     }
 
-    private void showToastSafe(String msg) {
-        runUiSafe(() -> Toast.makeText(getActivitySafe(), msg, Toast.LENGTH_SHORT).show());
+    private void showErrorSafe(String msg) {
+        runUiSafe(() -> InfoPopup.showError(getActivitySafe(), msg));
+    }
+
+    private void showSuccessSafe(String msg) {
+        runUiSafe(() -> InfoPopup.showSuccess(getActivitySafe(), msg));
     }
 }

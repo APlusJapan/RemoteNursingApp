@@ -10,7 +10,7 @@ import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
 
@@ -59,14 +59,14 @@ public class DailyCheckInFragment extends Fragment {
             @Override
             public void onFailure(Call call, IOException e) {
                 requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "加载失败", Toast.LENGTH_SHORT).show());
+                        InfoPopup.showError(getContext(), "加载失败"));
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 if (!response.isSuccessful()) {
                     requireActivity().runOnUiThread(() ->
-                            Toast.makeText(getContext(), "接口错误", Toast.LENGTH_SHORT).show());
+                            InfoPopup.showError(getContext(), "接口错误"));
                     return;
                 }
                 String resp = response.body().string();
@@ -275,7 +275,7 @@ public class DailyCheckInFragment extends Fragment {
             View inputView = fieldViewMap.get(field.fieldId);
             Object value = getFieldValue(field, inputView);
             if (field.isRequired && (value == null || value.toString().trim().isEmpty())) {
-                Toast.makeText(requireContext(), field.fieldLabel + "为必填项", Toast.LENGTH_SHORT).show();
+                InfoPopup.showError(requireContext(), field.fieldLabel + "为必填项");
                 hasEmpty = true;
                 break;
             }

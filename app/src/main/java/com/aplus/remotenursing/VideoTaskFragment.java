@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.adapters.VideoTaskAdapter;
 import com.aplus.remotenursing.manager.VideoPlayHistoryManager;
 import com.aplus.remotenursing.models.VideoTask;
@@ -72,7 +73,7 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
     private void fetchSeriesList() {
         String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) {
-            Toast.makeText(requireContext(), "请先登录", Toast.LENGTH_SHORT).show();
+            InfoPopup.showError(requireContext(), "请先登录");
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new UserLoginFragment())
@@ -89,7 +90,7 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
                 e.printStackTrace();
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        Toast.makeText(requireContext(), "加载视频列表失败", Toast.LENGTH_SHORT).show();
+                        InfoPopup.showError(requireContext(), "加载视频列表失败");
                     });
                 }
             }
@@ -107,13 +108,13 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
                             seriesList.addAll(list);
                             adapter.notifyDataSetChanged();
                         } else {
-                            Toast.makeText(requireContext(), "暂无视频数据", Toast.LENGTH_SHORT).show();
+                            InfoPopup.showError(requireContext(), "加载视频列表失败");
                         }
                     });
                 } else {
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
-                            Toast.makeText(requireContext(), "加载视频列表失败", Toast.LENGTH_SHORT).show();
+                            InfoPopup.showError(requireContext(), "加载视频列表失败");
                         });
                     }
                 }

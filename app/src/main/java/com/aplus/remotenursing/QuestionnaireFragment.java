@@ -14,7 +14,7 @@ import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
-
+import com.aplus.remotenursing.common.InfoPopup;
 import org.json.*;
 
 import java.io.IOException;
@@ -60,12 +60,12 @@ public class QuestionnaireFragment extends Fragment {
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
                 requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "加载失败", Toast.LENGTH_SHORT).show());
+                        InfoPopup.showError(getContext(), "加载失败"));
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
                 if (!response.isSuccessful()) {
                     requireActivity().runOnUiThread(() ->
-                            Toast.makeText(getContext(), "接口错误", Toast.LENGTH_SHORT).show());
+                            InfoPopup.showError(getContext(), "接口错误"));
                     return;
                 }
                 String resp = response.body().string();
@@ -186,7 +186,7 @@ public class QuestionnaireFragment extends Fragment {
             View inputView = fieldViewMap.get(field.fieldId);
             Object value = getFieldValue(field, inputView);
             if (field.isRequired && (value == null || value.toString().trim().isEmpty())) {
-                Toast.makeText(requireContext(), field.fieldLabel + "为必填项", Toast.LENGTH_SHORT).show();
+                InfoPopup.showError(requireContext(), field.fieldLabel + "为必填项");
                 hasEmpty = true;
                 break;
             }
@@ -210,7 +210,7 @@ public class QuestionnaireFragment extends Fragment {
             });
         }
         if (!hasEmpty) {
-            Toast.makeText(requireContext(), "问卷已提交", Toast.LENGTH_SHORT).show();
+            InfoPopup.showSuccess(requireContext(), "问卷已提交");
         }
     }
 
