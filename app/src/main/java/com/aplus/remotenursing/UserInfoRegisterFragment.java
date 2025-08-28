@@ -195,28 +195,34 @@ public class UserInfoRegisterFragment extends Fragment {
                     public void onResponse(Call call, Response response) throws IOException {
                         if (!isAdded() || getActivity() == null) {
                             Log.d("UserInfoDebug", "Fragment已销毁，不再回调UI");
+                            response.close();
                             return;
                         }
-                        String resp = response.body().string();
-                        Log.d("fetchAndFillUserInfo", "HTTP status: " + response.code() + " body: " + resp);
-
-                        UserInfo info = null;
+                        int code = response.code();
                         try {
-                            info = gson.fromJson(resp, UserInfo.class);
-                            Log.d("fetchAndFillUserInfo", "解析后 info: " + info);
-                        } catch (Exception ignore) {
-                            Log.e("fetchAndFillUserInfo", "JSON解析异常: " + ignore.getMessage());
-                        }
-                        final UserInfo finalInfo = info;
-                        runUiSafe(() -> {
-                            hideLoading();
-                            if (finalInfo != null && finalInfo.getUserId() != null) {
-                                Log.d("UserInfoDebug", "will call fillUserInfo");
-                                fillUserInfo(finalInfo);
-                            } else {
-                                showErrorSafe("未查到用户信息（" + response.code() + "）");
+                            String resp = response.body().string();
+                            Log.d("fetchAndFillUserInfo", "HTTP status: " + code + " body: " + resp);
+
+                            UserInfo info = null;
+                            try {
+                                info = gson.fromJson(resp, UserInfo.class);
+                                Log.d("fetchAndFillUserInfo", "解析后 info: " + info);
+                            } catch (Exception ignore) {
+                                Log.e("fetchAndFillUserInfo", "JSON解析异常: " + ignore.getMessage());
                             }
-                        });
+                            final UserInfo finalInfo = info;
+                            runUiSafe(() -> {
+                                hideLoading();
+                                if (finalInfo != null && finalInfo.getUserId() != null) {
+                                    Log.d("UserInfoDebug", "will call fillUserInfo");
+                                    fillUserInfo(finalInfo);
+                                } else {
+                                    showErrorSafe("未查到用户信息（" + code + "）");
+                                }
+                            });
+                        } finally {
+                            response.close();
+                        }
                     }
                 });
     }
@@ -282,12 +288,16 @@ public class UserInfoRegisterFragment extends Fragment {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 boolean exists = false;
-                if (response.isSuccessful()) {
-                    try {
-                        String resp = response.body().string();
-                        UserInfo infoRemote = gson.fromJson(resp, UserInfo.class);
-                        exists = (infoRemote != null && infoRemote.getUserId() != null);
-                    } catch (Exception ignore) { }
+                try {
+                    if (response.isSuccessful()) {
+                        try {
+                            String resp = response.body().string();
+                            UserInfo infoRemote = gson.fromJson(resp, UserInfo.class);
+                            exists = (infoRemote != null && infoRemote.getUserId() != null);
+                        } catch (Exception ignore) { }
+                    }
+                } finally {
+                    response.close();
                 }
                 doSaveOrUpdate(info, exists);
             }
@@ -322,9 +332,15 @@ public class UserInfoRegisterFragment extends Fragment {
             }
             @Override
             public void onResponse(Call call, Response response) throws IOException {
+                boolean successful;
+                try {
+                    successful = response.isSuccessful();
+                } finally {
+                    response.close();
+                }
                 runUiSafe(() -> {
                     hideLoading();
-                    if (response.isSuccessful()) {
+                    if (successful) {
                         showSuccessSafe("信息保存成功");
                         if (isAdded() && getActivity() != null) {
                             while (getActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {

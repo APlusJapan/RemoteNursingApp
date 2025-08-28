@@ -140,9 +140,18 @@ public class UserAccountRegisterFragment extends Fragment {
             }
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (!isAdded()) return;
-                String resp = response.body().string();
-                if (response.isSuccessful()) {
+                if (!isAdded()) {
+                    response.close();
+                    return;
+                }
+                boolean successful = response.isSuccessful();
+                String resp;
+                try {
+                    resp = response.body().string();
+                } finally {
+                    response.close();
+                }
+                if (successful) {
                     UserAccount userAccount = gson.fromJson(resp, UserAccount.class);
                     if (userAccount == null || userAccount.getUserId() == null || userAccount.getUserId().isEmpty()) {
                         requireActivity().runOnUiThread(() -> {

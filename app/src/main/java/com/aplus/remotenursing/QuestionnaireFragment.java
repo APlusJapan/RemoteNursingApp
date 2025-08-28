@@ -63,23 +63,27 @@ public class QuestionnaireFragment extends Fragment {
                         InfoPopup.showError(getContext(), "加载失败"));
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                if (!response.isSuccessful()) {
-                    requireActivity().runOnUiThread(() ->
-                            InfoPopup.showError(getContext(), "接口错误"));
-                    return;
-                }
-                String resp = response.body().string();
                 try {
-                    JSONArray arr = new JSONArray(resp);
-                    fieldList.clear();
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONObject obj = arr.getJSONObject(i);
-                        Field field = Field.fromJson(obj);
-                        fieldList.add(field);
+                    if (!response.isSuccessful()) {
+                        requireActivity().runOnUiThread(() ->
+                                InfoPopup.showError(getContext(), "接口错误"));
+                        return;
                     }
-                    requireActivity().runOnUiThread(() -> renderFormFields());
-                } catch (JSONException e) {
-                    e.printStackTrace();
+                    String resp = response.body().string();
+                    try {
+                        JSONArray arr = new JSONArray(resp);
+                        fieldList.clear();
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject obj = arr.getJSONObject(i);
+                            Field field = Field.fromJson(obj);
+                            fieldList.add(field);
+                        }
+                        requireActivity().runOnUiThread(() -> renderFormFields());
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                } finally {
+                    response.close();
                 }
             }
         });
@@ -206,7 +210,13 @@ public class QuestionnaireFragment extends Fragment {
                     .build();
             client.newCall(request).enqueue(new Callback() {
                 @Override public void onFailure(Call call, IOException e) { }
-                @Override public void onResponse(Call call, Response response) throws IOException { }
+                @Override public void onResponse(Call call, Response response) throws IOException {
+                    try {
+                        // no-op
+                    } finally {
+                        response.close();
+                    }
+                }
             });
         }
         if (!hasEmpty) {

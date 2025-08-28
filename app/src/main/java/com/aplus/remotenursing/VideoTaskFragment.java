@@ -97,26 +97,30 @@ public class VideoTaskFragment extends Fragment implements VideoTaskAdapter.OnSe
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful() && getActivity() != null) {
-                    String json = response.body().string();
-                    Gson gson = new Gson();
-                    List<VideoTask> list = gson.fromJson(json, new TypeToken<List<VideoTask>>(){}.getType());
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String json = response.body().string();
+                        Gson gson = new Gson();
+                        List<VideoTask> list = gson.fromJson(json, new TypeToken<List<VideoTask>>(){}.getType());
 
-                    getActivity().runOnUiThread(() -> {
-                        if (list != null && !list.isEmpty()) {
-                            seriesList.clear();
-                            seriesList.addAll(list);
-                            adapter.notifyDataSetChanged();
-                        } else {
-                            InfoPopup.showError(requireContext(), "加载视频列表失败");
-                        }
-                    });
-                } else {
-                    if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
-                            InfoPopup.showError(requireContext(), "加载视频列表失败");
+                            if (list != null && !list.isEmpty()) {
+                                seriesList.clear();
+                                seriesList.addAll(list);
+                                adapter.notifyDataSetChanged();
+                            } else {
+                                InfoPopup.showError(requireContext(), "加载视频列表失败");
+                            }
                         });
+                    } else {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                InfoPopup.showError(requireContext(), "加载视频列表失败");
+                            });
+                        }
                     }
+                } finally {
+                    response.close();
                 }
             }
         });

@@ -160,15 +160,19 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) { }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful() && getActivity() != null) {
-                    String body = response.body().string();
-                    try {
-                        JSONObject obj = new JSONObject(body);
-                        final int point = obj.optInt("availablePoint", 0);
-                        requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：" + point));
-                    } catch (Exception e) {
-                        requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：0"));
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String body = response.body().string();
+                        try {
+                            JSONObject obj = new JSONObject(body);
+                            final int point = obj.optInt("availablePoint", 0);
+                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：" + point));
+                        } catch (Exception e) {
+                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：0"));
+                        }
                     }
+                } finally {
+                    response.close();
                 }
             }
         });
@@ -181,22 +185,26 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) { }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful() && getActivity() != null) {
-                    String body = response.body().string();
-                    try {
-                        JSONArray arr = new JSONArray(body);
-                        taskPointRuleMap.clear();
-                        if (arr != null) {
-                            for (int i = 0; i < arr.length(); i++) {
-                                JSONObject obj = arr.getJSONObject(i);
-                                String taskType = obj.optString("taskType");
-                                int pointAmount = obj.optInt("pointAmount", 0);
-                                taskPointRuleMap.put(taskType, pointAmount);
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String body = response.body().string();
+                        try {
+                            JSONArray arr = new JSONArray(body);
+                            taskPointRuleMap.clear();
+                            if (arr != null) {
+                                for (int i = 0; i < arr.length(); i++) {
+                                    JSONObject obj = arr.getJSONObject(i);
+                                    String taskType = obj.optString("taskType");
+                                    int pointAmount = obj.optInt("pointAmount", 0);
+                                    taskPointRuleMap.put(taskType, pointAmount);
+                                }
                             }
-                        }
-                        pointRulesLoaded = true;
-                        tryRefreshTaskUI();
-                    } catch (Exception e) {}
+                            pointRulesLoaded = true;
+                            tryRefreshTaskUI();
+                        } catch (Exception e) {}
+                    }
+                } finally {
+                    response.close();
                 }
             }
         });
@@ -213,18 +221,22 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                 Log.e("UserTaskFragment", "fetchTasks failed: " + e.getMessage());
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful() && getActivity() != null) {
-                    String json = response.body().string();
-                    Log.d("UserTaskFragment", "fetchTasks返回: " + json); // 这一行是关键！
-                    Gson gson = new Gson();
-                    List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
-                    Log.d("UserTaskFragment", "解析后list.size=" + (list != null ? list.size() : "null"));
-                    if (list != null) {
-                        Collections.sort(list, (a, b) -> Integer.compare(a.getTaskOrder(), b.getTaskOrder()));
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String json = response.body().string();
+                        Log.d("UserTaskFragment", "fetchTasks返回: " + json); // 这一行是关键！
+                        Gson gson = new Gson();
+                        List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
+                        Log.d("UserTaskFragment", "解析后list.size=" + (list != null ? list.size() : "null"));
+                        if (list != null) {
+                            Collections.sort(list, (a, b) -> Integer.compare(a.getTaskOrder(), b.getTaskOrder()));
+                        }
+                        userTaskList = list;
+                        tasksLoaded = true;
+                        tryRefreshTaskUI();
                     }
-                    userTaskList = list;
-                    tasksLoaded = true;
-                    tryRefreshTaskUI();
+                } finally {
+                    response.close();
                 }
             }
         });

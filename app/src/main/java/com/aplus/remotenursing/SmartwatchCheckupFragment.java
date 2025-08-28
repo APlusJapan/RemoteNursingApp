@@ -299,17 +299,21 @@ public class SmartwatchCheckupFragment extends Fragment {
                 safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                if (!response.isSuccessful()) {
+                try {
+                    if (!response.isSuccessful()) {
+                        safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
+                        return;
+                    }
+                    String json = response.body().string();
+                    Gson gson = new Gson();
+                    Type listType = new TypeToken<List<CheckupStandard>>(){}.getType();
+                    List<CheckupStandard> standards = gson.fromJson(json, listType);
+                    standardList.clear();
+                    if (standards != null) standardList.addAll(standards);
                     safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
-                    return;
+                } finally {
+                    response.close();
                 }
-                String json = response.body().string();
-                Gson gson = new Gson();
-                Type listType = new TypeToken<List<CheckupStandard>>(){}.getType();
-                List<CheckupStandard> standards = gson.fromJson(json, listType);
-                standardList.clear();
-                if (standards != null) standardList.addAll(standards);
-                safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
             }
         });
     }

@@ -139,8 +139,15 @@ public class MyInfoFragment extends Fragment {
                 }
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    if (response.isSuccessful()) {
-                        String resp = response.body().string();
+                    String resp = "";
+                    int code = response.code();
+                    boolean success = response.isSuccessful();
+                    try {
+                        resp = response.body().string();
+                    } finally {
+                        response.close();
+                    }
+                    if (success) {
                         Log.d("MyAccountFragment", "从服务器获取用户信息响应: " + resp);
                         UserAccount remote = gson.fromJson(resp, UserAccount.class);
                         if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
@@ -154,7 +161,7 @@ public class MyInfoFragment extends Fragment {
                             return;
                         }
                     } else {
-                        Log.d("MyAccountFragment", "服务器响应失败: " + response.code());
+                        Log.d("MyAccountFragment", "服务器响应失败: " + code);
                     }
                 }
             });

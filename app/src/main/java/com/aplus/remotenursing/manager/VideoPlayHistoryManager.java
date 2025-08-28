@@ -270,20 +270,28 @@ public class VideoPlayHistoryManager {
                 // 失败时不清理，留待下次再传
             }
             @Override public void onResponse(Call call, Response response) throws IOException {
-                String resp = response.body() != null ? response.body().string() : "";
-                if (response.isSuccessful()) {
+                String resp = "";
+                int code = response.code();
+                boolean success = response.isSuccessful();
+                try {
+                    resp = response.body() != null ? response.body().string() : "";
+                } finally {
+                    response.close();
+                }
+                if (success) {
                     Log.d(TAG, "上传播放记录成功，响应: " + resp);
                     // 只清理已上传的，保留今天及以后
                     playRecordsList = toKeep;
                     saveLocalRecords(); // 持久化剩余记录
                     Log.d(TAG, "清理已上传的<今天记录。剩余本地记录数: " + playRecordsList.size());
                 } else {
-                    Log.e(TAG, "上传播放记录失败，HTTP " + response.code() + "，响应: " + resp);
+                    Log.e(TAG, "上传播放记录失败，HTTP " + code + "，响应: " + resp);
                     // 失败时不清理，留待下次再传
                 }
             }
         });
     }
+
 
 
     /**

@@ -71,29 +71,33 @@ public class CodeMasterManager {
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    if (!response.isSuccessful()) {
-                        IOException ex = new IOException("HTTP " + response.code());
-                        Log.e(TAG, "fetchCodeList http error: " + ex.getMessage());
-                        if (callback != null) callback.onFailure(ex);
-                        return;
-                    }
-                    String body = response.body() != null ? response.body().string() : "[]";
                     try {
-                        JSONArray arr = new JSONArray(body);
-                        List<CodeItem> result = new ArrayList<>();
-                        for (int i = 0; i < arr.length(); i++) {
-                            JSONObject o = arr.getJSONObject(i);
-                            CodeItem item = new CodeItem(
-                                    o.optString("code", ""),
-                                    o.optString("value", ""),
-                                    o.optString("value_type", "")
-                            );
-                            result.add(item);
+                        if (!response.isSuccessful()) {
+                            IOException ex = new IOException("HTTP " + response.code());
+                            Log.e(TAG, "fetchCodeList http error: " + ex.getMessage());
+                            if (callback != null) callback.onFailure(ex);
+                            return;
                         }
-                        if (callback != null) callback.onSuccess(result);
-                    } catch (Exception parseEx) {
-                        Log.e(TAG, "parse error: " + parseEx.getMessage(), parseEx);
-                        if (callback != null) callback.onFailure(parseEx);
+                        String body = response.body() != null ? response.body().string() : "[]";
+                        try {
+                            JSONArray arr = new JSONArray(body);
+                            List<CodeItem> result = new ArrayList<>();
+                            for (int i = 0; i < arr.length(); i++) {
+                                JSONObject o = arr.getJSONObject(i);
+                                CodeItem item = new CodeItem(
+                                        o.optString("code", ""),
+                                        o.optString("value", ""),
+                                        o.optString("value_type", "")
+                                );
+                                result.add(item);
+                            }
+                            if (callback != null) callback.onSuccess(result);
+                        } catch (Exception parseEx) {
+                            Log.e(TAG, "parse error: " + parseEx.getMessage(), parseEx);
+                            if (callback != null) callback.onFailure(parseEx);
+                        }
+                    } finally {
+                        response.close();
                     }
                 }
             });
