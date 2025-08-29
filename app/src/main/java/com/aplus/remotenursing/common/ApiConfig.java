@@ -17,10 +17,14 @@ public class ApiConfig {
     public static final String API_ACCOUNT_REGISTER = BASE_URL + "account/register";
     public static final String API_ACCOUNT_LOGIN = BASE_URL + "account/login";
     public static final String API_USER_ACCOUNT = BASE_URL + "useraccount/"; // requires userId after slash
-    public static final String API_CHECKIN_FIELDS = BASE_URL + "checkin/field/form/"; // 需要formId拼接
-    public static final String API_CHECKIN_RECORD = BASE_URL + "checkin/record";
+    public static final String API_CHECKIN_FIELDS = BASE_URL + "dailycheckin/field/form/"; // 需要formId拼接
+    public static final String API_CHECKIN_RECORD = BASE_URL + "dailycheckin/record";
+    public static final String API_CHECKIN_RECORD_COUNT = BASE_URL + "dailycheckin/record/count";
+    public static final String API_GET_CHECKIN_FORMID = BASE_URL + "dailycheckin/form/valid-id";
     public static final String API_QUESTIONNAIRE_FIELDS = BASE_URL + "questionnaire/field/form/";
     public static final String API_QUESTIONNAIRE_RECORD = BASE_URL + "questionnaire/record";
+    public static final String API_QUESTIONNAIRE_RECORD_COUNT = BASE_URL + "questionnaire/record/count";
+    public static final String API_GET_QUESTIONNAIRE_FORMID = BASE_URL + "questionnaire/form/valid-id";
     public static final String API_POINT_RULES = BASE_URL + "point/rule";
     public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
     public static final String API_CHECKUP_STANDARD = BASE_URL + "checkup-standard/by-user/";
