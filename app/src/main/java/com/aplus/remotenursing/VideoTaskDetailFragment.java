@@ -140,6 +140,7 @@ public class VideoTaskDetailFragment extends Fragment {
         initOriginalViews(view, videoSeriesName);
         initCacheViews(view);
 
+
         // 2) 权限与缓存
         checkPermissionsAndInitCache();
 

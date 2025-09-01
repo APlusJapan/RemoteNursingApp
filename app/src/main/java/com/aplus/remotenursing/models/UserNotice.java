@@ -3,7 +3,7 @@ package com.aplus.remotenursing.models;
 import com.google.gson.annotations.SerializedName;
 import java.util.Date;
 
-public class UserTask {
+public class UserNotice {
     @SerializedName("id")
     private Integer id;
 
@@ -13,20 +13,11 @@ public class UserTask {
     @SerializedName("teamId")
     private String teamId;
 
-    @SerializedName("taskId")
-    private String taskId;
+    @SerializedName("noticeId")
+    private String noticeId;
 
-    @SerializedName("taskType")
-    private String taskType;
-
-    @SerializedName("taskName")
-    private String taskName;
-
-    @SerializedName("taskOrder")
-    private int taskOrder;
-
-    @SerializedName("displayType")
-    private String displayType;
+    @SerializedName("noticeText")
+    private String noticeText;
 
     @SerializedName("startTime")
     private Date startTime;
@@ -46,23 +37,31 @@ public class UserTask {
     @SerializedName("updatedTime")
     private Date updatedTime;
 
-    public UserTask() {}
+    public UserNotice() {}
 
-    // 保持原有的核心getter方法
-    public String getTaskId() { return taskId; }
-    public String getTaskType() { return taskType; }
-    public String getTaskName() { return taskName; }
-    public int getTaskOrder() { return taskOrder; }
-
-    // 新增的getter方法
+    // Getters
     public Integer getId() { return id; }
     public String getProjectId() { return projectId; }
     public String getTeamId() { return teamId; }
-    public String getDisplayType() { return displayType; }
+    public String getNoticeId() { return noticeId; }
+    public String getNoticeText() { return noticeText; }
     public Date getStartTime() { return startTime; }
     public Date getEndTime() { return endTime; }
     public String getAdminId() { return adminId; }
     public boolean isDeleted() { return isDeleted; }
     public Date getCreateTime() { return createTime; }
     public Date getUpdatedTime() { return updatedTime; }
+
+    // Setters
+    public void setId(Integer id) { this.id = id; }
+    public void setProjectId(String projectId) { this.projectId = projectId; }
+    public void setTeamId(String teamId) { this.teamId = teamId; }
+    public void setNoticeId(String noticeId) { this.noticeId = noticeId; }
+    public void setNoticeText(String noticeText) { this.noticeText = noticeText; }
+    public void setStartTime(Date startTime) { this.startTime = startTime; }
+    public void setEndTime(Date endTime) { this.endTime = endTime; }
+    public void setAdminId(String adminId) { this.adminId = adminId; }
+    public void setDeleted(boolean deleted) { isDeleted = deleted; }
+    public void setCreateTime(Date createTime) { this.createTime = createTime; }
+    public void setUpdatedTime(Date updatedTime) { this.updatedTime = updatedTime; }
 }

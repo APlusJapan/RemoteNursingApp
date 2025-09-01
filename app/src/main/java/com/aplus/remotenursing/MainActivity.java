@@ -19,7 +19,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentTransaction;
 
 import com.aplus.remotenursing.common.ApiConfig;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -32,19 +31,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String SP_NAME = "privacy_prefs";
     private static final String SP_KEY_ACCEPTED = "privacy_accepted_v1";
 
-    private Fragment usertaskFragment;
-    private Fragment myInfoFragment;
-
-    // 用于记录当前 tab 索引
-    private int lastTabIndex = 0;
-    private Fragment[] fragments;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 1) 首次打开 => 先做隐私合规拦截
+        // 首次打开 => 先做隐私合规拦截
         if (hasAcceptedPrivacy(this)) {
             // 已同意，直接正常启动
             bootstrapAfterConsent();
@@ -54,19 +46,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 首次同意后再做：初始化Fragment、底部导航、申请权限 */
+    /** 首次同意后再做：初始化默认Fragment、底部导航、申请权限 */
     private void bootstrapAfterConsent() {
-        // 2) 实例化 Fragment（保留你原来的逻辑）
-        usertaskFragment = new UserTaskFragment();
-        myInfoFragment = new MyInfoFragment();
-        fragments = new Fragment[]{usertaskFragment, myInfoFragment};
+        // 只创建并显示默认的UserTaskFragment
+        Fragment defaultFragment = new UserTaskFragment();
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, defaultFragment)
+                .commit();
 
-        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        ft.add(R.id.fragment_container, usertaskFragment, "usertask");
-        ft.add(R.id.fragment_container, myInfoFragment, "myInfo").hide(myInfoFragment);
-        ft.commit();
+        // 设置底部导航
+        setupBottomNavigation();
 
-        // 3) 底部导航切换（保留你原来的逻辑）
+        // 申请 BLE 动态权限
+        requestBlePermissionsIfNeeded();
+    }
+
+    /** 设置底部导航切换逻辑 */
+    private void setupBottomNavigation() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setOnItemSelectedListener(item -> {
             Fragment fragment;
@@ -77,14 +73,15 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 return false;
             }
+
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, fragment)
                     .commit();
             return true;
         });
 
-        // 4) 再申请 BLE 动态权限（同意隐私后再申请）
-        requestBlePermissionsIfNeeded();
+        // 设置默认选中第一个tab
+        nav.setSelectedItemId(R.id.navigation_task);
     }
 
     /** 首次打开时的隐私弹窗（必须同意才继续） */
@@ -144,7 +141,7 @@ public class MainActivity extends AppCompatActivity {
             });
         });
 
-        // 点击“查看隐私政策”按钮：优先打开线上URL，没填则走本地assets
+        // 点击"查看隐私政策"按钮：优先打开线上URL，没填则走本地assets
         btnView.setOnClickListener(v -> openPrivacyPage());
 
         dialog.show();
@@ -154,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
     private void openPrivacyPage() {
         String url = null;
         try {
-            url = com.aplus.remotenursing.common.ApiConfig.ALIYUN_OSS_PRIVACY_URL;
+            url = ApiConfig.ALIYUN_OSS_PRIVACY_URL;
         } catch (Throwable ignore) {}
         Intent it = new Intent(this, PrivacyActivity.class);
         if (url != null && url.startsWith("http")) {
@@ -163,13 +160,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(it);
     }
 
-    // ===== 原有方法保留 / 调整顺序 =====
-
-    // 新增：供Fragment调用，主动切换tab并刷新fragment
+    /** 供Fragment调用，主动切换tab */
     public void switchToTab(int itemId) {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
         nav.setSelectedItemId(itemId);
-        // nav的监听会自动切换Fragment，不需额外操作
+        // nav的监听器会自动切换Fragment
     }
 
     private void requestBlePermissionsIfNeeded() {

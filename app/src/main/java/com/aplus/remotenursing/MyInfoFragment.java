@@ -50,7 +50,7 @@ public class MyInfoFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        loadUserInfo();
+//        loadUserInfo();
     }
 
     @Override
@@ -116,59 +116,61 @@ public class MyInfoFragment extends Fragment {
                 .commit();
     }
 
-    private void loadUserInfo() {
-        userAccount = UserUtils.getUserAccount(requireContext());
-
-        Log.d("MyAccountFragment", "userAccount=" + (userAccount != null ? gson.toJson(userAccount) : "null"));
-        Log.d("MyAccountFragment", "userId=" + (userAccount != null ? userAccount.getUserId() : "null"));
-        Log.d("MyAccountFragment", "loginName=" + (userAccount != null ? userAccount.getLoginName() : "null"));
-        // 添加 adminId 的日志输出
-        Log.d("MyAccountFragment", "adminId=" + (userAccount != null ? userAccount.getAdminId() : "null"));
-
-        // 本地已登录，联网后台检查有效性
-        if (userAccount != null && userAccount.getUserId() != null && !userAccount.getUserId().isEmpty()) {
-            showLoggedIn(userAccount);
-
-            String url = ApiConfig.API_USER_ACCOUNT + userAccount.getUserId();
-            OkHttpClient client = new OkHttpClient();
-            Request request = new Request.Builder().url(url).build();
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    Log.d("MyAccountFragment", "网络不可用，保留本地登录状态，仅提示");
-                }
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    String resp = "";
-                    int code = response.code();
-                    boolean success = response.isSuccessful();
-                    try {
-                        resp = response.body().string();
-                    } finally {
-                        response.close();
-                    }
-                    if (success) {
-                        Log.d("MyAccountFragment", "从服务器获取用户信息响应: " + resp);
-                        UserAccount remote = gson.fromJson(resp, UserAccount.class);
-                        if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
-                            userAccount = remote;
-                            UserUtils.saveUserAccount(requireContext(), remote);
-                            Log.d("MyAccountFragment", "更新后的用户信息: userId=" + remote.getUserId()
-                                    + ", loginName=" + remote.getLoginName()
-                                    + ", nickName=" + remote.getNickName()
-                                    + ", adminId=" + remote.getAdminId());
-                            if (getActivity() != null) getActivity().runOnUiThread(() -> showLoggedIn(remote));
-                            return;
-                        }
-                    } else {
-                        Log.d("MyAccountFragment", "服务器响应失败: " + code);
-                    }
-                }
-            });
-        } else {
-            showNotLoggedIn();
-        }
-    }
+//    private void loadUserInfo() {
+//        userAccount = UserUtils.getUserAccount(requireContext());
+//
+//        Log.d("MyAccountFragment", "userAccount=" + (userAccount != null ? gson.toJson(userAccount) : "null"));
+//        Log.d("MyAccountFragment", "userId=" + (userAccount != null ? userAccount.getUserId() : "null"));
+//        Log.d("MyAccountFragment", "loginName=" + (userAccount != null ? userAccount.getLoginName() : "null"));
+//        // 添加 adminId 的日志输出
+//        Log.d("MyAccountFragment", "adminId=" + (userAccount != null ? userAccount.getAdminId() : "null"));
+//
+//        String userId = userAccount.getUserId();
+//    // 本地已登录，联网后台检查有效性
+//        if (userAccount != null && userId != null && !userAccount.getUserId().isEmpty()) {
+//            showLoggedIn(userAccount);
+//
+//            String url = ApiConfig.API_SEARCH_ACCOUNT + "?userId="+userId;
+//
+//            OkHttpClient client = new OkHttpClient();
+//            Request request = new Request.Builder().url(url).build();
+//            client.newCall(request).enqueue(new Callback() {
+//                @Override
+//                public void onFailure(Call call, IOException e) {
+//                    Log.d("MyAccountFragment", "网络不可用，保留本地登录状态，仅提示");
+//                }
+//                @Override
+//                public void onResponse(Call call, Response response) throws IOException {
+//                    String resp = "";
+//                    int code = response.code();
+//                    boolean success = response.isSuccessful();
+//                    try {
+//                        resp = response.body().string();
+//                    } finally {
+//                        response.close();
+//                    }
+//                    if (success) {
+//                        Log.d("MyAccountFragment", "从服务器获取用户信息响应: " + resp);
+//                        UserAccount remote = gson.fromJson(resp, UserAccount.class);
+//                        if (remote != null && remote.getUserId() != null && !remote.getUserId().isEmpty()) {
+//                            userAccount = remote;
+//                            UserUtils.saveUserAccount(requireContext(), remote);
+//                            Log.d("MyAccountFragment", "更新后的用户信息: userId=" + remote.getUserId()
+//                                    + ", loginName=" + remote.getLoginName()
+//                                    + ", nickName=" + remote.getNickName()
+//                                    + ", adminId=" + remote.getAdminId());
+//                            if (getActivity() != null) getActivity().runOnUiThread(() -> showLoggedIn(remote));
+//                            return;
+//                        }
+//                    } else {
+//                        Log.d("MyAccountFragment", "服务器响应失败: " + code);
+//                    }
+//                }
+//            });
+//        } else {
+//            showNotLoggedIn();
+//        }
+//    }
 
     private void showLoggedIn(UserAccount account) {
         isLoggedIn = true;

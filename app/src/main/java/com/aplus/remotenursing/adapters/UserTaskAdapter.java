@@ -85,11 +85,7 @@ public class UserTaskAdapter extends RecyclerView.Adapter<UserTaskAdapter.ViewHo
         public void bind(UserTask task, int taskPoint) {
             if (task != null) {
                 tvTaskName.setText(task.getTaskName());
-                String status = "未完成";
-                if ("1".equals(task.getActionStatus())) {
-                    status = "已完成";
-                }
-                tvTaskPoint.setText(status + " | 积分：" + taskPoint);
+                tvTaskPoint.setText("完成得分：" + taskPoint);
             } else {
                 tvTaskName.setText("");
                 tvTaskPoint.setText("");

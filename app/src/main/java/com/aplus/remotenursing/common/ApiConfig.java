@@ -16,7 +16,7 @@ public class ApiConfig {
     public static final String API_CREATE_USER_INFO = BASE_URL + "createUserinfo";
     public static final String API_ACCOUNT_REGISTER = BASE_URL + "account/register";
     public static final String API_ACCOUNT_LOGIN = BASE_URL + "account/login";
-    public static final String API_USER_ACCOUNT = BASE_URL + "useraccount/"; // requires userId after slash
+    public static final String API_SEARCH_ACCOUNT = BASE_URL + "account/searchAccount"; // requires userId after slash
     public static final String API_CHECKIN_FIELDS = BASE_URL + "dailycheckin/field/form/"; // 需要formId拼接
     public static final String API_CHECKIN_RECORD = BASE_URL + "dailycheckin/record";
     public static final String API_CHECKIN_RECORD_COUNT = BASE_URL + "dailycheckin/record/count";
@@ -26,12 +26,14 @@ public class ApiConfig {
     public static final String API_QUESTIONNAIRE_RECORD_COUNT = BASE_URL + "questionnaire/record/count";
     public static final String API_GET_QUESTIONNAIRE_FORMID = BASE_URL + "questionnaire/form/valid-id";
     public static final String API_POINT_RULES = BASE_URL + "point/rule";
-    public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
+    public static final String API_USER_POINT_ACCOUNT = BASE_URL + "point/countByUserId";
+    public static final String API_ADD_USERPOINT = BASE_URL + "point/addPoint";
     public static final String API_CHECKUP_STANDARD = BASE_URL + "checkup-standard/by-user/";
     public static final String API_CHECKUP_RECORD_SAVE = BASE_URL + "user-checkup-record";
     public static final String API_VIDEO_HISTORY_RECORD_SAVE = BASE_URL + "video-play-history/batch-update";
     public static final String API_VIDEO_UPDATE_NOTICE = BASE_URL + "videos/getUpdateNotice";
     public static final String API_VIDEO_UPDATE_RECEIPT = BASE_URL + "videos/updates/";
+    public static final String API_GET_NOTICE = BASE_URL + "usernotice/search";
     public static final String API_CODE_MASTER = BASE_URL + "code-master/list";
 
 }

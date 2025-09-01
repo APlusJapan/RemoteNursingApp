@@ -44,8 +44,9 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
     private RecyclerView rvTasks;
     private UserTaskAdapter adapter;
-    private TextView tvPoint, tvTaskCount, tvTaskPointTotal, tvTaskPointRemain;
+    private TextView tvPoint, tvNotice;
     private boolean pointRulesLoaded = false;
+
     private boolean tasksLoaded = false;
     private List<UserTask> userTaskList = Collections.emptyList();
     private Map<String, Integer> taskPointRuleMap = new HashMap<>();
@@ -66,13 +67,11 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         // 积分区
         TextView tvNickName = view.findViewById(R.id.tv_nick_name);
         tvPoint = view.findViewById(R.id.tv_point);
-        tvTaskCount = view.findViewById(R.id.tv_task_count);
-        tvTaskPointTotal = view.findViewById(R.id.tv_task_point_total);
-        tvTaskPointRemain = view.findViewById(R.id.tv_task_point_remain);
+        tvNotice = view.findViewById(R.id.tv_notice);
+
         // 找到功能区2个CardView
         cardLearnVideo = view.findViewById(R.id.card_learn_video);
         //cardDailyCheck = view.findViewById(R.id.card_daily_check);
-        tvVideoHint = view.findViewById(R.id.tv_video_hint);
         //tvCheckHint = view.findViewById(R.id.tv_check_hint);
 
         // 默认隐藏
@@ -84,7 +83,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         if (userAccount != null && userAccount.getNickName() != null) {
             tvNickName.setText(userAccount.getNickName());
         } else {
-            tvNickName.setText("未登录");
+            tvNickName.setText("未登录，请先完成登录。");
         }
 
         // 卡片点击事件
@@ -96,14 +95,6 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .addToBackStack(null)
                     .commit();
         });
-//        cardDailyCheck.setOnClickListener(v -> {
-//            // 跳转到体检
-//            requireActivity().getSupportFragmentManager()
-//                    .beginTransaction()
-//                    .replace(R.id.fragment_container, new SmartwatchCheckupFragment())
-//                    .addToBackStack(null)
-//                    .commit();
-//        });
 
         // 通知图片轮播区
         ViewPager2 vpBanner = view.findViewById(R.id.vp_notice_banner);
@@ -125,7 +116,6 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         };
         // 启动自动滚动
         vpBanner.postDelayed(autoScrollRunnable, 3000);
-
 
         // 任务区RecyclerView
         rvTasks = view.findViewById(R.id.rv_tasks);
@@ -155,7 +145,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) return;
         OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_USERPOINT_USERACCOUNT + userId;
+        String url = ApiConfig.API_USER_POINT_ACCOUNT + "?userId=" + userId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) { }
@@ -183,8 +173,11 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         String url = ApiConfig.API_POINT_RULES;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException e) { }
-            @Override public void onResponse(Call call, Response response) throws IOException {
+            @Override
+            public void onFailure(Call call, IOException e) { }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
                 try {
                     if (response.isSuccessful() && getActivity() != null) {
                         String body = response.body().string();
@@ -208,6 +201,9 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                 }
             }
         });
+
+        // 获取通知内容
+        fetchNoticeContent();
     }
 
     private void fetchTasks() {
@@ -224,7 +220,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                 try {
                     if (response.isSuccessful() && getActivity() != null) {
                         String json = response.body().string();
-                        Log.d("UserTaskFragment", "fetchTasks返回: " + json); // 这一行是关键！
+                        Log.d("UserTaskFragment", "fetchTasks返回: " + json);
                         Gson gson = new Gson();
                         List<UserTask> list = gson.fromJson(json, new TypeToken<List<UserTask>>(){}.getType());
                         Log.d("UserTaskFragment", "解析后list.size=" + (list != null ? list.size() : "null"));
@@ -241,7 +237,6 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
             }
         });
     }
-
 
     private void tryRefreshTaskUI() {
         if (tasksLoaded && pointRulesLoaded && getActivity() != null) {
@@ -262,44 +257,155 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                 if (videoTask != null) {
                     cardLearnVideo.setVisibility(View.VISIBLE);
                     TextView tvTitle = cardLearnVideo.findViewById(R.id.tv_learn_video_title);
-                    TextView tvHint = cardLearnVideo.findViewById(R.id.tv_video_hint);
                     tvTitle.setTextSize(26); // 字再大一点
-                    tvTitle.setText("康复视频库");
-                    if ("1".equals(videoTask.getActionStatus())) {
-                        tvHint.setText("已完成");
-                        tvHint.setTextColor(0xFFD32F2F); // 红色
-                    } else {
-                        tvHint.setText("有新视频");
-                        tvHint.setTextColor(0xFFD32F2F);
-                    }
+                    tvTitle.setText(videoTask.getTaskName());
                 } else {
                     cardLearnVideo.setVisibility(View.GONE);
                 }
                 // Adapter设置
                 adapter.setTaskPointRuleMap(new HashMap<>(taskPointRuleMap));
                 adapter.setTasks(showTasks);
-                refreshTaskStat(userTaskList);
+                refreshTaskStat();
             });
         }
     }
 
-    private void refreshTaskStat(List<UserTask> taskList) {
-        if (taskList == null) taskList = Collections.emptyList();
-        int todayTaskCount = taskList.size();
-        int todayTaskPointTotal = 0;
-        int todayTaskPointEarned = 0;
-        for (UserTask task : taskList) {
-            String type = task.getTaskType();
-            if (type.length() == 1) type = "0" + type;
-            int point = taskPointRuleMap.containsKey(type) ? taskPointRuleMap.get(type) : 0;
-            todayTaskPointTotal += point;
-            if ("1".equals(task.getActionStatus())) {
-                todayTaskPointEarned += point;
+    private void refreshTaskStat() {
+        // 这个方法已简化，不再显示任务数统计
+        // 任务数相关的控件已从布局中删除
+    }
+
+    /**
+     * 获取通知内容的新方法
+     */
+    private void fetchNoticeContent() {
+        // 获取用户账户信息以获取projectId和teamId
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        if (userAccount == null || userAccount.getProjectId() == null || userAccount.getTeamId() == null) {
+            // 如果无法获取项目和团队信息，设置默认通知
+            if (getActivity() != null) {
+                requireActivity().runOnUiThread(() -> {
+                    if (tvNotice != null) {
+                        tvNotice.setText("欢迎使用远程护理系统");
+                    }
+                });
+            }
+            return;
+        }
+
+        String projectId = userAccount.getProjectId();
+        String teamId = userAccount.getTeamId();
+
+        OkHttpClient client = new OkHttpClient();
+
+        // 构建通知查询URL
+        String noticeUrl = ApiConfig.API_GET_NOTICE +
+                "?projectId=" + projectId +
+                "&teamId=" + teamId;
+
+        Log.d("UserTaskFragment", "通知请求URL: " + noticeUrl);
+
+        Request noticeRequest = new Request.Builder().url(noticeUrl).build();
+
+        client.newCall(noticeRequest).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("UserTaskFragment", "获取通知失败: " + e.getMessage());
+                // 网络失败时设置默认通知
+                if (getActivity() != null) {
+                    requireActivity().runOnUiThread(() -> {
+                        if (tvNotice != null) {
+                            tvNotice.setText("欢迎使用远程护理系统");
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String noticeBody = response.body().string();
+                        Log.d("UserTaskFragment", "通知响应: " + noticeBody);
+
+                        try {
+                            JSONArray noticeArray = new JSONArray(noticeBody);
+
+                            // 处理通知列表，选择要显示的通知
+                            String displayNotice = "【通知】: "+processNoticeList(noticeArray);
+
+                            // 在UI线程中更新通知显示
+                            requireActivity().runOnUiThread(() -> {
+                                if (tvNotice != null) {
+                                    tvNotice.setText(displayNotice);
+                                }
+                            });
+
+                        } catch (Exception e) {
+                            Log.e("UserTaskFragment", "解析通知数据失败: " + e.getMessage());
+                            // 解析失败时设置默认通知
+                            requireActivity().runOnUiThread(() -> {
+                                if (tvNotice != null) {
+                                    tvNotice.setText("欢迎使用远程问卷调查系统");
+                                }
+                            });
+                        }
+                    } else {
+                        Log.w("UserTaskFragment", "获取通知响应不成功: " + response.code());
+                        // 响应不成功时设置默认通知
+                        if (getActivity() != null) {
+                            requireActivity().runOnUiThread(() -> {
+                                if (tvNotice != null) {
+                                    tvNotice.setText("欢迎使用远程问卷调查系统");
+                                }
+                            });
+                        }
+                    }
+                } finally {
+                    response.close();
+                }
+            }
+        });
+    }
+
+    /**
+     * 处理通知列表，选择要显示的通知内容
+     * @param noticeArray 通知JSON数组
+     * @return 要显示的通知文本
+     */
+    private String processNoticeList(JSONArray noticeArray) {
+        if (noticeArray == null || noticeArray.length() == 0) {
+            return "欢迎使用远程问卷调查系统";
+        }
+
+        // 收集所有有效的通知文本
+        List<String> noticeTexts = new ArrayList<>();
+
+        for (int i = 0; i < noticeArray.length(); i++) {
+            try {
+                JSONObject noticeObj = noticeArray.getJSONObject(i);
+                String noticeText = noticeObj.optString("noticeText");
+
+                // 只添加非空的通知文本
+                if (noticeText != null && !noticeText.trim().isEmpty()) {
+                    noticeTexts.add(noticeText.trim());
+                }
+            } catch (Exception e) {
+                Log.w("UserTaskFragment", "处理第" + i + "个通知时出错: " + e.getMessage());
             }
         }
-        tvTaskCount.setText("今日任务数：" + todayTaskCount);
-        tvTaskPointTotal.setText("今日可获得积分：" + todayTaskPointTotal);
-        tvTaskPointRemain.setText("今日已获得积分：" + todayTaskPointEarned);
+
+        if (noticeTexts.isEmpty()) {
+            return "欢迎使用远程问卷调查系统";
+        }
+
+        // 如果只有一条通知，直接显示
+        if (noticeTexts.size() == 1) {
+            return noticeTexts.get(0);
+        }
+
+        // 如果有多条通知，显示第一条
+        return noticeTexts.get(0);
     }
 
     @Override

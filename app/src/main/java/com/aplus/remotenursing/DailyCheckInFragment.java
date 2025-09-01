@@ -12,6 +12,8 @@ import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.aplus.remotenursing.common.Contants;
 import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
@@ -521,6 +523,14 @@ public class DailyCheckInFragment extends Fragment {
             }
         }
 
+        // 显示加载状态
+        showSubmittingDialog();
+
+        // 计数器跟踪提交进度
+        final int totalRecords = answerCache.size();
+        final java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        final java.util.concurrent.atomic.AtomicInteger completedCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
         // 提交所有答案
         OkHttpClient client = new OkHttpClient();
         for (int i = 0; i < fieldList.size(); i++) {
@@ -544,22 +554,172 @@ public class DailyCheckInFragment extends Fragment {
                         .url(ApiConfig.API_CHECKIN_RECORD)
                         .post(body)
                         .build();
+
                 client.newCall(request).enqueue(new Callback() {
-                    @Override public void onFailure(Call call, IOException e) { }
-                    @Override public void onResponse(Call call, Response response) throws IOException {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        handleSubmissionComplete(completedCount.incrementAndGet(), successCount.get(), totalRecords);
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
                         try {
-                            // no-op
+                            if (response.isSuccessful()) {
+                                successCount.incrementAndGet();
+                            }
                         } finally {
                             response.close();
+                            handleSubmissionComplete(completedCount.incrementAndGet(), successCount.get(), totalRecords);
                         }
                     }
                 });
             }
         }
+    }
 
+    private AlertDialog submittingDialog;
+
+    private void showSubmittingDialog() {
+        if (submittingDialog == null) {
+            submittingDialog = new AlertDialog.Builder(requireContext())
+                    .setMessage("正在提交打卡数据...")
+                    .setCancelable(false)
+                    .create();
+        }
+        submittingDialog.show();
+    }
+
+    private void hideSubmittingDialog() {
+        if (submittingDialog != null && submittingDialog.isShowing()) {
+            submittingDialog.dismiss();
+        }
+    }
+
+    private void handleSubmissionComplete(int completed, int successful, int total) {
+        android.util.Log.d("DailyCheckin", "handleSubmissionComplete: completed=" + completed + ", successful=" + successful + ", total=" + total);
+
+        if (completed < total) {
+            android.util.Log.d("DailyCheckin", "还有未完成的请求，等待中...");
+            return; // 还有未完成的请求
+        }
+
+        android.util.Log.d("DailyCheckin", "所有提交请求已完成");
+
+        // 检查Fragment是否仍然attached
+        if (!isAdded() || getActivity() == null) {
+            android.util.Log.w("DailyCheckin", "Fragment已分离，无法继续处理UI更新");
+            return;
+        }
+
+        // 所有请求都已完成
+        requireActivity().runOnUiThread(() -> {
+            hideSubmittingDialog();
+
+            if (successful == total) {
+                android.util.Log.d("DailyCheckin", "所有记录提交成功，开始增加积分");
+                // 所有记录提交成功，增加积分
+                addPointsForDailyCheckin();
+            } else {
+                android.util.Log.w("DailyCheckin", "部分提交失败: successful=" + successful + ", total=" + total);
+                // 部分失败
+                InfoPopup.showError(requireContext(), "部分数据提交失败，请重试");
+            }
+        });
+    }
+
+    private void addPointsForDailyCheckin() {
+        android.util.Log.d("DailyCheckin", "开始执行 addPointsForDailyCheckin 方法");
+
+        // 获取每日打卡对应的积分数（任务类型"03"）
+        int points = UserUtils.getPointForTaskType(requireContext(), Contants.USER_TASK_TYPE_DAILYCHECKIN_03);
+        android.util.Log.d("DailyCheckin", "获取到的积分数: " + points);
+
+        if (points <= 0) {
+            android.util.Log.w("DailyCheckin", "没有配置积分规则或积分为0，跳过积分增加");
+            // 没有配置积分规则，直接显示成功消息
+            finishCheckinSuccess(0);
+            return;
+        }
+
+        android.util.Log.d("DailyCheckin", "开始调用积分API，用户ID: " + userId + "，积分: " + points);
+        android.util.Log.d("DailyCheckin", "积分API地址: " + ApiConfig.API_ADD_USERPOINT);
+
+        // 调用积分API
+        UserUtils.addPointsToUserApi(userId, points, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                android.util.Log.e("DailyCheckin", "积分增加网络请求失败: " + e.getMessage());
+                e.printStackTrace();
+                // 积分增加失败不影响打卡成功
+                if (isAdded() && getActivity() != null) {
+                    requireActivity().runOnUiThread(() -> finishCheckinSuccess(0));
+                } else {
+                    android.util.Log.w("DailyCheckin", "Fragment已分离，无法更新UI");
+                }
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                android.util.Log.d("DailyCheckin", "积分API响应状态码: " + response.code());
+
+                boolean successful = response.isSuccessful();
+                String responseBody;
+                try {
+                    responseBody = response.body().string();
+                    android.util.Log.d("DailyCheckin", "积分API响应内容: " + responseBody);
+                } finally {
+                    response.close();
+                }
+
+                // 检查Fragment是否仍然attached
+                if (!isAdded() || getActivity() == null) {
+                    android.util.Log.w("DailyCheckin", "Fragment已分离，无法更新UI，但积分API调用已完成");
+                    return;
+                }
+
+                requireActivity().runOnUiThread(() -> {
+                    if (successful) {
+                        try {
+                            int newTotal = Integer.parseInt(responseBody.trim());
+
+                            if (newTotal == -1) {
+                                // 账户被锁定或过期，但打卡仍然成功
+                                android.util.Log.w("DailyCheckin", "用户账户被锁定或已过期，无法获得积分");
+                                finishCheckinSuccess(0);
+                            } else {
+                                // 积分增加成功
+                                android.util.Log.d("DailyCheckin", "每日打卡获得积分: " + points + "，新的总积分: " + newTotal);
+                                finishCheckinSuccess(points);
+                            }
+                        } catch (NumberFormatException e) {
+                            android.util.Log.e("DailyCheckin", "解析积分响应失败: " + e.getMessage());
+                            finishCheckinSuccess(0);
+                        }
+                    } else if (response.code() == 404) {
+                        android.util.Log.w("DailyCheckin", "用户不存在，无法获得积分");
+                        finishCheckinSuccess(0);
+                    } else {
+                        android.util.Log.w("DailyCheckin", "积分增加失败，状态码: " + response.code());
+                        finishCheckinSuccess(0);
+                    }
+                });
+            }
+        });
+    }
+
+    private void finishCheckinSuccess(int earnedPoints) {
         // 清除缓存
         clearCache();
-        InfoPopup.showSuccess(requireContext(), "今日打卡已完成，感谢您的配合！");
+
+        // 构建成功消息
+        String message;
+        if (earnedPoints > 0) {
+            message = "今日打卡已完成，获得积分 +" + earnedPoints + "！感谢您的配合！";
+        } else {
+            message = "今日打卡已完成，感谢您的配合！";
+        }
+
+        InfoPopup.showSuccess(requireContext(), message);
         requireActivity().getSupportFragmentManager().popBackStack();
     }
 

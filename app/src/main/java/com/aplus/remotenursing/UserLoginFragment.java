@@ -18,10 +18,14 @@ import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.models.PointRuleTaskType;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.List;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -80,7 +84,6 @@ public class UserLoginFragment extends Fragment {
     private void showLoading() {
         if (progressDialog == null) {
             View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_loading, null);
-            // 移除.setMessage()，它会覆盖自定义布局
             progressDialog = new AlertDialog.Builder(requireContext())
                     .setView(view)
                     .setCancelable(false)
@@ -95,6 +98,79 @@ public class UserLoginFragment extends Fragment {
         }
     }
 
+    /**
+     * 获取并缓存用户积分规则
+     * @param userAccount 已登录的用户账号信息
+     */
+    private void fetchAndCachePointRules(UserAccount userAccount) {
+        Log.d("UserLogin", "开始获取积分规则...");
+
+        // 缓存Context，避免Fragment被移除后无法访问Context
+        final android.content.Context appContext = requireContext().getApplicationContext();
+
+        OkHttpClient client = new OkHttpClient();
+
+        // GET请求，不需要请求体参数，直接调用findAll()
+        Request request = new Request.Builder()
+                .url(ApiConfig.API_POINT_RULES) // 请确保在ApiConfig中定义此常量
+                .get() // GET请求
+                .build();
+
+        Log.d("UserLogin", "积分规则API请求URL: " + ApiConfig.API_POINT_RULES);
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("UserLogin", "获取积分规则网络请求失败: " + e.getMessage());
+                e.printStackTrace();
+                // 积分规则获取失败不影响登录流程，仅记录日志
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.d("UserLogin", "积分规则API响应状态码: " + response.code());
+
+                boolean successful = response.isSuccessful();
+                String responseBody;
+                try {
+                    responseBody = response.body().string();
+                    Log.d("UserLogin", "积分规则API响应内容: " + responseBody);
+                } finally {
+                    response.close();
+                }
+
+                if (successful && responseBody != null && !responseBody.isEmpty()) {
+                    try {
+                        // 解析积分规则列表
+                        Type listType = new TypeToken<List<PointRuleTaskType>>(){}.getType();
+                        List<PointRuleTaskType> pointRules = gson.fromJson(responseBody, listType);
+
+                        Log.d("UserLogin", "解析到积分规则数量: " + (pointRules != null ? pointRules.size() : 0));
+
+                        if (pointRules != null && !pointRules.isEmpty()) {
+                            // 使用ApplicationContext保存到本地缓存，避免Fragment生命周期问题
+                            UserUtils.savePointRules(appContext, pointRules);
+                            Log.d("UserLogin", "积分规则缓存成功，共 " + pointRules.size() + " 条规则");
+
+                            // 打印每条规则的详细信息
+                            for (int i = 0; i < pointRules.size(); i++) {
+                                PointRuleTaskType rule = pointRules.get(i);
+                                Log.d("UserLogin", "规则" + i + ": taskType=" + rule.getTaskType() + ", pointAmount=" + rule.getPointAmount());
+                            }
+                        } else {
+                            Log.w("UserLogin", "积分规则列表为空");
+                        }
+                    } catch (Exception e) {
+                        Log.e("UserLogin", "解析积分规则数据失败: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                } else {
+                    Log.w("UserLogin", "积分规则API返回失败，状态码: " + response.code() + ", 响应内容: " + responseBody);
+                }
+            }
+        });
+    }
+
     private void doLogin() {
         String loginName = etLoginname.getText().toString().trim();
         String password = etPassword.getText().toString();
@@ -107,6 +183,7 @@ public class UserLoginFragment extends Fragment {
         JsonObject obj = new JsonObject();
         obj.addProperty("login_name", loginName);
         obj.addProperty("password", password);
+
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
                 .url(ApiConfig.API_ACCOUNT_LOGIN)
@@ -145,8 +222,11 @@ public class UserLoginFragment extends Fragment {
                         });
                         return;
                     }
-                    // 统一用UserUtil保存用户账号（推荐）
+                    // 保存用户账号到缓存
                     UserUtils.saveUserAccount(requireContext(), userAccount);
+
+                    // ====== 新增：获取并缓存积分规则 ======
+                    fetchAndCachePointRules(userAccount);
 
                     // 通知MyInfoFragment刷新
                     Bundle bundle = new Bundle();
