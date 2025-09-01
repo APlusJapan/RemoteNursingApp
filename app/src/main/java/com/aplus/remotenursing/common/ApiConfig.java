@@ -26,7 +26,8 @@ public class ApiConfig {
     public static final String API_QUESTIONNAIRE_RECORD_COUNT = BASE_URL + "questionnaire/record/count";
     public static final String API_GET_QUESTIONNAIRE_FORMID = BASE_URL + "questionnaire/form/valid-id";
     public static final String API_POINT_RULES = BASE_URL + "point/rule";
-    public static final String API_USERPOINT_USERACCOUNT = BASE_URL + "point/account/";
+    public static final String API_USERPOINT_ACCOUNT = BASE_URL + "point/countByUserId/";
+    public static final String API_ADD_USERPOINT = BASE_URL + "point/addPoint";
     public static final String API_CHECKUP_STANDARD = BASE_URL + "checkup-standard/by-user/";
     public static final String API_CHECKUP_RECORD_SAVE = BASE_URL + "user-checkup-record";
     public static final String API_VIDEO_HISTORY_RECORD_SAVE = BASE_URL + "video-play-history/batch-update";

@@ -22,6 +22,7 @@ import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.Contants;
 import com.aplus.remotenursing.manager.CodeMasterManager;
 import com.aplus.remotenursing.models.CodeItem;
 import com.google.gson.Gson;
@@ -224,7 +225,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         codeManager = new CodeMasterManager();
         codeManager.fetchCodeList("SMARTWATCH_TYPE", new CodeMasterManager.CodeListCallback() {
             @Override public void onSuccess(List<CodeItem> list) {
-                // 仅收集 value 作为“手表型号显示名”（如需用 code 也参与匹配，可同时加入）
+                // 仅收集 value 作为"手表型号显示名"（如需用 code 也参与匹配，可同时加入）
                 smartwatchNameWhiteList.clear();
                 for (CodeItem item : list) {
                     if (item.getValue() != null && !item.getValue().trim().isEmpty()) {
@@ -266,6 +267,9 @@ public class SmartwatchCheckupFragment extends Fragment {
         UserAccount userAccount = UserUtils.getUserAccount(requireContext());
         userId = userAccount != null ? userAccount.getUserId() : null;
         log("当前用户ID: " + userId);
+
+        // 先尝试从缓存加载上次体检结果
+        loadCheckupResultFromCache();
 
         // 加载标准后再绑定按钮
         loadCheckupStandard(userId, () -> {
@@ -361,7 +365,7 @@ public class SmartwatchCheckupFragment extends Fragment {
     /** 判断设备名是否在码表白名单中（忽略大小写；支持等于或前缀匹配，适配有版本后缀的广播名） */
     /**
      * 白名单判断：
-     * - 白名单未加载完成 → 不拦截（返回 true），避免“还没拿到表就把设备全挡了”
+     * - 白名单未加载完成 → 不拦截（返回 true），避免"还没拿到表就把设备全挡了"
      * - 白名单已加载但为空 → 不命中（返回 false）
      * - 忽略大小写，用 contains；兼容设备名包含型号在中间/后缀
      */
@@ -664,26 +668,6 @@ public class SmartwatchCheckupFragment extends Fragment {
         }, 1);
     }
 
-    // ===== 新增：TimeData转Date的辅助方法 =====
-//    private Date convertTimeDataToDate(TimeData timeData) {
-//        try {
-//            Calendar cal = Calendar.getInstance(); // 使用当前时区
-//            // 保持当前日期，只设置时间
-//            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
-//            cal.set(Calendar.MINUTE, timeData.getMinute());
-//            cal.set(Calendar.SECOND, timeData.getSecond());
-//            cal.set(Calendar.MILLISECOND, 0);
-//
-//            Date result = cal.getTime();
-//            log("TimeData转换: " + timeData.getHour() + ":" + timeData.getMinute() +
-//                    " -> " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(result));
-//            return result;
-//        } catch (Exception e) {
-//            log("TimeData转换失败: " + e.getMessage());
-//            return null;
-//        }
-//    }
-
     private void showProgressBarFor(String item) {
         progressSteps.setVisibility(View.GONE);
         progressHeartrate.setVisibility(View.GONE);
@@ -798,6 +782,10 @@ public class SmartwatchCheckupFragment extends Fragment {
 
         log("=== 准备更新UI状态 ===");
         updateCheckupUI(CheckupStatus.FINISHED, "体检完成！");
+
+        log("=== 保存体检结果到缓存 ===");
+        // 保存体检结果到缓存
+        saveCheckupResultToCache();
 
         log("=== 准备调用uploadTodayRecord ===");
         // ===== 上传到后台 =====
@@ -917,10 +905,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         return sdf.format(cal.getTime());
     }
 
-    // ===== 新：直接上送 UserCheckupRecord =====
-    // 修改 uploadTodayRecord() 方法
-    // 在SmartwatchCheckupFragment中，完全替换uploadTodayRecord方法
-
+    // ===== 修改：uploadTodayRecord方法，添加积分功能 =====
     private void uploadTodayRecord() {
         log("=== uploadTodayRecord 方法开始执行 ===");
         log("当前userId: " + userId);
@@ -932,6 +917,16 @@ public class SmartwatchCheckupFragment extends Fragment {
             log("未登录用户，跳过上传");
             return;
         }
+
+        // 确保从UserAccount获取完整信息，包括adminId
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        if (userAccount == null) {
+            log("获取用户账户信息失败，跳过上传");
+            return;
+        }
+
+        String adminId = userAccount.getAdminId();
+        log("获取到的adminId: " + (adminId != null ? adminId : "null"));
 
         BackendUserCheckupRecord body = new BackendUserCheckupRecord();
         body.userId = userId;
@@ -956,8 +951,8 @@ public class SmartwatchCheckupFragment extends Fragment {
         body.sleepDown = formatDateToISO(lastSleepDown);
         body.sleepUp = formatDateToISO(lastSleepUp);
 
-        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
-        body.adminId = userAccount != null ? userAccount.getAdminId() : null;
+        // 确保正确设置adminId
+        body.adminId = adminId;
         body.isDeleted = false;
 
         String url = ApiConfig.API_CHECKUP_RECORD_SAVE;
@@ -978,19 +973,208 @@ public class SmartwatchCheckupFragment extends Fragment {
             public void onFailure(Call call, IOException e) {
                 log("体检记录上传失败：" + e.getMessage());
                 e.printStackTrace();
+
+                // 即使上传失败，也不显示错误给用户，因为体检数据已经完成
+                safeUi(() -> {
+                    log("体检记录上传失败，但不影响用户体验");
+                });
             }
+
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (!response.isSuccessful()) {
-                    String responseBody = response.body() != null ? response.body().string() : "无响应体";
+                boolean successful = response.isSuccessful();
+                String responseBody = response.body() != null ? response.body().string() : "";
+
+                if (!successful) {
                     log("体检记录上传失败，code=" + response.code() + ", message=" + response.message() + ", body=" + responseBody);
+                    safeUi(() -> {
+                        log("体检记录上传失败，但不影响用户体验");
+                    });
                 } else {
-                    String responseBody = response.body() != null ? response.body().string() : "成功";
                     log("体检记录上传成功，响应: " + responseBody);
+                    // 体检记录上传成功后，增加积分
+                    addPointsForCheckup();
                 }
             }
         });
         log("=== HTTP请求已提交 ===");
+    }
+
+    /**
+     * 体检完成后增加积分
+     */
+    private void addPointsForCheckup() {
+        log("=== 开始体检积分增加流程 ===");
+
+        // 获取体检任务对应的积分数（任务类型"02"）
+        int points = UserUtils.getPointForTaskType(requireContext(), Contants.USER_TASK_TYPE_CHECKUP_02);
+        log("体检任务对应积分数: " + points);
+
+        if (points <= 0) {
+            log("没有配置体检任务的积分规则，跳过积分增加");
+            return;
+        }
+
+        if (TextUtils.isEmpty(userId)) {
+            log("用户ID为空，无法增加积分");
+            return;
+        }
+
+        log("开始调用积分API，用户ID: " + userId + "，积分: " + points);
+
+        // 调用积分API
+        UserUtils.addPointsToUserApi(userId, points, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                log("体检积分增加网络请求失败: " + e.getMessage());
+                e.printStackTrace();
+                // 积分增加失败不影响体检完成状态，只记录日志
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                log("体检积分API响应状态码: " + response.code());
+
+                boolean successful = response.isSuccessful();
+                String responseBody;
+                try {
+                    responseBody = response.body().string();
+                    log("体检积分API响应内容: " + responseBody);
+                } finally {
+                    response.close();
+                }
+
+                if (successful) {
+                    try {
+                        int newTotal = Integer.parseInt(responseBody.trim());
+
+                        if (newTotal == -1) {
+                            log("用户账户被锁定或已过期，无法获得体检积分");
+                        } else {
+                            log("体检积分增加成功: +" + points + "，新的总积分: " + newTotal);
+
+                            // 在UI线程中显示积分获得提示
+                            safeUi(() -> {
+                                showPointsEarnedMessage(points);
+                            });
+                        }
+                    } catch (NumberFormatException e) {
+                        log("解析体检积分响应失败: " + e.getMessage());
+                    }
+                } else if (response.code() == 404) {
+                    log("用户不存在，无法获得体检积分");
+                } else {
+                    log("体检积分增加失败，状态码: " + response.code());
+                }
+            }
+        });
+    }
+
+    /**
+     * 显示积分获得消息
+     */
+    private void showPointsEarnedMessage(int earnedPoints) {
+        if (!isAdded()) {
+            log("Fragment已分离，无法显示积分消息");
+            return;
+        }
+
+        // 用积分消息覆盖"体检完成！"状态显示
+        tvMeasureStatus.setText("体检完成！获得积分 +" + earnedPoints);
+        log("已显示积分获得消息: " + earnedPoints + " 分");
+    }
+
+    // ===== 体检结果缓存相关 =====
+
+    /**
+     * 体检结果数据模型
+     */
+    private static class CheckupResultData {
+        public int steps;
+        public int heartRate;
+        public int spo2;
+        public int bpHigh;
+        public int bpLow;
+        public float bloodGlucose;
+        public int sleep;
+    }
+
+    /**
+     * 保存体检结果到缓存
+     */
+    private void saveCheckupResultToCache() {
+        if (TextUtils.isEmpty(userId)) {
+            return;
+        }
+
+        try {
+            // 构建体检数据
+            CheckupResultData resultData = new CheckupResultData();
+            resultData.steps = lastSteps;
+            resultData.heartRate = lastHeart;
+            resultData.spo2 = lastSpo2;
+            resultData.bpHigh = lastBpHigh;
+            resultData.bpLow = lastBpLow;
+            resultData.bloodGlucose = lastBloodGlucose;
+            resultData.sleep = lastSleep;
+
+            // 转换为JSON
+            String dataJson = gson.toJson(resultData);
+            String conclusion = tvResult.getText().toString();
+            String checkupTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
+
+            // 使用UserUtils保存
+            UserUtils.saveCheckupResultCache(requireContext(), userId, dataJson, conclusion, checkupTime);
+
+            log("体检结果已保存到缓存: " + checkupTime);
+        } catch (Exception e) {
+            log("保存体检结果到缓存失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 从缓存读取并显示上次体检结果
+     */
+    private void loadCheckupResultFromCache() {
+        if (TextUtils.isEmpty(userId)) {
+            return;
+        }
+
+        try {
+            // 使用UserUtils读取缓存
+            String dataJson = UserUtils.getCheckupResultDataJson(requireContext(), userId);
+            String conclusion = UserUtils.getCheckupResultConclusion(requireContext(), userId);
+            String checkupTime = UserUtils.getCheckupResultTime(requireContext(), userId);
+
+            if (dataJson != null && checkupTime != null) {
+                // 解析体检数据
+                CheckupResultData resultData = gson.fromJson(dataJson, CheckupResultData.class);
+
+                // 显示体检数据
+                tvSteps.setText("步数：" + resultData.steps + " 步");
+                tvHeart.setText("心率：" + resultData.heartRate + " 次/分");
+                tvSpo2.setText("血氧：" + resultData.spo2 + "%");
+                tvBp.setText("血压：" + resultData.bpHigh + "/" + resultData.bpLow + " mmHg");
+                tvBloodGlucose.setText("血糖：" + resultData.bloodGlucose + " mmol/L");
+                tvSleep.setText("睡眠时长：" + formatMinutes(resultData.sleep));
+
+                // 显示结论
+                if (conclusion != null && !conclusion.isEmpty()) {
+                    tvResult.setText(conclusion);
+                    cardResult.setVisibility(View.VISIBLE);
+                }
+
+                // 显示上次体检时间
+                tvMeasureStatus.setText("上次体检时间：" + checkupTime);
+
+                // 更新UI状态为已完成
+                updateCheckupUI(CheckupStatus.FINISHED, "上次体检时间：" + checkupTime);
+
+                log("已从缓存读取上次体检结果: " + checkupTime);
+            }
+        } catch (Exception e) {
+            log("从缓存读取体检结果失败: " + e.getMessage());
+        }
     }
 
     // 新增：日期格式化为ISO字符串的辅助方法
@@ -1005,7 +1189,8 @@ public class SmartwatchCheckupFragment extends Fragment {
         log("日期格式化: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date) + " -> " + result);
         return result;
     }
-    // 3. 新增：如果需要特定处理睡眠时间跨日问题
+
+    // 新增：如果需要特定处理睡眠时间跨日问题
     private Date adjustSleepTime(TimeData timeData, boolean isSleepDown) {
         try {
             Calendar cal = Calendar.getInstance();
@@ -1040,5 +1225,4 @@ public class SmartwatchCheckupFragment extends Fragment {
             return null;
         }
     }
-
 }

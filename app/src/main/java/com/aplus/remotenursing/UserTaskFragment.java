@@ -155,7 +155,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) return;
         OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_USERPOINT_USERACCOUNT + userId;
+        String url = ApiConfig.API_USERPOINT_ACCOUNT + userId;
         Request request = new Request.Builder().url(url).build();
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) { }
