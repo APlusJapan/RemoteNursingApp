@@ -96,7 +96,7 @@
                 android:paddingEnd="12dp">
                 <TextView
                     android:id="@+id/tv_learn_video_title"
-                    android:text="康复视频库"
+                    android:text="视频库"
                     android:textSize="26sp"
                     android:textStyle="bold"
                     android:textColor="#2A2A2A"
@@ -128,7 +128,7 @@
             <TextView
                 android:id="@+id/tv_task_area_title"
                 android:text="任务区"
-                android:textSize="20sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
                 android:textColor="#444"
                 android:layout_width="wrap_content"

@@ -16,6 +16,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.aplus.remotenursing.adapters.BannerAdapter;
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
+import com.aplus.remotenursing.common.Contants;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.UserTask;
 import com.aplus.remotenursing.common.ApiConfig;
@@ -332,7 +333,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                             JSONArray noticeArray = new JSONArray(noticeBody);
 
                             // 处理通知列表，选择要显示的通知
-                            String displayNotice = "【通知】: "+processNoticeList(noticeArray);
+                            String displayNotice = processNoticeList(noticeArray);
 
                             // 在UI线程中更新通知显示
                             requireActivity().runOnUiThread(() -> {
@@ -346,7 +347,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                             // 解析失败时设置默认通知
                             requireActivity().runOnUiThread(() -> {
                                 if (tvNotice != null) {
-                                    tvNotice.setText("欢迎使用远程问卷调查系统");
+                                    tvNotice.setText("（暂无新通知）");
                                 }
                             });
                         }
@@ -356,7 +357,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         if (getActivity() != null) {
                             requireActivity().runOnUiThread(() -> {
                                 if (tvNotice != null) {
-                                    tvNotice.setText("欢迎使用远程问卷调查系统");
+                                    tvNotice.setText("（暂无新通知）");
                                 }
                             });
                         }
@@ -375,7 +376,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
      */
     private String processNoticeList(JSONArray noticeArray) {
         if (noticeArray == null || noticeArray.length() == 0) {
-            return "欢迎使用远程问卷调查系统";
+            return "（暂无新通知）";
         }
 
         // 收集所有有效的通知文本
@@ -396,7 +397,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         }
 
         if (noticeTexts.isEmpty()) {
-            return "欢迎使用远程问卷调查系统";
+            return "（暂无新通知）";
         }
 
         // 如果只有一条通知，直接显示
@@ -410,25 +411,25 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
     @Override
     public void onTaskClick(UserTask task) {
-        if ("01".equals(task.getTaskType())) {
+        if (Contants.USER_TASK_TYPE_VIDEO_01.equals(task.getTaskType())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new VideoTaskFragment())
                     .addToBackStack(null)
                     .commit();
-        } else if ("02".equals(task.getTaskType())) {
+        } else if (Contants.USER_TASK_TYPE_CHECKUP_02.equals(task.getTaskType())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new SmartwatchCheckupFragment())
                     .addToBackStack(null)
                     .commit();
-        } else if ("03".equals(task.getTaskType())) {
+        } else if (Contants.USER_TASK_TYPE_DAILYCHECKIN_03.equals(task.getTaskType())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new DailyCheckInFragment())
                     .addToBackStack(null)
                     .commit();
-        } else if ("04".equals(task.getTaskType())) {
+        } else if (Contants.USER_TASK_TYPE_QA_04.equals(task.getTaskType())) {
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, new QuestionnaireFragment())
