@@ -1,8 +1,12 @@
 // WebViewActivity.java
 package com.aplus.remotenursing;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -11,6 +15,7 @@ import android.widget.ProgressBar;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
 
 public class WebViewActivity extends AppCompatActivity {
 
@@ -20,11 +25,38 @@ public class WebViewActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 设置状态栏和导航栏样式
+        setupStatusBar();
+
         setContentView(R.layout.activity_webview);
 
         initViews();
         initWebView();
         loadUrl();
+    }
+
+    private void setupStatusBar() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Window window = getWindow();
+
+            // 设置状态栏背景为白色
+            window.setStatusBarColor(ContextCompat.getColor(this, android.R.color.white));
+
+            // 设置状态栏文字为深色（黑色）
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            );
+
+            // 如果需要，也可以设置导航栏
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                window.setNavigationBarColor(ContextCompat.getColor(this, android.R.color.white));
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR |
+                                View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                );
+            }
+        }
     }
 
     private void initViews() {
@@ -35,6 +67,17 @@ public class WebViewActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setDisplayShowHomeEnabled(true);
+
+            // 设置标题文字颜色为黑色
+            getSupportActionBar().setTitle("");
+            toolbar.setTitleTextColor(ContextCompat.getColor(this, android.R.color.black));
+
+            // 设置返回箭头颜色为黑色
+            toolbar.setNavigationIcon(R.drawable.ic_arrow_back_black_24dp);
+            // 如果没有黑色箭头图标，可以动态着色
+            if (toolbar.getNavigationIcon() != null) {
+                toolbar.getNavigationIcon().setTint(ContextCompat.getColor(this, android.R.color.black));
+            }
         }
 
         webView = findViewById(R.id.webview);
@@ -52,9 +95,6 @@ public class WebViewActivity extends AppCompatActivity {
 
         // 启用缓存
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
-
-        // 移除已废弃的setAppCacheEnabled方法
-        // webSettings.setAppCacheEnabled(true); // 这行已被废弃，删除
 
         // 支持缩放
         webSettings.setSupportZoom(true);
@@ -86,6 +126,9 @@ public class WebViewActivity extends AppCompatActivity {
                     String title = view.getTitle();
                     if (title != null && !title.isEmpty()) {
                         getSupportActionBar().setTitle(title);
+                        // 确保标题颜色为黑色
+                        Toolbar toolbar = findViewById(R.id.toolbar);
+                        toolbar.setTitleTextColor(ContextCompat.getColor(WebViewActivity.this, android.R.color.black));
                     }
                 }
             }
@@ -110,6 +153,9 @@ public class WebViewActivity extends AppCompatActivity {
                 super.onReceivedTitle(view, title);
                 if (getSupportActionBar() != null) {
                     getSupportActionBar().setTitle(title);
+                    // 确保标题颜色为黑色
+                    Toolbar toolbar = findViewById(R.id.toolbar);
+                    toolbar.setTitleTextColor(ContextCompat.getColor(WebViewActivity.this, android.R.color.black));
                 }
             }
         });
@@ -125,6 +171,9 @@ public class WebViewActivity extends AppCompatActivity {
 
         if (title != null && !title.isEmpty() && getSupportActionBar() != null) {
             getSupportActionBar().setTitle(title);
+            // 确保标题颜色为黑色
+            Toolbar toolbar = findViewById(R.id.toolbar);
+            toolbar.setTitleTextColor(ContextCompat.getColor(this, android.R.color.black));
         }
     }
 

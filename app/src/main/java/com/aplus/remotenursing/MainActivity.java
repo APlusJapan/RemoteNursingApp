@@ -31,6 +31,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String SP_NAME = "privacy_prefs";
     private static final String SP_KEY_ACCEPTED = "privacy_accepted_v1";
 
+    private boolean isInitialized = false; // 防止重复初始化
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,11 +50,21 @@ public class MainActivity extends AppCompatActivity {
 
     /** 首次同意后再做：初始化默认Fragment、底部导航、申请权限 */
     private void bootstrapAfterConsent() {
-        // 只创建并显示默认的UserTaskFragment
-        Fragment defaultFragment = new UserTaskFragment();
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, defaultFragment)
-                .commit();
+        // 防止重复初始化
+        if (isInitialized) {
+            return;
+        }
+        isInitialized = true;
+
+        // 检查是否已有Fragment，避免重复创建
+        Fragment existingFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (existingFragment == null) {
+            // 只有在没有Fragment时才创建新的
+            Fragment defaultFragment = new UserTaskFragment();
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, defaultFragment)
+                    .commit();
+        }
 
         // 设置底部导航
         setupBottomNavigation();
@@ -64,24 +76,41 @@ public class MainActivity extends AppCompatActivity {
     /** 设置底部导航切换逻辑 */
     private void setupBottomNavigation() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
+
+        // 防止重复设置监听器
+        nav.setOnItemSelectedListener(null);
+
         nav.setOnItemSelectedListener(item -> {
-            Fragment fragment;
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            Fragment targetFragment = null;
+
             if (item.getItemId() == R.id.navigation_task) {
-                fragment = new UserTaskFragment();
+                // 如果当前已经是UserTaskFragment，就不重复替换
+                if (!(currentFragment instanceof UserTaskFragment)) {
+                    targetFragment = new UserTaskFragment();
+                }
             } else if (item.getItemId() == R.id.navigation_myInfo) {
-                fragment = new MyInfoFragment();
+                // 如果当前已经是MyInfoFragment，就不重复替换
+                if (!(currentFragment instanceof MyInfoFragment)) {
+                    targetFragment = new MyInfoFragment();
+                }
             } else {
                 return false;
             }
 
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, fragment)
-                    .commit();
+            // 只有在需要切换Fragment时才执行替换
+            if (targetFragment != null) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, targetFragment)
+                        .commit();
+            }
             return true;
         });
 
-        // 设置默认选中第一个tab
-        nav.setSelectedItemId(R.id.navigation_task);
+        // 设置默认选中第一个tab（只在第一次设置）
+        if (nav.getSelectedItemId() != R.id.navigation_task) {
+            nav.setSelectedItemId(R.id.navigation_task);
+        }
     }
 
     /** 首次打开时的隐私弹窗（必须同意才继续） */
@@ -163,8 +192,24 @@ public class MainActivity extends AppCompatActivity {
     /** 供Fragment调用，主动切换tab */
     public void switchToTab(int itemId) {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
-        nav.setSelectedItemId(itemId);
-        // nav的监听器会自动切换Fragment
+        if (nav.getSelectedItemId() != itemId) {
+            nav.setSelectedItemId(itemId);
+            // nav的监听器会自动切换Fragment
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean("isInitialized", isInitialized);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if (savedInstanceState != null) {
+            isInitialized = savedInstanceState.getBoolean("isInitialized", false);
+        }
     }
 
     private void requestBlePermissionsIfNeeded() {
