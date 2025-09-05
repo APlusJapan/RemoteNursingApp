@@ -36,66 +36,74 @@ import okhttp3.Response;
 public class BannerActionManager {
     private Context context;
     private static final String TAG = "BannerActionManager";
+    private static final long CLICK_DEBOUNCE_TIME = 2000; // 2秒防抖，避免重复点击
+    private long lastClickTime = 0;
 
     public BannerActionManager(Context context) {
         this.context = context;
     }
 
     public void handleBannerClick(AppBanner banner) {
-        Log.d("BannerActionManager", "=== Banner点击调试信息 ===");
-        Log.d("BannerActionManager", "Banner ID: " + banner.getId());
-        Log.d("BannerActionManager", "Banner标题: " + banner.getTitle());
-        Log.d("BannerActionManager", "ActionType: " + banner.getActionType());
-        Log.d("BannerActionManager", "ActionType类型: " + banner.getActionType());
-        Log.d("BannerActionManager", "ActionData: " + banner.getActionData());
+        // 防抖处理
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastClickTime < CLICK_DEBOUNCE_TIME) {
+            Log.d(TAG, "Banner点击过于频繁，忽略此次点击");
+            return;
+        }
+        lastClickTime = currentTime;
+
+        Log.d(TAG, "=== Banner点击调试信息 ===");
+        Log.d(TAG, "Banner ID: " + banner.getId());
+        Log.d(TAG, "Banner标题: " + banner.getTitle());
+        Log.d(TAG, "ActionType: " + banner.getActionType());
+        Log.d(TAG, "ActionData: " + banner.getActionData());
 
         try {
             JSONObject actionData = banner.getActionDataJson();
-            Log.d("BannerActionManager", "解析后的ActionData: " + actionData.toString());
+            Log.d(TAG, "解析后的ActionData: " + actionData.toString());
 
-            // 记录点击统计
+            // 记录点击统计 - 只在真实处理点击时记录
             recordBannerClick(banner);
 
             int actionType = banner.getActionType();
-            Log.d("BannerActionManager", "准备处理ActionType: " + actionType);
+            Log.d(TAG, "准备处理ActionType: " + actionType);
 
             switch (actionType) {
                 case 0: // 添加对actionType=0的处理
-                    Log.w("BannerActionManager", "ActionType为0，使用默认处理方式");
-                    // 可以设置一个默认行为，比如显示提示信息
+                    Log.w(TAG, "ActionType为0，使用默认处理方式");
                     Toast.makeText(context, "Banner配置有误，请联系管理员", Toast.LENGTH_SHORT).show();
                     break;
                 case 1: // 网页
-                    Log.d("BannerActionManager", "处理网页点击");
+                    Log.d(TAG, "处理网页点击");
                     handleWebAction(actionData);
                     break;
                 case 2: // App内页面
-                    Log.d("BannerActionManager", "处理App内页面点击");
+                    Log.d(TAG, "处理App内页面点击");
                     handleInternalAction(actionData);
                     break;
                 case 3: // 外部App
-                    Log.d("BannerActionManager", "处理外部App点击");
+                    Log.d(TAG, "处理外部App点击");
                     handleExternalAppAction(actionData);
                     break;
                 case 4: // 直播间
-                    Log.d("BannerActionManager", "处理直播间点击");
+                    Log.d(TAG, "处理直播间点击");
                     handleLiveAction(actionData);
                     break;
                 case 5: // 下载
-                    Log.d("BannerActionManager", "处理下载点击");
+                    Log.d(TAG, "处理下载点击");
                     handleDownloadAction(actionData);
                     break;
                 case 6: // 分享
-                    Log.d("BannerActionManager", "处理分享点击");
+                    Log.d(TAG, "处理分享点击");
                     handleShareAction(actionData);
                     break;
                 default:
-                    Log.w("BannerActionManager", "不支持的ActionType: " + actionType + ", 类型: " + actionType);
+                    Log.w(TAG, "不支持的ActionType: " + actionType);
                     Toast.makeText(context, "暂不支持此类型操作", Toast.LENGTH_SHORT).show();
             }
 
         } catch (Exception e) {
-            Log.e("BannerActionManager", "处理Banner点击失败", e);
+            Log.e(TAG, "处理Banner点击失败", e);
             Toast.makeText(context, "操作失败，请稍后重试", Toast.LENGTH_SHORT).show();
         }
     }
@@ -106,11 +114,14 @@ public class BannerActionManager {
             String url = webData.getString("url");
             boolean openInApp = webData.optBoolean("openInApp", true);
 
+            Log.d(TAG, "处理网页跳转: url=" + url + ", openInApp=" + openInApp);
+
             if (openInApp) {
-                // 使用WebView打开（需要实现WebViewActivity）
+                // 使用WebView打开
                 Intent intent = new Intent(context, WebViewActivity.class);
                 intent.putExtra("url", url);
                 intent.putExtra("title", webData.optString("title", ""));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
             } else {
                 // 使用系统浏览器
@@ -129,6 +140,8 @@ public class BannerActionManager {
             JSONObject internalData = data.getJSONObject("internal");
             String fragmentClass = internalData.getString("fragmentClass");
             JSONObject params = internalData.optJSONObject("params");
+
+            Log.d(TAG, "处理内部页面跳转: fragmentClass=" + fragmentClass);
 
             Fragment fragment = createFragmentByClassName(fragmentClass);
             if (fragment == null) {
@@ -172,6 +185,7 @@ public class BannerActionManager {
             case "QuestionnaireFragment":
                 return new QuestionnaireFragment();
             default:
+                Log.w(TAG, "未知的Fragment类名: " + className);
                 return null;
         }
     }
@@ -183,6 +197,8 @@ public class BannerActionManager {
             String deepLink = appData.optString("deepLink");
             String downloadUrl = appData.optString("downloadUrl");
             String fallbackUrl = appData.optString("fallbackUrl");
+
+            Log.d(TAG, "处理外部App跳转: packageName=" + packageName);
 
             if (isAppInstalled(packageName)) {
                 // 尝试Deep Link
@@ -219,6 +235,8 @@ public class BannerActionManager {
             String platform = liveData.getString("platform");
             String roomId = liveData.getString("roomId");
             String deepLink = liveData.optString("deepLink");
+
+            Log.d(TAG, "处理直播间跳转: platform=" + platform + ", roomId=" + roomId);
 
             switch (platform.toLowerCase()) {
                 case "douyin":
@@ -310,6 +328,8 @@ public class BannerActionManager {
     private void handleDownloadAction(JSONObject data) {
         try {
             String downloadUrl = data.optString("url", "");
+            Log.d(TAG, "处理下载: url=" + downloadUrl);
+
             if (!downloadUrl.isEmpty()) {
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -325,6 +345,8 @@ public class BannerActionManager {
         try {
             String shareText = data.optString("text", "");
             String shareUrl = data.optString("url", "");
+
+            Log.d(TAG, "处理分享: text=" + shareText + ", url=" + shareUrl);
 
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("text/plain");
@@ -380,6 +402,9 @@ public class BannerActionManager {
                 .show();
     }
 
+    /**
+     * 记录Banner点击 - 添加防抖机制
+     */
     private void recordBannerClick(AppBanner banner) {
         // 异步记录点击统计
         new Thread(() -> {
@@ -390,7 +415,13 @@ public class BannerActionManager {
                         "?bannerId=" + banner.getId() +
                         "&userId=" + (userId != null ? userId : "");
 
-                Request request = new Request.Builder().url(url).post(okhttp3.RequestBody.create(new byte[0])).build();
+                Log.d(TAG, "记录Banner点击: bannerId=" + banner.getId() + ", userId=" + userId);
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .post(okhttp3.RequestBody.create(new byte[0]))
+                        .build();
+
                 client.newCall(request).enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
@@ -399,10 +430,15 @@ public class BannerActionManager {
 
                     @Override
                     public void onResponse(Call call, Response response) throws IOException {
-                        if (response.isSuccessful()) {
-                            Log.d(TAG, "记录Banner点击成功");
+                        try {
+                            if (response.isSuccessful()) {
+                                Log.d(TAG, "记录Banner点击成功");
+                            } else {
+                                Log.w(TAG, "记录Banner点击响应失败: " + response.code());
+                            }
+                        } finally {
+                            response.close();
                         }
-                        response.close();
                     }
                 });
             } catch (Exception e) {

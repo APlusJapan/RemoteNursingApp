@@ -8,57 +8,60 @@ import org.json.JSONObject;
 public class AppBanner {
     private Long id;
 
-    @SerializedName("project_id")
+    @SerializedName("projectId")  // 从之前日志看应该是驼峰格式
     private String projectId;
 
-    @SerializedName("team_id")
+    @SerializedName("teamId")
     private String teamId;
 
     private String title;
 
-    @SerializedName("image_url")
+    @SerializedName("imageUrl")  // 修改：改为驼峰格式
     private String imageUrl;
 
-    @SerializedName("banner_type")
+    @SerializedName("bannerType")  // 修改：改为驼峰格式
     private int bannerType;
 
-    @SerializedName("action_type")
+    @SerializedName("actionType")  // 修改：改为驼峰格式
     private int actionType;
 
-    @SerializedName("action_data")
+    @SerializedName("actionData")  // 修改：改为驼峰格式
     private String actionData;
 
-    @SerializedName("display_order")
+    @SerializedName("displayOrder")  // 修改：改为驼峰格式
     private int displayOrder;
 
-    @SerializedName("start_time")
+    @SerializedName("startTime")  // 修改：改为驼峰格式
     private String startTime;
 
-    @SerializedName("end_time")
+    @SerializedName("endTime")  // 修改：改为驼峰格式
     private String endTime;
 
-    @SerializedName("target_user_type")
+    @SerializedName("targetUserType")  // 修改：改为驼峰格式
     private String targetUserType;
 
-    @SerializedName("click_count")
+    @SerializedName("clickCount")  // 修改：改为驼峰格式
     private int clickCount;
 
-    @SerializedName("view_count")
+    @SerializedName("viewCount")  // 修改：改为驼峰格式
     private int viewCount;
 
     private int status;
 
-    @SerializedName("admin_id")
+    @SerializedName("adminId")  // 修改：改为驼峰格式
     private String adminId;
 
-    @SerializedName("is_deleted")
-    private int isDeleted;
+    @SerializedName("isDeleted")  // 修改：改为驼峰格式
+    private boolean isDeleted;  // 修改：改为boolean类型，因为JSON返回的是true/false
 
-    @SerializedName("create_time")
+    @SerializedName("createTime")  // 修改：改为驼峰格式
     private String createTime;
 
-    @SerializedName("updated_time")
+    @SerializedName("updatedTime")  // 修改：改为驼峰格式
     private String updatedTime;
+
+    @SerializedName("active")  // 新增：直接映射active字段
+    private boolean active;
 
     // 构造函数
     public AppBanner() {}
@@ -192,11 +195,11 @@ public class AppBanner {
         this.adminId = adminId;
     }
 
-    public int getIsDeleted() {
+    public boolean getIsDeleted() {  // 修改：改为boolean
         return isDeleted;
     }
 
-    public void setIsDeleted(int isDeleted) {
+    public void setIsDeleted(boolean isDeleted) {  // 修改：改为boolean
         this.isDeleted = isDeleted;
     }
 
@@ -216,6 +219,14 @@ public class AppBanner {
         this.updatedTime = updatedTime;
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
     // 辅助方法：解析actionData
     public JSONObject getActionDataJson() {
         try {
@@ -223,10 +234,5 @@ public class AppBanner {
         } catch (JSONException e) {
             return new JSONObject();
         }
-    }
-
-    // 辅助方法：检查Banner是否活跃（简单版本，不考虑时间）
-    public boolean isActive() {
-        return status == 1 && isDeleted == 0;
     }
 }
