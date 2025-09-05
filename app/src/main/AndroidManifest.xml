@@ -80,5 +80,11 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.RemoteNursing.Fullscreen"
             android:exported="false"/>
+
+        <activity
+            android:name=".WebViewActivity"
+            android:label="网页浏览"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:exported="false" />
     </application>
 </manifest>

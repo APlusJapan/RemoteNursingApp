@@ -27,8 +27,8 @@
                 <!-- ...你积分区内容不变... -->
                 <TextView
                     android:id="@+id/tv_point"
-                    android:text="当前总积分：0"
-                    android:textSize="32sp"
+                    android:text="当前积分：0"
+                    android:textSize="28sp"
                     android:textStyle="bold"
                     android:textColor="#222"
                     android:layout_alignParentStart="true"

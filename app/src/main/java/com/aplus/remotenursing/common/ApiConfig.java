@@ -36,4 +36,8 @@ public class ApiConfig {
     public static final String API_GET_NOTICE = BASE_URL + "usernotice/search";
     public static final String API_CODE_MASTER = BASE_URL + "code-master/list";
 
+    public static final String API_GET_BANNERS = BASE_URL + "banner/list";
+    public static final String API_BANNER_CLICK = BASE_URL + "banner/click";
+    public static final String API_BANNER_VIEW = BASE_URL + "banner/view";
+
 }

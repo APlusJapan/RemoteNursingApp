@@ -17,13 +17,14 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.aplus.remotenursing.adapters.BannerAdapter;
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.common.Contants;
+import com.aplus.remotenursing.models.AppBanner;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.UserTask;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.manager.BannerActionManager;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -72,12 +73,9 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
         // 找到功能区2个CardView
         cardLearnVideo = view.findViewById(R.id.card_learn_video);
-        //cardDailyCheck = view.findViewById(R.id.card_daily_check);
-        //tvCheckHint = view.findViewById(R.id.tv_check_hint);
 
         // 默认隐藏
         cardLearnVideo.setVisibility(View.GONE);
-        //cardDailyCheck.setVisibility(View.GONE);
 
         // 登录状态
         UserAccount userAccount = UserUtils.getUserAccount(requireContext());
@@ -97,26 +95,10 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .commit();
         });
 
-        // 通知图片轮播区
+        // 通知图片轮播区 - 改为动态Banner
         ViewPager2 vpBanner = view.findViewById(R.id.vp_notice_banner);
-        List<String> bannerUrls = Arrays.asList(
-                "https://preview.qiantucdn.com/auto_machine/20231019/46d772bb-d956-43ad-9c9f-cdd320d87caa.png!qt_h320",
-                "https://img2.baidu.com/it/u=3487252190,2163576535&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=255"
-        );
-        vpBanner.setAdapter(new BannerAdapter(requireContext(), bannerUrls));
-
-        // 自动滚动轮播
-        autoScrollRunnable = new Runnable() {
-            @Override
-            public void run() {
-                int itemCount = bannerUrls.size();
-                int nextItem = (vpBanner.getCurrentItem() + 1) % itemCount;
-                vpBanner.setCurrentItem(nextItem, true);
-                vpBanner.postDelayed(this, 3000); // 3秒
-            }
-        };
-        // 启动自动滚动
-        vpBanner.postDelayed(autoScrollRunnable, 3000);
+        // 加载动态Banner数据
+        fetchBannerData(vpBanner);
 
         // 任务区RecyclerView
         rvTasks = view.findViewById(R.id.rv_tasks);
@@ -142,6 +124,200 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         fetchTasks();
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // 清理自动滚动
+        if (autoScrollRunnable != null) {
+            ViewPager2 vpBanner = getView() != null ? getView().findViewById(R.id.vp_notice_banner) : null;
+            if (vpBanner != null) {
+                vpBanner.removeCallbacks(autoScrollRunnable);
+            }
+        }
+    }
+
+    // 新增：获取Banner数据的方法
+    private void fetchBannerData(ViewPager2 vpBanner) {
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+
+        String projectId = "PJT1001"; // 默认测试项目ID
+        String teamId = "T001";
+
+        // 如果用户已登录，使用用户的项目ID和团队ID
+        if (userAccount != null) {
+            if (userAccount.getProjectId() != null && !userAccount.getProjectId().isEmpty()) {
+                projectId = userAccount.getProjectId();
+            }
+            teamId = userAccount.getTeamId();
+        }
+
+        OkHttpClient client = new OkHttpClient();
+        String url = ApiConfig.API_GET_BANNERS +
+                "?projectId=" + projectId +
+                (teamId != null && !teamId.isEmpty() ? "&teamId=" + teamId : "");
+
+        Log.d("UserTaskFragment", "Banner请求URL: " + url);
+
+        Request request = new Request.Builder().url(url).build();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("UserTaskFragment", "获取Banner失败: " + e.getMessage());
+                // 使用默认Banner
+                if (getActivity() != null) {
+                    requireActivity().runOnUiThread(() -> setupDefaultBanners(vpBanner));
+                }
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                try {
+                    if (response.isSuccessful() && getActivity() != null) {
+                        String json = response.body().string();
+                        Log.d("UserTaskFragment", "Banner响应: " + json);
+
+                        try {
+                            Gson gson = new Gson();
+                            List<AppBanner> list = gson.fromJson(json, new TypeToken<List<AppBanner>>(){}.getType());
+
+                            if (list != null && !list.isEmpty()) {
+                                // 过滤活跃的Banner
+                                List<AppBanner> activeBanners = new ArrayList<>();
+                                for (AppBanner banner : list) {
+                                    if (banner.isActive()) {
+                                        activeBanners.add(banner);
+                                    }
+                                }
+
+                                if (!activeBanners.isEmpty()) {
+                                    requireActivity().runOnUiThread(() -> setupBannerViewPager(vpBanner, activeBanners));
+                                } else {
+                                    requireActivity().runOnUiThread(() -> setupDefaultBanners(vpBanner));
+                                }
+                            } else {
+                                requireActivity().runOnUiThread(() -> setupDefaultBanners(vpBanner));
+                            }
+                        } catch (Exception e) {
+                            Log.e("UserTaskFragment", "解析Banner数据失败", e);
+                            requireActivity().runOnUiThread(() -> setupDefaultBanners(vpBanner));
+                        }
+                    } else {
+                        Log.w("UserTaskFragment", "Banner响应不成功: " + response.code());
+                        if (getActivity() != null) {
+                            requireActivity().runOnUiThread(() -> setupDefaultBanners(vpBanner));
+                        }
+                    }
+                } finally {
+                    response.close();
+                }
+            }
+        });
+    }
+
+    // 新增：设置动态Banner ViewPager
+    private void setupBannerViewPager(ViewPager2 vpBanner, List<AppBanner> banners) {
+        BannerActionManager actionManager = new BannerActionManager(requireContext());
+
+        BannerAdapter adapter = BannerAdapter.createWithBanners(requireContext(), banners);
+        adapter.setOnBannerClickListener(new BannerAdapter.OnBannerClickListener() {
+            @Override
+            public void onBannerClick(AppBanner banner, int position) {
+                actionManager.handleBannerClick(banner);
+            }
+
+            @Override
+            public void onBannerView(AppBanner banner, int position) {
+                // 记录展示统计
+                recordBannerView(banner);
+            }
+
+            @Override
+            public void onLegacyBannerClick(String url, int position) {
+                // 兼容旧版本，不需要实现
+            }
+        });
+
+        vpBanner.setAdapter(adapter);
+
+        // 如果有多个Banner才启动自动滚动
+        if (banners.size() > 1) {
+            startAutoScroll(vpBanner);
+        }
+    }
+
+    // 新增：设置默认Banner
+    private void setupDefaultBanners(ViewPager2 vpBanner) {
+        // 设置默认Banner
+        List<String> defaultUrls = Arrays.asList(
+                "https://preview.qiantucdn.com/auto_machine/20231019/46d772bb-d956-43ad-9c9f-cdd320d87caa.png!qt_h320",
+                "https://img2.baidu.com/it/u=3487252190,2163576535&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=255"
+        );
+
+        BannerAdapter defaultAdapter = new BannerAdapter(requireContext(), defaultUrls);
+        vpBanner.setAdapter(defaultAdapter);
+
+        if (defaultUrls.size() > 1) {
+            startAutoScroll(vpBanner);
+        }
+    }
+
+    // 新增：启动自动滚动
+    private void startAutoScroll(ViewPager2 vpBanner) {
+        // 如果已经有自动滚动，先停止
+        if (autoScrollRunnable != null) {
+            vpBanner.removeCallbacks(autoScrollRunnable);
+        }
+
+        autoScrollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                int itemCount = vpBanner.getAdapter() != null ? vpBanner.getAdapter().getItemCount() : 0;
+                if (itemCount > 1) {
+                    int nextItem = (vpBanner.getCurrentItem() + 1) % itemCount;
+                    vpBanner.setCurrentItem(nextItem, true);
+                    vpBanner.postDelayed(this, 3000); // 3秒自动滚动
+                }
+            }
+        };
+        vpBanner.postDelayed(autoScrollRunnable, 3000);
+    }
+
+    // 新增：记录Banner展示统计
+    private void recordBannerView(AppBanner banner) {
+        // 异步记录展示统计
+        new Thread(() -> {
+            try {
+                String userId = UserUtils.loadUserId(requireContext());
+                OkHttpClient client = new OkHttpClient();
+                String url = ApiConfig.API_BANNER_VIEW +
+                        "?bannerId=" + banner.getId() +
+                        "&userId=" + (userId != null ? userId : "");
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .post(okhttp3.RequestBody.create(new byte[0]))
+                        .build();
+
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        Log.w("UserTaskFragment", "记录Banner展示失败: " + e.getMessage());
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (response.isSuccessful()) {
+                            Log.d("UserTaskFragment", "记录Banner展示成功");
+                        }
+                        response.close();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e("UserTaskFragment", "记录Banner展示异常", e);
+            }
+        }).start();
+    }
+
     private void fetchUserPoint() {
         String userId = UserUtils.loadUserId(requireContext());
         if (userId == null) return;
@@ -156,10 +332,10 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         String body = response.body().string();
                         try {
                             JSONObject obj = new JSONObject(body);
-                            final int point = obj.optInt("availablePoint", 0);
-                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：" + point));
+                            final int point = obj.optInt("totalPoint", 0);
+                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前积分：" + point));
                         } catch (Exception e) {
-                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前总积分：0"));
+                            requireActivity().runOnUiThread(() -> tvPoint.setText("当前积分：0"));
                         }
                     }
                 } finally {
