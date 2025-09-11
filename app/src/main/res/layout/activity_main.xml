@@ -10,10 +10,90 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottom_nav"
+    <!-- 自定义水平导航栏 -->
+    <LinearLayout
+        android:id="@+id/bottom_nav_custom"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:menu="@menu/bottom_nav_menu" />
+        android:layout_height="80dp"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:elevation="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <!-- 任务按钮 -->
+        <LinearLayout
+            android:id="@+id/nav_task"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="12dp">
+
+            <ImageView
+                android:id="@+id/icon_task"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_data"
+                android:layout_marginEnd="12dp"
+                app:tint="@color/bottom_nav_unselected" />
+
+            <TextView
+                android:id="@+id/text_task"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="任务区"
+                android:textSize="22sp"
+                android:textStyle="normal"
+                android:textColor="@color/bottom_nav_unselected"
+                android:gravity="center_vertical" />
+
+        </LinearLayout>
+
+        <!-- 分割线 -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_vertical"
+            android:background="#E0E0E0" />
+
+        <!-- 个人信息按钮 -->
+        <LinearLayout
+            android:id="@+id/nav_myinfo"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="12dp">
+
+            <ImageView
+                android:id="@+id/icon_myinfo"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_myinfo"
+                android:layout_marginEnd="12dp"
+                app:tint="@color/bottom_nav_unselected" />
+
+            <TextView
+                android:id="@+id/text_myinfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功能区"
+                android:textSize="22sp"
+                android:textStyle="normal"
+                android:textColor="@color/bottom_nav_unselected"
+                android:gravity="center_vertical" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

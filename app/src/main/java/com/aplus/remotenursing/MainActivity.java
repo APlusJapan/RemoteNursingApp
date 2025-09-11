@@ -5,12 +5,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -18,10 +20,10 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.ImageViewCompat;
 import androidx.fragment.app.Fragment;
 
 import com.aplus.remotenursing.common.ApiConfig;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.io.File;
 
@@ -32,6 +34,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String SP_KEY_ACCEPTED = "privacy_accepted_v1";
 
     private boolean isInitialized = false; // 防止重复初始化
+
+    // 自定义导航栏相关组件
+    private LinearLayout navTask, navMyinfo;
+    private ImageView iconTask, iconMyinfo;
+    private TextView textTask, textMyinfo;
+    private int currentSelectedTab = 0; // 0=任务, 1=个人信息
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,50 +74,96 @@ public class MainActivity extends AppCompatActivity {
                     .commit();
         }
 
-        // 设置底部导航
-        setupBottomNavigation();
+        // 设置自定义底部导航
+        setupCustomBottomNavigation();
 
         // 申请 BLE 动态权限
         requestBlePermissionsIfNeeded();
     }
 
-    /** 设置底部导航切换逻辑 */
-    private void setupBottomNavigation() {
-        BottomNavigationView nav = findViewById(R.id.bottom_nav);
+    /** 设置自定义底部导航切换逻辑 */
+    private void setupCustomBottomNavigation() {
+        // 初始化自定义导航栏组件
+        navTask = findViewById(R.id.nav_task);
+        navMyinfo = findViewById(R.id.nav_myinfo);
+        iconTask = findViewById(R.id.icon_task);
+        iconMyinfo = findViewById(R.id.icon_myinfo);
+        textTask = findViewById(R.id.text_task);
+        textMyinfo = findViewById(R.id.text_myinfo);
 
-        // 防止重复设置监听器
-        nav.setOnItemSelectedListener(null);
-
-        nav.setOnItemSelectedListener(item -> {
-            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-            Fragment targetFragment = null;
-
-            if (item.getItemId() == R.id.navigation_task) {
-                // 如果当前已经是UserTaskFragment，就不重复替换
-                if (!(currentFragment instanceof UserTaskFragment)) {
-                    targetFragment = new UserTaskFragment();
-                }
-            } else if (item.getItemId() == R.id.navigation_myInfo) {
-                // 如果当前已经是MyInfoFragment，就不重复替换
-                if (!(currentFragment instanceof MyInfoFragment)) {
-                    targetFragment = new MyInfoFragment();
-                }
-            } else {
-                return false;
+        // 设置点击事件
+        navTask.setOnClickListener(v -> {
+            if (currentSelectedTab != 0) {
+                showFragment(new UserTaskFragment());
+                updateNavSelection(0);
+                currentSelectedTab = 0;
             }
-
-            // 只有在需要切换Fragment时才执行替换
-            if (targetFragment != null) {
-                getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, targetFragment)
-                        .commit();
-            }
-            return true;
         });
 
-        // 设置默认选中第一个tab（只在第一次设置）
-        if (nav.getSelectedItemId() != R.id.navigation_task) {
-            nav.setSelectedItemId(R.id.navigation_task);
+        navMyinfo.setOnClickListener(v -> {
+            if (currentSelectedTab != 1) {
+                showFragment(new MyInfoFragment());
+                updateNavSelection(1);
+                currentSelectedTab = 1;
+            }
+        });
+
+        // 默认选中任务页面
+        updateNavSelection(0);
+    }
+
+    /** 更新导航栏选中状态 */
+    private void updateNavSelection(int selectedIndex) {
+        // 重置所有状态到未选中
+        resetNavItemState(iconTask, textTask);
+        resetNavItemState(iconMyinfo, textMyinfo);
+
+        // 设置选中状态
+        if (selectedIndex == 0) {
+            setNavItemSelected(iconTask, textTask);
+        } else {
+            setNavItemSelected(iconMyinfo, textMyinfo);
+        }
+    }
+
+    /** 重置导航项为未选中状态 */
+    private void resetNavItemState(ImageView icon, TextView text) {
+        ImageViewCompat.setImageTintList(icon,
+                ContextCompat.getColorStateList(this, R.color.bottom_nav_unselected));
+        text.setTextColor(ContextCompat.getColor(this, R.color.bottom_nav_unselected));
+        text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        text.setTypeface(null, Typeface.NORMAL);
+    }
+
+    /** 设置导航项为选中状态 */
+    private void setNavItemSelected(ImageView icon, TextView text) {
+        ImageViewCompat.setImageTintList(icon,
+                ContextCompat.getColorStateList(this, R.color.bottom_nav_selected));
+        text.setTextColor(ContextCompat.getColor(this, R.color.bottom_nav_selected));
+        text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        text.setTypeface(null, Typeface.BOLD);
+    }
+
+    /** 显示Fragment */
+    private void showFragment(Fragment fragment) {
+        getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .commit();
+    }
+
+    /** 供Fragment调用，主动切换tab */
+    public void switchToTab(int tabIndex) {
+        if (tabIndex == 0 && currentSelectedTab != 0) {
+            // 切换到任务页面
+            showFragment(new UserTaskFragment());
+            updateNavSelection(0);
+            currentSelectedTab = 0;
+        } else if (tabIndex == 1 && currentSelectedTab != 1) {
+            // 切换到个人信息页面
+            showFragment(new MyInfoFragment());
+            updateNavSelection(1);
+            currentSelectedTab = 1;
         }
     }
 
@@ -189,19 +243,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(it);
     }
 
-    /** 供Fragment调用，主动切换tab */
-    public void switchToTab(int itemId) {
-        BottomNavigationView nav = findViewById(R.id.bottom_nav);
-        if (nav.getSelectedItemId() != itemId) {
-            nav.setSelectedItemId(itemId);
-            // nav的监听器会自动切换Fragment
-        }
-    }
-
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBoolean("isInitialized", isInitialized);
+        outState.putInt("currentSelectedTab", currentSelectedTab);
     }
 
     @Override
@@ -209,6 +255,12 @@ public class MainActivity extends AppCompatActivity {
         super.onRestoreInstanceState(savedInstanceState);
         if (savedInstanceState != null) {
             isInitialized = savedInstanceState.getBoolean("isInitialized", false);
+            currentSelectedTab = savedInstanceState.getInt("currentSelectedTab", 0);
+
+            // 恢复导航状态
+            if (isInitialized) {
+                updateNavSelection(currentSelectedTab);
+            }
         }
     }
 

@@ -4,10 +4,10 @@
     <item
         android:id="@+id/navigation_task"
         android:icon="@drawable/ic_data"
-        android:title="@string/bottom_menu_task" />
+        android:title="任务区" />
 
     <item
         android:id="@+id/navigation_myInfo"
         android:icon="@drawable/ic_myinfo"
-        android:title="@string/bottom_menu_me" />
+        android:title="功能区" />
 </menu>

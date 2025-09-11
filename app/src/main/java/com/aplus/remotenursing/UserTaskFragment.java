@@ -53,26 +53,29 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     private UserTaskAdapter adapter;
     private TextView tvPoint, tvNotice;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private boolean pointRulesLoaded = false;
-
-    private boolean tasksLoaded = false;
-    private List<UserTask> userTaskList = Collections.emptyList();
-    private Map<String, Integer> taskPointRuleMap = new HashMap<>();
     private androidx.cardview.widget.CardView cardLearnVideo;
     private Runnable autoScrollRunnable;
     private Handler autoScrollHandler;
     private BannerAdapter currentBannerAdapter;
     private boolean isAutoScrolling = false;
 
-    // 数据加载状态控制
-    private boolean isDataLoaded = false;
-    private boolean isInitialized = false;
+    // 数据状态管理
+    private boolean isViewInitialized = false;
+    private boolean tasksLoaded = false;
+    private boolean pointRulesLoaded = false;
+    private List<UserTask> userTaskList = Collections.emptyList();
+    private Map<String, Integer> taskPointRuleMap = new HashMap<>();
 
     // 请求状态跟踪
     private boolean isBannerLoading = false;
     private boolean isTasksLoading = false;
     private boolean isPointLoading = false;
     private boolean isPointRulesLoading = false;
+
+    // 通知缓存相关变量
+    private String cachedNoticeContent = null;
+    private long noticeLastUpdateTime = 0; // 记录最后更新时间
+    private static final long NOTICE_CACHE_DURATION = 1 * 60 * 1000; // 缓存5分钟
 
     @Nullable
     @Override
@@ -86,37 +89,190 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "=== onViewCreated 开始 ===");
-        Log.d(TAG, "isInitialized: " + isInitialized + ", isDataLoaded: " + isDataLoaded);
 
-        if (!isInitialized) {
-            Log.d(TAG, "首次初始化视图");
-            initViews(view);
-            setupRecyclerView();
-            isInitialized = true;
-        } else {
-            Log.d(TAG, "视图已初始化，重新绑定");
-            // 重新绑定视图组件
-            TextView tvNickName = view.findViewById(R.id.tv_nick_name);
-            tvPoint = view.findViewById(R.id.tv_point);
-            tvNotice = view.findViewById(R.id.tv_notice);
-            cardLearnVideo = view.findViewById(R.id.card_learn_video);
-            swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
+        // 每次都重新初始化所有组件
+        initViews(view);
+        forceSetupRecyclerView(); // 强制重新设置RecyclerView
+        isViewInitialized = true;
 
-            setUserInfo(tvNickName);
-            setupSwipeRefresh();
-            setupRecyclerView();
+        // 如果有数据，延迟刷新UI
+        if (tasksLoaded && pointRulesLoaded) {
+            Log.d(TAG, "数据已存在，延迟刷新UI");
+            new Handler().postDelayed(() -> {
+                if (isAdded() && getView() != null) {
+                    forceRefreshTaskUI();
+                }
+            }, 200);
         }
 
-        // 只在第一次创建时加载数据
-        if (!isDataLoaded) {
-            Log.d(TAG, "第一次加载数据");
+        // 加载数据
+        if (!tasksLoaded || !pointRulesLoaded) {
             loadInitialData();
-            isDataLoaded = true;
         } else {
-            Log.d(TAG, "数据已加载，跳过初始数据加载");
+            refreshUserPointOnly();
         }
 
         Log.d(TAG, "=== onViewCreated 完成 ===");
+    }
+
+    // 检查通知缓存是否过期
+    private boolean isNoticeCacheExpired() {
+        return (System.currentTimeMillis() - noticeLastUpdateTime) > NOTICE_CACHE_DURATION;
+    }
+
+    // 强制设置RecyclerView的方法
+    private void forceSetupRecyclerView() {
+        Log.d(TAG, "=== forceSetupRecyclerView 开始 ===");
+
+        if (getView() == null) {
+            Log.e(TAG, "View为null，无法设置RecyclerView");
+            return;
+        }
+
+        // 重新获取RecyclerView引用
+        rvTasks = getView().findViewById(R.id.rv_tasks);
+        if (rvTasks == null) {
+            Log.e(TAG, "找不到RecyclerView组件 R.id.rv_tasks");
+            return;
+        }
+
+        // 清除旧的设置
+        rvTasks.setAdapter(null);
+        rvTasks.setLayoutManager(null);
+
+        // 重新设置LayoutManager
+        GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 2);
+        rvTasks.setLayoutManager(layoutManager);
+        Log.d(TAG, "LayoutManager重新设置完成");
+
+        // 重新创建Adapter
+        adapter = new UserTaskAdapter();
+        adapter.setOnTaskClickListener(this);
+        rvTasks.setAdapter(adapter);
+
+        Log.d(TAG, "Adapter重新创建并设置完成");
+
+        // 验证设置
+        if (rvTasks.getAdapter() != null) {
+            Log.d(TAG, "RecyclerView适配器设置成功验证");
+        } else {
+            Log.e(TAG, "RecyclerView适配器设置失败！");
+        }
+    }
+
+    // 强制刷新UI的方法
+    private void forceRefreshTaskUI() {
+        Log.d(TAG, "=== forceRefreshTaskUI 开始 ===");
+
+        if (!tasksLoaded || !pointRulesLoaded || !isAdded() || getActivity() == null) {
+            Log.d(TAG, "刷新条件不满足");
+            return;
+        }
+
+        requireActivity().runOnUiThread(() -> {
+            // 检查通知TextView状态和缓存过期
+            if (tvNotice != null) {
+                String currentText = tvNotice.getText().toString();
+                Log.d(TAG, "当前通知显示内容: " + currentText);
+
+                // 如果缓存过期，重新获取通知
+                if (isNoticeCacheExpired()) {
+                    Log.d(TAG, "通知缓存已过期，重新获取");
+                    fetchNoticeContent();
+                } else if ("加载中...".equals(currentText) && cachedNoticeContent != null && !cachedNoticeContent.isEmpty()) {
+                    tvNotice.setText(cachedNoticeContent);
+                    Log.d(TAG, "更新通知显示为缓存内容: " + cachedNoticeContent);
+                }
+            } else {
+                Log.w(TAG, "tvNotice为null，重新获取");
+                if (getView() != null) {
+                    tvNotice = getView().findViewById(R.id.tv_notice);
+                    if (tvNotice != null && cachedNoticeContent != null && !isNoticeCacheExpired()) {
+                        tvNotice.setText(cachedNoticeContent);
+                        Log.d(TAG, "重新获取tvNotice并设置缓存内容");
+                    }
+                }
+            }
+
+            // 检查Banner ViewPager
+            if (getView() != null) {
+                ViewPager2 vpBanner = getView().findViewById(R.id.vp_notice_banner);
+                if (vpBanner != null && vpBanner.getAdapter() == null) {
+                    Log.w(TAG, "Banner ViewPager没有适配器，检查Banner数据加载状态");
+                    if (!isBannerLoading) {
+                        Log.d(TAG, "重新加载Banner数据");
+                        fetchBannerData(vpBanner);
+                    }
+                }
+            }
+
+            // 再次检查RecyclerView
+            if (rvTasks == null || rvTasks.getAdapter() == null) {
+                Log.w(TAG, "RecyclerView或适配器为null，重新设置");
+                forceSetupRecyclerView();
+            }
+
+            Log.d(TAG, "任务列表大小: " + (userTaskList != null ? userTaskList.size() : "null"));
+
+            if (userTaskList == null || userTaskList.isEmpty()) {
+                Log.w(TAG, "任务列表为空");
+                return;
+            }
+
+            // 分离视频任务和其他任务
+            UserTask videoTask = null;
+            List<UserTask> showTasks = new ArrayList<>();
+
+            for (UserTask task : userTaskList) {
+                String type = task.getTaskType();
+                if (type.length() == 1) type = "0" + type;
+
+                if ("01".equals(type)) {
+                    videoTask = task;
+                } else {
+                    showTasks.add(task);
+                    Log.d(TAG, "添加显示任务: " + task.getTaskName() + " (类型: " + task.getTaskType() + ")");
+                }
+            }
+
+            // 设置视频卡片
+            if (videoTask != null) {
+                cardLearnVideo.setVisibility(View.VISIBLE);
+                TextView tvTitle = cardLearnVideo.findViewById(R.id.tv_learn_video_title);
+                if (tvTitle != null) {
+                    tvTitle.setText(videoTask.getTaskName());
+                }
+                Log.d(TAG, "视频卡片已设置: " + videoTask.getTaskName());
+            } else {
+                cardLearnVideo.setVisibility(View.GONE);
+            }
+
+            // 更新RecyclerView数据
+            if (adapter != null && !showTasks.isEmpty()) {
+                Log.d(TAG, "开始更新RecyclerView数据，任务数量: " + showTasks.size());
+
+                adapter.setTaskPointRuleMap(new HashMap<>(taskPointRuleMap));
+                adapter.setTasks(showTasks);
+                adapter.notifyDataSetChanged();
+
+                // 强制请求布局
+                rvTasks.requestLayout();
+                rvTasks.invalidate();
+
+                Log.d(TAG, "RecyclerView数据更新完成");
+
+                // 验证更新结果
+                new Handler().postDelayed(() -> {
+                    if (rvTasks.getAdapter() != null) {
+                        Log.d(TAG, "验证：RecyclerView项目数 = " + rvTasks.getAdapter().getItemCount());
+                    } else {
+                        Log.e(TAG, "验证失败：RecyclerView适配器为null");
+                    }
+                }, 100);
+            } else {
+                Log.e(TAG, "适配器为null或任务列表为空，无法更新");
+            }
+        });
     }
 
     private void initViews(View view) {
@@ -127,6 +283,25 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
 
         cardLearnVideo.setVisibility(View.GONE);
+
+        // 智能通知初始化
+        if (tvNotice != null) {
+            // 检查缓存是否过期
+            if (cachedNoticeContent != null && !cachedNoticeContent.isEmpty() && !isNoticeCacheExpired()) {
+                tvNotice.setText(cachedNoticeContent);
+                Log.d(TAG, "使用有效缓存的通知内容: " + cachedNoticeContent);
+            } else {
+                tvNotice.setText("加载中...");
+                if (isNoticeCacheExpired()) {
+                    Log.d(TAG, "通知缓存已过期，将重新加载");
+                } else {
+                    Log.d(TAG, "通知TextView初始化为加载中");
+                }
+            }
+        } else {
+            Log.e(TAG, "找不到通知TextView组件");
+        }
+
         setUserInfo(tvNickName);
         setupCardClickListeners();
         setupSwipeRefresh();
@@ -169,52 +344,41 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         }
     }
 
-    private void setupRecyclerView() {
-        if (rvTasks == null) {
-            rvTasks = getView().findViewById(R.id.rv_tasks);
-        }
-
-        GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 2);
-        rvTasks.setLayoutManager(layoutManager);
-
-        if (adapter == null) {
-            adapter = new UserTaskAdapter();
-            adapter.setOnTaskClickListener(this);
-        }
-        rvTasks.setAdapter(adapter);
-    }
-
     private void loadInitialData() {
         Log.d(TAG, "=== loadInitialData 开始 ===");
+
+        if (getView() == null) {
+            Log.w(TAG, "View为null，跳过数据加载");
+            return;
+        }
+
+        // 确保ViewPager2正确获取
         ViewPager2 vpBanner = getView().findViewById(R.id.vp_notice_banner);
+        if (vpBanner == null) {
+            Log.e(TAG, "找不到Banner ViewPager2组件 R.id.vp_notice_banner");
+        } else {
+            Log.d(TAG, "Banner ViewPager2组件获取成功");
+        }
 
         // 并行加载各种数据，但避免重复请求
-        if (!isBannerLoading) {
+        if (!isBannerLoading && vpBanner != null) {
             Log.d(TAG, "开始加载Banner数据");
             fetchBannerData(vpBanner);
-        } else {
-            Log.d(TAG, "Banner正在加载中，跳过");
         }
 
         if (!isPointLoading) {
             Log.d(TAG, "开始加载积分数据");
             fetchUserPoint();
-        } else {
-            Log.d(TAG, "积分正在加载中，跳过");
         }
 
         if (!isPointRulesLoading) {
             Log.d(TAG, "开始加载积分规则数据");
             fetchPointRules();
-        } else {
-            Log.d(TAG, "积分规则正在加载中，跳过");
         }
 
         if (!isTasksLoading) {
             Log.d(TAG, "开始加载任务数据");
             fetchTasks();
-        } else {
-            Log.d(TAG, "任务正在加载中，跳过");
         }
 
         Log.d(TAG, "=== loadInitialData 调用完成 ===");
@@ -223,52 +387,57 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     @Override
     public void onResume() {
         super.onResume();
+        Log.d(TAG, "=== onResume 开始 ===");
 
-        // 如果数据已加载但UI可能需要刷新（比如从其他页面返回）
-        if (isDataLoaded) {
-            // 刷新积分
-            if (!isPointLoading) {
-                refreshUserPointOnly();
+        // 设置用户信息
+        if (getView() != null) {
+            TextView tvNickName = getView().findViewById(R.id.tv_nick_name);
+            if (tvNickName != null) {
+                setUserInfo(tvNickName);
             }
-
-            // 检查并刷新UI显示
-            refreshUIIfNeeded();
-        } else {
-            // 如果数据未加载，重新加载
-            loadInitialData();
-            isDataLoaded = true;
         }
 
+        // 检查通知缓存是否过期
+        if (isNoticeCacheExpired()) {
+            Log.d(TAG, "onResume - 通知缓存已过期，重新获取");
+            refreshNoticeContent();
+        }
+
+        // 如果数据已加载，强制刷新UI
+        if (isViewInitialized && tasksLoaded && pointRulesLoaded) {
+            Log.d(TAG, "onResume - 执行强制刷新");
+            new Handler().postDelayed(() -> {
+                if (isAdded() && getView() != null) {
+                    forceRefreshTaskUI();
+                }
+            }, 150);
+        }
+
+        // 刷新积分
+        if (!isPointLoading) {
+            refreshUserPointOnly();
+        }
+
+        // 恢复自动滚动
         if (autoScrollRunnable != null && autoScrollHandler != null) {
             startAutoScrollDelayed();
         }
+
+        Log.d(TAG, "=== onResume 完成 ===");
     }
 
-    // 检查并刷新UI显示
-    private void refreshUIIfNeeded() {
-        if (getView() == null) return;
+    // 手动刷新通知的方法
+    public void refreshNoticeContent() {
+        Log.d(TAG, "手动刷新通知内容");
+        // 清空缓存，强制重新获取
+        cachedNoticeContent = null;
+        noticeLastUpdateTime = 0;
 
-        // 检查RecyclerView是否有数据显示
-        if (adapter != null && userTaskList != null && !userTaskList.isEmpty()) {
-            // 如果adapter没有数据，重新设置
-            if (adapter.getItemCount() == 0) {
-                tryRefreshTaskUI();
-            }
+        if (tvNotice != null) {
+            tvNotice.setText("加载中...");
         }
 
-        // 检查Banner是否正常显示
-        ViewPager2 vpBanner = getView().findViewById(R.id.vp_notice_banner);
-        if (vpBanner != null && vpBanner.getAdapter() == null) {
-            if (!isBannerLoading) {
-                fetchBannerData(vpBanner);
-            }
-        }
-
-        // 检查用户信息显示
-        TextView tvNickName = getView().findViewById(R.id.tv_nick_name);
-        if (tvNickName != null && tvNickName.getText().toString().contains("未登录")) {
-            setUserInfo(tvNickName);
-        }
+        fetchNoticeContent();
     }
 
     // 刷新所有数据（下拉刷新时调用）
@@ -278,11 +447,15 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         // 重置所有加载状态
         resetLoadingStates();
 
-        // 重置数据状态
+        // 重置数据状态（包括通知缓存）
         pointRulesLoaded = false;
         tasksLoaded = false;
         userTaskList = Collections.emptyList();
         taskPointRuleMap.clear();
+
+        // 清空通知缓存，强制重新加载
+        cachedNoticeContent = null;
+        noticeLastUpdateTime = 0;
 
         // 清空适配器数据
         if (adapter != null) {
@@ -396,12 +569,10 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         stopAutoScroll();
         currentBannerAdapter = null;
 
-        // 重置状态，但保留初始化状态
-        isDataLoaded = false;
-        isBannerLoading = false;
-        isTasksLoading = false;
-        isPointLoading = false;
-        isPointRulesLoading = false;
+        // 重置状态，但保留通知缓存给下次使用
+        isViewInitialized = false;
+        resetLoadingStates();
+        // 注意：不清空cachedNoticeContent和noticeLastUpdateTime，让它们在Fragment重建时可用
     }
 
     private void fetchBannerData(ViewPager2 vpBanner) {
@@ -528,6 +699,19 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void setupBannerViewPager(ViewPager2 vpBanner, List<AppBanner> banners) {
+        if (vpBanner == null) {
+            Log.e(TAG, "vpBanner为null，无法设置Banner");
+            return;
+        }
+
+        if (banners == null || banners.isEmpty()) {
+            Log.w(TAG, "Banner列表为空");
+            setupDefaultBanners(vpBanner);
+            return;
+        }
+
+        Log.d(TAG, "开始设置Banner ViewPager，Banner数量: " + banners.size());
+
         BannerActionManager actionManager = new BannerActionManager(requireContext());
 
         BannerAdapter adapter = BannerAdapter.createWithBanners(requireContext(), banners);
@@ -552,12 +736,19 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         });
 
         vpBanner.setAdapter(adapter);
+        Log.d(TAG, "Banner适配器已设置");
+
+        // 验证设置是否成功
+        if (vpBanner.getAdapter() != null) {
+            Log.d(TAG, "Banner ViewPager设置成功，项目数: " + vpBanner.getAdapter().getItemCount());
+        } else {
+            Log.e(TAG, "Banner ViewPager设置失败");
+        }
 
         vpBanner.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageScrollStateChanged(int state) {
                 super.onPageScrollStateChanged(state);
-
                 switch (state) {
                     case ViewPager2.SCROLL_STATE_DRAGGING:
                         if (currentBannerAdapter != null) {
@@ -565,7 +756,6 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         }
                         isAutoScrolling = false;
                         stopAutoScroll();
-                        Log.d(TAG, "用户开始拖拽banner");
                         break;
 
                     case ViewPager2.SCROLL_STATE_SETTLING:
@@ -581,7 +771,6 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         if (!isAutoScrolling && banners.size() > 1) {
                             startAutoScrollDelayed();
                         }
-                        Log.d(TAG, "Banner滑动结束");
                         break;
                 }
             }
@@ -741,6 +930,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "获取积分规则失败: " + e.getMessage());
                 isPointRulesLoading = false;
             }
 
@@ -761,8 +951,11 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                                 }
                             }
                             pointRulesLoaded = true;
+                            Log.d(TAG, "积分规则加载完成，尝试刷新UI");
                             tryRefreshTaskUI();
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                            Log.e(TAG, "解析积分规则失败: " + e.getMessage());
+                        }
                     }
                 } finally {
                     response.close();
@@ -808,6 +1001,7 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         }
                         userTaskList = list;
                         tasksLoaded = true;
+                        Log.d(TAG, "任务数据加载完成，尝试刷新UI");
                         tryRefreshTaskUI();
                     }
                 } finally {
@@ -821,10 +1015,24 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void tryRefreshTaskUI() {
-        if (tasksLoaded && pointRulesLoaded && getActivity() != null) {
+        Log.d(TAG, "tryRefreshTaskUI - tasksLoaded: " + tasksLoaded + ", pointRulesLoaded: " + pointRulesLoaded + ", isAdded: " + isAdded());
+
+        if (tasksLoaded && pointRulesLoaded && getActivity() != null && isAdded()) {
             requireActivity().runOnUiThread(() -> {
+                Log.d(TAG, "开始刷新任务UI，userTaskList.size = " + (userTaskList != null ? userTaskList.size() : "null"));
+
+                if (userTaskList == null || userTaskList.isEmpty()) {
+                    Log.w(TAG, "任务列表为空，隐藏所有任务卡片");
+                    cardLearnVideo.setVisibility(View.GONE);
+                    if (adapter != null) {
+                        adapter.setTasks(Collections.emptyList());
+                    }
+                    return;
+                }
+
                 UserTask videoTask = null;
                 List<UserTask> showTasks = new ArrayList<>();
+
                 for (UserTask t : userTaskList) {
                     String type = t.getTaskType();
                     if (type.length() == 1) type = "0" + type;
@@ -834,16 +1042,35 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                         showTasks.add(t);
                     }
                 }
+
+                Log.d(TAG, "videoTask: " + (videoTask != null ? videoTask.getTaskName() : "null"));
+                Log.d(TAG, "showTasks.size: " + showTasks.size());
+
+                // 处理视频任务卡片
                 if (videoTask != null) {
                     cardLearnVideo.setVisibility(View.VISIBLE);
                     TextView tvTitle = cardLearnVideo.findViewById(R.id.tv_learn_video_title);
-                    tvTitle.setTextSize(26);
-                    tvTitle.setText(videoTask.getTaskName());
+                    if (tvTitle != null) {
+                        tvTitle.setTextSize(26);
+                        tvTitle.setText(videoTask.getTaskName());
+                    }
+                    Log.d(TAG, "视频卡片已显示: " + videoTask.getTaskName());
                 } else {
                     cardLearnVideo.setVisibility(View.GONE);
+                    Log.d(TAG, "没有视频任务，隐藏视频卡片");
                 }
-                adapter.setTaskPointRuleMap(new HashMap<>(taskPointRuleMap));
-                adapter.setTasks(showTasks);
+
+                // 处理其他任务
+                if (adapter != null) {
+                    adapter.setTaskPointRuleMap(new HashMap<>(taskPointRuleMap));
+                    adapter.setTasks(showTasks);
+                    Log.d(TAG, "RecyclerView适配器已更新，任务数量: " + showTasks.size());
+
+                    // 强制通知适配器数据已更改
+                    adapter.notifyDataSetChanged();
+                } else {
+                    Log.w(TAG, "适配器为null，无法更新任务");
+                }
 
                 // 所有主要数据加载完成后，停止刷新动画
                 if (swipeRefreshLayout != null && swipeRefreshLayout.isRefreshing()) {
@@ -851,12 +1078,16 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     Log.d(TAG, "数据刷新完成，停止刷新动画");
                 }
             });
+        } else {
+            Log.d(TAG, "UI刷新条件不满足，等待后续调用");
         }
     }
 
+    // 修改后的通知获取方法，添加缓存机制和防缓存策略
     private void fetchNoticeContent() {
         UserAccount userAccount = UserUtils.getUserAccount(requireContext());
         if (userAccount == null || userAccount.getProjectId() == null || userAccount.getTeamId() == null) {
+            Log.w(TAG, "用户账户信息不完整，设置默认通知");
             setDefaultNotice("欢迎使用远程护理系统");
             return;
         }
@@ -867,17 +1098,21 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
         OkHttpClient client = new OkHttpClient();
         String noticeUrl = ApiConfig.API_GET_NOTICE +
                 "?projectId=" + projectId +
-                "&teamId=" + teamId;
+                "&teamId=" + teamId +
+                "&t=" + System.currentTimeMillis(); // 添加时间戳防止HTTP缓存
 
         Log.d(TAG, "通知请求URL: " + noticeUrl);
 
-        Request noticeRequest = new Request.Builder().url(noticeUrl).build();
+        Request noticeRequest = new Request.Builder()
+                .url(noticeUrl)
+                .addHeader("Cache-Control", "no-cache") // 禁用HTTP缓存
+                .build();
 
         client.newCall(noticeRequest).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "获取通知失败: " + e.getMessage());
-                setDefaultNotice("欢迎使用远程护理系统");
+                setDefaultNotice("（网络错误，无法获取通知）");
             }
 
             @Override
@@ -886,24 +1121,34 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     if (response.isSuccessful() && getActivity() != null) {
                         String noticeBody = response.body().string();
                         Log.d(TAG, "通知响应成功，数据长度: " + noticeBody.length());
+                        Log.d(TAG, "通知原始数据: " + noticeBody);
 
                         try {
                             JSONArray noticeArray = new JSONArray(noticeBody);
                             String displayNotice = processNoticeList(noticeArray);
+                            Log.d(TAG, "处理后的通知内容: " + displayNotice);
+
+                            // 更新缓存和时间戳
+                            cachedNoticeContent = displayNotice;
+                            noticeLastUpdateTime = System.currentTimeMillis();
+                            Log.d(TAG, "通知缓存已更新，时间戳: " + noticeLastUpdateTime);
 
                             requireActivity().runOnUiThread(() -> {
                                 if (tvNotice != null) {
                                     tvNotice.setText(displayNotice);
+                                    Log.d(TAG, "通知已设置到TextView: " + displayNotice);
+                                } else {
+                                    Log.e(TAG, "tvNotice为null，无法设置通知");
                                 }
                             });
 
                         } catch (Exception e) {
                             Log.e(TAG, "解析通知数据失败: " + e.getMessage());
-                            setDefaultNotice("（暂无新通知）");
+                            setDefaultNotice("（数据解析错误）");
                         }
                     } else {
                         Log.w(TAG, "获取通知失败: " + response.code() + " " + response.message());
-                        setDefaultNotice("（暂无新通知）");
+                        setDefaultNotice("（服务器错误）");
                     }
                 } finally {
                     response.close();
@@ -913,10 +1158,19 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     }
 
     private void setDefaultNotice(String notice) {
+        Log.d(TAG, "设置默认通知: " + notice);
+
+        // 缓存默认通知和时间戳
+        cachedNoticeContent = notice;
+        noticeLastUpdateTime = System.currentTimeMillis();
+
         if (getActivity() != null) {
             requireActivity().runOnUiThread(() -> {
                 if (tvNotice != null) {
                     tvNotice.setText(notice);
+                    Log.d(TAG, "默认通知已设置: " + notice);
+                } else {
+                    Log.e(TAG, "tvNotice为null，无法设置默认通知");
                 }
             });
         }

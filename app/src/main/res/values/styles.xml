@@ -11,4 +11,19 @@
         <item name="android:textColor">#D9534F</item>
         <item name="android:windowMinWidthMajor">80%</item>
     </style>
+    <!-- 激活状态的底部导航文字样式 -->
+    <style name="BottomNavTextActive" parent="@style/TextAppearance.Design.Tab">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+
+    <!-- 非激活状态的底部导航文字样式 -->
+    <style name="BottomNavTextInactive" parent="@style/TextAppearance.Design.Tab">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
 </resources>

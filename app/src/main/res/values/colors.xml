@@ -56,4 +56,8 @@
     <!-- 半透明颜色 -->
     <color name="overlay_light">#80FFFFFF</color>
     <color name="overlay_dark">#80000000</color>
+
+    <!-- 底部导航项目颜色状态 -->
+    <color name="bottom_nav_selected">#2196F3</color>
+    <color name="bottom_nav_unselected">#80000000</color>
 </resources>

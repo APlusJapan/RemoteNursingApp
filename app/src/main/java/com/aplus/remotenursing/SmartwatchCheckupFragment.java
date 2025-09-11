@@ -24,6 +24,7 @@ import androidx.fragment.app.Fragment;
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.Contants;
 import com.aplus.remotenursing.manager.CodeMasterManager;
+import com.aplus.remotenursing.manager.FragmentSafetyManager;  // 新增导入
 import com.aplus.remotenursing.models.CodeItem;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -44,11 +45,9 @@ import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.common.UserUtils;
 
 /**
- * 体检流程 + 结果上传
+ * 体检流程 + 结果上传 - 集成 FragmentSafetyManager
  */
 public class SmartwatchCheckupFragment extends Fragment {
-
-//    private static final String TARGET_NAME = "F57L";
 
     private static final int REQUEST_LOCATION = 1;
     private enum CheckupStatus { BEFORE, IN_PROGRESS, FINISHED }
@@ -76,19 +75,19 @@ public class SmartwatchCheckupFragment extends Fragment {
     private int lastSteps = 0, lastHeart = 0, lastSpo2 = 0, lastBpHigh = 0, lastBpLow = 0, lastSleep = 0;
     private float lastBloodGlucose = 0f;
 
-    // ===== 新增：睡眠相关数据变量 =====
-    private int lastSleepQuality = 0;      // 睡眠质量
-    private int lastWakeCount = 0;         // 睡眠中起床次数
-    private int lastDeepSleepTime = 0;     // 深睡时长(分钟)
-    private int lastLightSleepTime = 0;    // 浅睡时长(分钟)
-    private Date lastSleepDown = null;     // 入睡时间
-    private Date lastSleepUp = null;       // 起床时间
+    // ===== 睡眠相关数据变量 =====
+    private int lastSleepQuality = 0;
+    private int lastWakeCount = 0;
+    private int lastDeepSleepTime = 0;
+    private int lastLightSleepTime = 0;
+    private Date lastSleepDown = null;
+    private Date lastSleepUp = null;
 
     // 标准
     private List<CheckupStandard> standardList = new ArrayList<>();
-    private String userId = null; // 动态获取
+    private String userId = null;
 
-    // ====== 新增：上传相关 ======
+    // ====== 上传相关 ======
     private final OkHttpClient http = new OkHttpClient();
     private final Gson gson = new Gson();
 
@@ -97,7 +96,7 @@ public class SmartwatchCheckupFragment extends Fragment {
     private CodeMasterManager codeManager;
     private volatile boolean watchListLoaded = false;
 
-    // ====== 后台"标准"模型（保持与你现有解析一致）======
+    // ====== 后台"标准"模型 ======
     public static class CheckupStandard {
         public String itemCode;
         public String itemName;
@@ -107,13 +106,11 @@ public class SmartwatchCheckupFragment extends Fragment {
         public String unit;
     }
 
-    // 修改请求模型，匹配后端实体
-    // 修改SmartwatchCheckupFragment中的BackendUserCheckupRecord类
-
+    // 后端请求模型
     public static class BackendUserCheckupRecord {
         public Integer id;
         public String userId;
-        public String measureDate;       // 保持String类型，但确保格式正确
+        public String measureDate;
         public Integer steps;
         public Integer heartRate;
         public Integer spo2;
@@ -127,14 +124,14 @@ public class SmartwatchCheckupFragment extends Fragment {
         public Integer lightSleepTime;
         public Integer allSleepTime;
 
-        // 修改：将Date类型改为String，使用ISO格式
-        public String sleepDown;         // 改为String，格式: "yyyy-MM-dd'T'HH:mm:ss"
-        public String sleepUp;           // 改为String，格式: "yyyy-MM-dd'T'HH:mm:ss"
+        public String sleepDown;
+        public String sleepUp;
 
         public String adminId;
         public Boolean isDeleted;
     }
 
+    // BLE 监听器
     private final IABluetoothStateListener mBleStateListener = new IABluetoothStateListener() {
         @Override
         public void onBluetoothStateChanged(boolean openOrClosed) {
@@ -159,9 +156,11 @@ public class SmartwatchCheckupFragment extends Fragment {
         if (code == 0) log("设备连接成功，等待服务就绪…");
         else log("连接失败，code=" + code);
     };
+
     private final IBleWriteResponse writeCallback = code -> {
         if (code != 0) log("命令写入响应 code=" + code);
     };
+
     private final IPwdDataListener pwdListener = pwd -> {
         log("设备号：" + pwd.getDeviceNumber() + "，版本：" + pwd.getDeviceVersion());
         if (pwd.getDeviceNumber() != 0) {
@@ -171,12 +170,15 @@ public class SmartwatchCheckupFragment extends Fragment {
             log("密码确认失败，请检查密码或重试");
         }
     };
+
     private final IDeviceFuctionDataListener functionListener = fs -> {
         if (fs.getHeartDetect() == EFunctionStatus.SUPPORT_OPEN) {
             log("设备支持并已打开自动心率检测");
         }
     };
+
     private final ICustomSettingDataListener customSettingListener = data -> {};
+
     private final INotifyResponse notifyCallback = state -> {
         if (state == 0 && !hasRetrieved) {
             hasRetrieved = true;
@@ -198,9 +200,22 @@ public class SmartwatchCheckupFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inf, ViewGroup container, Bundle saved) {
         View root = inf.inflate(R.layout.fragment_smartwatch_checkup, container, false);
-        root.findViewById(R.id.smartwatch_btn_back)
-                .setOnClickListener(v -> requireActivity().onBackPressed());
 
+        // 使用 FragmentSafetyManager 安全返回
+        root.findViewById(R.id.smartwatch_btn_back)
+                .setOnClickListener(v -> FragmentSafetyManager.safePopBackStack(this));
+
+        initViews(root);
+        initData();
+        initCodeManager();
+        initBluetooth();
+        loadCheckupResultFromCache();
+        loadCheckupStandardWithSafety();
+
+        return root;
+    }
+
+    private void initViews(View root) {
         tvSteps = root.findViewById(R.id.tv_steps);
         tvHeart = root.findViewById(R.id.tv_heartrate);
         tvSpo2 = root.findViewById(R.id.tv_spo2);
@@ -220,29 +235,51 @@ public class SmartwatchCheckupFragment extends Fragment {
 
         tvMeasureStatus = root.findViewById(R.id.tv_measure_status);
         tvStatus = root.findViewById(R.id.tv_measure_status);
+    }
 
-        // 初始化 manager
+    private void initData() {
+        uiHandler = new Handler(Looper.getMainLooper());
         codeManager = new CodeMasterManager();
+        hasRetrieved = false;
+        isConnected = false;
+        targetMac = null;
+
+        // 获取 userId
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        userId = userAccount != null ? userAccount.getUserId() : null;
+        log("当前用户ID: " + userId);
+
+        updateCheckupUI(CheckupStatus.BEFORE, null);
+    }
+
+    private void initCodeManager() {
+        // 使用 FragmentSafetyManager 安全加载码表
         codeManager.fetchCodeList("SMARTWATCH_TYPE", new CodeMasterManager.CodeListCallback() {
-            @Override public void onSuccess(List<CodeItem> list) {
-                // 仅收集 value 作为"手表型号显示名"（如需用 code 也参与匹配，可同时加入）
-                smartwatchNameWhiteList.clear();
-                for (CodeItem item : list) {
-                    if (item.getValue() != null && !item.getValue().trim().isEmpty()) {
-                        smartwatchNameWhiteList.add(item.getValue().trim());
+            @Override
+            public void onSuccess(List<CodeItem> list) {
+                FragmentSafetyManager.safeExecuteOnUI(SmartwatchCheckupFragment.this, () -> {
+                    smartwatchNameWhiteList.clear();
+                    for (CodeItem item : list) {
+                        if (item.getValue() != null && !item.getValue().trim().isEmpty()) {
+                            smartwatchNameWhiteList.add(item.getValue().trim());
+                        }
                     }
-                }
-                watchListLoaded = true;
-                log("SMARTWATCH_TYPE 白名单: " + smartwatchNameWhiteList);
+                    watchListLoaded = true;
+                    log("SMARTWATCH_TYPE 白名单: " + smartwatchNameWhiteList);
+                });
             }
-            @Override public void onFailure(Throwable t) {
-                log("SMARTWATCH_TYPE 白名单获取失败");
-                // 拉取失败时保留空列表，后续匹配将自然不命中（即相当于旧逻辑里的TARGET_NAME都不符合）
-                watchListLoaded = true;
+
+            @Override
+            public void onFailure(Throwable t) {
+                FragmentSafetyManager.safeExecuteOnUI(SmartwatchCheckupFragment.this, () -> {
+                    log("SMARTWATCH_TYPE 白名单获取失败");
+                    watchListLoaded = true;
+                });
             }
         });
+    }
 
-        uiHandler = new Handler(Looper.getMainLooper());
+    private void initBluetooth() {
         mgr = VPOperateManager.getInstance();
         mgr.init(requireContext());
         mgr.registerBluetoothStateListener(mBleStateListener);
@@ -250,29 +287,55 @@ public class SmartwatchCheckupFragment extends Fragment {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         scanner = adapter != null ? adapter.getBluetoothLeScanner() : null;
 
-        hasRetrieved = false;
-        isConnected = false;
-        targetMac = null;
-
         String cur = VPOperateManager.getCurrentDeviceAddress();
         if (!TextUtils.isEmpty(cur) && mgr.isDeviceConnected(cur)) {
             targetMac = cur;
             isConnected = true;
             log("恢复连接状态：已连接到 " + cur);
         }
+    }
 
-        updateCheckupUI(CheckupStatus.BEFORE, null);
+    // ========标准加载（使用 FragmentSafetyManager）========
+    private void loadCheckupStandardWithSafety() {
+        if (TextUtils.isEmpty(userId)) {
+            setupCheckupButton();
+            return;
+        }
 
-        // 获取 userId
-        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
-        userId = userAccount != null ? userAccount.getUserId() : null;
-        log("当前用户ID: " + userId);
+        OkHttpClient client = new OkHttpClient();
+        String url = ApiConfig.API_CHECKUP_STANDARD + userId;
+        Request request = new Request.Builder().url(url).build();
 
-        // 先尝试从缓存加载上次体检结果
-        loadCheckupResultFromCache();
+        // 使用 FragmentSafetyManager 的带重试的关键数据加载
+        client.newCall(request).enqueue(
+                FragmentSafetyManager.createAutoRetryCallback(
+                        this,
+                        request,
+                        client,
+                        // 成功回调
+                        (responseBody) -> {
+                            try {
+                                Type listType = new TypeToken<List<CheckupStandard>>(){}.getType();
+                                List<CheckupStandard> standards = gson.fromJson(responseBody, listType);
+                                standardList.clear();
+                                if (standards != null) {
+                                    standardList.addAll(standards);
+                                }
+                                log("加载体检标准成功，共" + standardList.size() + "项");
+                            } catch (Exception e) {
+                                log("解析体检标准失败：" + e.getMessage());
+                                throw new RuntimeException("解析体检标准失败", e);
+                            } finally {
+                                setupCheckupButton();
+                            }
+                        },
+                        "获取体检标准"
+                )
+        );
+    }
 
-        // 加载标准后再绑定按钮
-        loadCheckupStandard(userId, () -> {
+    private void setupCheckupButton() {
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
             btnSync.setOnClickListener(v -> {
                 if (checkupStatus != CheckupStatus.IN_PROGRESS) {
                     updateCheckupUI(CheckupStatus.IN_PROGRESS, null);
@@ -285,44 +348,9 @@ public class SmartwatchCheckupFragment extends Fragment {
                 }
             });
         });
-
-        return root;
     }
 
-    // --------标准加载--------
-    private void loadCheckupStandard(String userId, Runnable afterLoad) {
-        if (TextUtils.isEmpty(userId)) {
-            safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
-            return;
-        }
-        OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_CHECKUP_STANDARD + userId;
-        Request request = new Request.Builder().url(url).build();
-        client.newCall(request).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException e) {
-                safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
-            }
-            @Override public void onResponse(Call call, Response response) throws IOException {
-                try {
-                    if (!response.isSuccessful()) {
-                        safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
-                        return;
-                    }
-                    String json = response.body().string();
-                    Gson gson = new Gson();
-                    Type listType = new TypeToken<List<CheckupStandard>>(){}.getType();
-                    List<CheckupStandard> standards = gson.fromJson(json, listType);
-                    standardList.clear();
-                    if (standards != null) standardList.addAll(standards);
-                    safeUi(() -> { if (afterLoad != null) afterLoad.run(); });
-                } finally {
-                    response.close();
-                }
-            }
-        });
-    }
-
-    // =================== 原有流程 ===================
+    // =================== 原有流程（保持不变） ===================
 
     @SuppressLint("MissingPermission")
     private void startScanAndConnect() {
@@ -346,7 +374,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         public void onScanResult(int cbType, @NonNull ScanResult res) {
             String name = res.getDevice().getName();
             if (TextUtils.isEmpty(name) && res.getScanRecord() != null) {
-                name = res.getScanRecord().getDeviceName(); // 兜底从广告里取一次
+                name = res.getScanRecord().getDeviceName();
             }
             if (name != null && isInSmartwatchWhiteList(name)) {
                 scanner.stopScan(this);
@@ -362,23 +390,14 @@ public class SmartwatchCheckupFragment extends Fragment {
         }
     };
 
-    /** 判断设备名是否在码表白名单中（忽略大小写；支持等于或前缀匹配，适配有版本后缀的广播名） */
-    /**
-     * 白名单判断：
-     * - 白名单未加载完成 → 不拦截（返回 true），避免"还没拿到表就把设备全挡了"
-     * - 白名单已加载但为空 → 不命中（返回 false）
-     * - 忽略大小写，用 contains；兼容设备名包含型号在中间/后缀
-     */
     private boolean isInSmartwatchWhiteList(String deviceName) {
         if (TextUtils.isEmpty(deviceName)) return false;
 
-        // 白名单还在网络加载中 → 不拦截，保持原有体验
         if (!watchListLoaded) {
             log("白名单未加载完成，暂不过滤：" + deviceName);
             return true;
         }
 
-        // 白名单加载完成但为空 → 视为无可匹配项
         if (smartwatchNameWhiteList.isEmpty()) {
             log("白名单已加载但为空，直接不命中：" + deviceName);
             return false;
@@ -394,7 +413,6 @@ public class SmartwatchCheckupFragment extends Fragment {
         }
         return false;
     }
-
 
     private void syncOnce() {
         if (!mgr.isCurrentDeviceConnected()) {
@@ -426,7 +444,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startSteps() {
         log("开始读取步数…");
-        tvMeasureStatus.setText("正在读取步数，请等待…");
+        safeUi(() -> tvMeasureStatus.setText("正在读取步数，请等待…"));
         showProgressBarFor("steps");
         mgr.readSportStep(writeCallback, data -> {
             lastSteps = data.getStep();
@@ -439,7 +457,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startHeart() {
         log("开始心率测量…");
-        tvMeasureStatus.setText("正在测量心率，请等待…");
+        safeUi(() -> tvMeasureStatus.setText("正在测量心率，请等待…"));
         showProgressBarFor("heartrate");
         heartRateList.clear();
         mgr.startDetectHeart(writeCallback, new IHeartDataListener() {
@@ -472,7 +490,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startSpo2() {
         log("开始血氧测量…");
-        tvMeasureStatus.setText("正在测量血氧，请等待…");
+        safeUi(() -> tvMeasureStatus.setText("正在测量血氧，请等待…"));
         showProgressBarFor("spo2");
         spo2hList.clear();
         mgr.startDetectSPO2H(writeCallback, new ISpo2hDataListener() {
@@ -505,7 +523,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startBP() {
         log("开始血压测量…");
-        tvMeasureStatus.setText("正在测量血压…");
+        safeUi(() -> tvMeasureStatus.setText("正在测量血压…"));
         showProgressBarFor("bp");
         mgr.startDetectBP(writeCallback, new IBPDetectDataListener() {
             @Override
@@ -526,7 +544,7 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startBloodGlucose() {
         log("开始血糖测量…");
-        tvMeasureStatus.setText("正在测量血糖…");
+        safeUi(() -> tvMeasureStatus.setText("正在测量血糖…"));
         showProgressBarFor("bg");
         mgr.startBloodGlucoseDetect(writeCallback, new AbsBloodGlucoseChangeListener() {
             @Override
@@ -546,12 +564,12 @@ public class SmartwatchCheckupFragment extends Fragment {
 
     private void startSleep() {
         log("开始读取睡眠时间…");
-        tvMeasureStatus.setText("正在读取睡眠数据…");
+        safeUi(() -> tvMeasureStatus.setText("正在读取睡眠数据…"));
         showProgressBarFor("sleep");
         final boolean[] hasSleepData = {false};
         final boolean[] hasCompleted = {false};
 
-        // 添加超时机制，防止睡眠数据读取卡住
+        // 添加超时机制
         uiHandler.postDelayed(() -> {
             if (!hasCompleted[0]) {
                 log("睡眠数据读取超时，强制完成");
@@ -563,7 +581,7 @@ public class SmartwatchCheckupFragment extends Fragment {
                     showCheckupResultAndFinish();
                 });
             }
-        }, 5000); // 5秒超时
+        }, 5000);
 
         mgr.readSleepData(writeCallback, new ISleepDataListener() {
             @Override
@@ -572,60 +590,21 @@ public class SmartwatchCheckupFragment extends Fragment {
                 if (!hasCompleted[0]) {
                     hasSleepData[0] = true;
 
-                    // 获取睡眠总时长
                     int total = sd.getAllSleepTime();
                     lastSleep = total;
-
-                    // 获取睡眠详细数据
                     lastSleepQuality = sd.getSleepQulity();
                     lastWakeCount = sd.getWakeCount();
                     lastDeepSleepTime = sd.getDeepSleepTime();
                     lastLightSleepTime = sd.getLowSleepTime();
 
-                    // 处理入睡和起床时间 - 增强调试
                     TimeData sleepDownTime = sd.getSleepDown();
                     TimeData sleepUpTime = sd.getSleepUp();
 
                     if (sleepDownTime != null) {
-                        log("原始入睡时间: " + sleepDownTime.getHour() + ":" +
-                                String.format("%02d", sleepDownTime.getMinute()) + ":" +
-                                String.format("%02d", sleepDownTime.getSecond()));
                         lastSleepDown = adjustSleepTime(sleepDownTime, true);
-                        if (lastSleepDown != null) {
-                            log("处理后入睡时 间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepDown));
-                        }
-                    } else {
-                        log("未获取到入睡时间数据");
                     }
-
                     if (sleepUpTime != null) {
-                        log("原始起床时间: " + sleepUpTime.getHour() + ":" +
-                                String.format("%02d", sleepUpTime.getMinute()) + ":" +
-                                String.format("%02d", sleepUpTime.getSecond()));
                         lastSleepUp = adjustSleepTime(sleepUpTime, false);
-                        if (lastSleepUp != null) {
-                            log("处理后起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
-                        }
-                    } else {
-                        log("未获取到起床时间数据");
-                    }
-
-                    // 验证时间逻辑
-                    if (lastSleepDown != null && lastSleepUp != null) {
-                        long sleepDurationMillis = lastSleepUp.getTime() - lastSleepDown.getTime();
-                        long sleepDurationMinutes = sleepDurationMillis / (1000 * 60);
-                        log("计算的睡眠时长: " + sleepDurationMinutes + "分钟，设备报告: " + total + "分钟");
-
-                        // 如果计算的睡眠时长为负数，说明跨日处理有问题
-                        if (sleepDurationMinutes < 0) {
-                            log("警告：睡眠时长为负数，可能是跨日处理错误");
-                            // 尝试修正：如果起床时间在入睡时间之前，给起床时间加一天
-                            Calendar cal = Calendar.getInstance();
-                            cal.setTime(lastSleepUp);
-                            cal.add(Calendar.DAY_OF_MONTH, 1);
-                            lastSleepUp = cal.getTime();
-                            log("修正后起床时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(lastSleepUp));
-                        }
                     }
 
                     safeUi(() -> tvSleep.setText("睡眠总：" + formatMinutes(total)));
@@ -634,14 +613,17 @@ public class SmartwatchCheckupFragment extends Fragment {
                     safeUi(() -> showCheckupResultAndFinish());
                 }
             }
+
             @Override
             public void onSleepProgress(float p) {
                 log("睡眠数据进度：" + p);
             }
+
             @Override
             public void onSleepProgressDetail(String d, int p) {
                 log("睡眠数据详细进度：" + d + ", " + p);
             }
+
             @Override
             public void onReadSleepComplete() {
                 log("睡眠数据-读取结束");
@@ -650,7 +632,6 @@ public class SmartwatchCheckupFragment extends Fragment {
                         log("睡眠数据读取完成但无数据，设置默认值");
                         hasCompleted[0] = true;
                         lastSleep = 0;
-                        // 重置所有睡眠相关变量
                         lastSleepQuality = 0;
                         lastWakeCount = 0;
                         lastDeepSleepTime = 0;
@@ -669,51 +650,59 @@ public class SmartwatchCheckupFragment extends Fragment {
     }
 
     private void showProgressBarFor(String item) {
-        progressSteps.setVisibility(View.GONE);
-        progressHeartrate.setVisibility(View.GONE);
-        progressSpo2.setVisibility(View.GONE);
-        progressBp.setVisibility(View.GONE);
-        progressBg.setVisibility(View.GONE);
-        progressSleep.setVisibility(View.GONE);
-        switch(item) {
-            case "steps": progressSteps.setVisibility(View.VISIBLE); break;
-            case "heartrate": progressHeartrate.setVisibility(View.VISIBLE); break;
-            case "spo2": progressSpo2.setVisibility(View.VISIBLE); break;
-            case "bp": progressBp.setVisibility(View.VISIBLE); break;
-            case "bg": progressBg.setVisibility(View.VISIBLE); break;
-            case "sleep": progressSleep.setVisibility(View.VISIBLE); break;
-        }
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            progressSteps.setVisibility(View.GONE);
+            progressHeartrate.setVisibility(View.GONE);
+            progressSpo2.setVisibility(View.GONE);
+            progressBp.setVisibility(View.GONE);
+            progressBg.setVisibility(View.GONE);
+            progressSleep.setVisibility(View.GONE);
+            switch(item) {
+                case "steps": progressSteps.setVisibility(View.VISIBLE); break;
+                case "heartrate": progressHeartrate.setVisibility(View.VISIBLE); break;
+                case "spo2": progressSpo2.setVisibility(View.VISIBLE); break;
+                case "bp": progressBp.setVisibility(View.VISIBLE); break;
+                case "bg": progressBg.setVisibility(View.VISIBLE); break;
+                case "sleep": progressSleep.setVisibility(View.VISIBLE); break;
+            }
+        });
     }
 
     private void hideAllProgressBars() {
-        progressSteps.setVisibility(View.GONE);
-        progressHeartrate.setVisibility(View.GONE);
-        progressSpo2.setVisibility(View.GONE);
-        progressBp.setVisibility(View.GONE);
-        progressBg.setVisibility(View.GONE);
-        progressSleep.setVisibility(View.GONE);
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            progressSteps.setVisibility(View.GONE);
+            progressHeartrate.setVisibility(View.GONE);
+            progressSpo2.setVisibility(View.GONE);
+            progressBp.setVisibility(View.GONE);
+            progressBg.setVisibility(View.GONE);
+            progressSleep.setVisibility(View.GONE);
+        });
     }
 
     private void showCheckupResultAndFinish() {
         log("=== showCheckupResultAndFinish 开始执行 ===");
         hideAllProgressBars();
-        tvMeasureStatus.setText("体检完成！");
-        String stepsDesc = lastSteps + "步";
-        String hrDesc = lastHeart + "次/分";
-        String spo2Desc = lastSpo2 + "%";
-        String bpDesc = lastBpHigh + "/" + lastBpLow + " mmHg";
-        String bgDesc = lastBloodGlucose + " mmol/L";
-        String sleepDesc = formatMinutes(lastSleep);
 
-        tvSteps.setText("步数：" + stepsDesc);
-        tvHeart.setText("心率：" + hrDesc);
-        tvSpo2.setText("血氧：" + spo2Desc);
-        tvBp.setText("血压：" + bpDesc);
-        tvBloodGlucose.setText("血糖：" + bgDesc);
-        tvSleep.setText("睡眠时长：" + sleepDesc);
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            tvMeasureStatus.setText("体检完成！");
+
+            String stepsDesc = lastSteps + "步";
+            String hrDesc = lastHeart + "次/分";
+            String spo2Desc = lastSpo2 + "%";
+            String bpDesc = lastBpHigh + "/" + lastBpLow + " mmHg";
+            String bgDesc = lastBloodGlucose + " mmol/L";
+            String sleepDesc = formatMinutes(lastSleep);
+
+            tvSteps.setText("步数：" + stepsDesc);
+            tvHeart.setText("心率：" + hrDesc);
+            tvSpo2.setText("血氧：" + spo2Desc);
+            tvBp.setText("血压：" + bpDesc);
+            tvBloodGlucose.setText("血糖：" + bgDesc);
+            tvSleep.setText("睡眠时长：" + sleepDesc);
+        });
 
         log("=== 开始生成结论文案 ===");
-        // ===== 生成结论文案 =====
+        // 生成结论文案
         StringBuilder sb = new StringBuilder();
         CheckupStandard stdHeart = findStandard("HEART_RATE");
         CheckupStandard stdSpo2 = findStandard("SPO2");
@@ -723,7 +712,7 @@ public class SmartwatchCheckupFragment extends Fragment {
         CheckupStandard stdStep = findStandard("STEP");
         CheckupStandard stdSleep = findStandard("SLEEP_TIME");
 
-        // 心率
+        // 心率检查
         if (stdHeart != null) {
             int min = Integer.parseInt(stdHeart.minValue);
             int max = Integer.parseInt(stdHeart.maxValue);
@@ -732,13 +721,15 @@ public class SmartwatchCheckupFragment extends Fragment {
             else if (lastHeart > max)
                 sb.append(getString(R.string.checkup_heart_rate_high)).append("；");
         }
-        // 血氧
+
+        // 血氧检查
         if (stdSpo2 != null) {
             int min = Integer.parseInt(stdSpo2.minValue);
             if (lastSpo2 < min)
                 sb.append(getString(R.string.checkup_spo2_low)).append("；");
         }
-        // 血压
+
+        // 血压检查
         if (stdBpHigh != null && stdBpLow != null) {
             int stdBpHighMax = Integer.parseInt(stdBpHigh.maxValue);
             int stdBpLowMax = Integer.parseInt(stdBpLow.maxValue);
@@ -753,7 +744,8 @@ public class SmartwatchCheckupFragment extends Fragment {
                 sb.append(getString(R.string.checkup_bp_high_low)).append("；");
             }
         }
-        // 血糖
+
+        // 血糖检查
         if (stdGlucose != null) {
             float min = Float.parseFloat(stdGlucose.minValue);
             float max = Float.parseFloat(stdGlucose.maxValue);
@@ -762,37 +754,250 @@ public class SmartwatchCheckupFragment extends Fragment {
             else if (lastBloodGlucose > max)
                 sb.append(getString(R.string.checkup_blood_glucose_high)).append("；");
         }
-        // 步数
+
+        // 步数检查
         if (stdStep != null) {
             int min = Integer.parseInt(stdStep.minValue);
             if (lastSteps < min)
                 sb.append(getString(R.string.checkup_step_low)).append("；");
         }
-        // 睡眠
+
+        // 睡眠检查
         if (stdSleep != null) {
-            int min = Integer.parseInt(stdSleep.minValue); // 注意：这里是分钟
+            int min = Integer.parseInt(stdSleep.minValue);
             if (lastSleep < min)
                 sb.append(getString(R.string.checkup_sleep_time_low)).append("；");
         }
-        if (sb.length() == 0) sb.append(getString(R.string.checkup_all_normal));
+
+        if (sb.length() == 0) {
+            sb.append(getString(R.string.checkup_all_normal));
+        }
 
         String conclusion = sb.toString();
-        tvResult.setText(conclusion);
-        cardResult.setVisibility(View.VISIBLE);
 
-        log("=== 准备更新UI状态 ===");
-        updateCheckupUI(CheckupStatus.FINISHED, "体检完成！");
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            tvResult.setText(conclusion);
+            cardResult.setVisibility(View.VISIBLE);
+            updateCheckupUI(CheckupStatus.FINISHED, "体检完成！");
+        });
 
         log("=== 保存体检结果到缓存 ===");
-        // 保存体检结果到缓存
         saveCheckupResultToCache();
 
         log("=== 准备调用uploadTodayRecord ===");
-        // ===== 上传到后台 =====
-        uploadTodayRecord();
+        uploadTodayRecordWithSafety();
         log("=== uploadTodayRecord 调用完成 ===");
     }
 
+    // ===== 使用 FragmentSafetyManager 安全上传 =====
+    private void uploadTodayRecordWithSafety() {
+        log("=== uploadTodayRecordWithSafety 方法开始执行 ===");
+
+        if (TextUtils.isEmpty(userId)) {
+            log("未登录用户，跳过上传");
+            return;
+        }
+
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        if (userAccount == null) {
+            log("获取用户账户信息失败，跳过上传");
+            return;
+        }
+
+        String adminId = userAccount.getAdminId();
+        log("获取到的adminId: " + (adminId != null ? adminId : "null"));
+
+        BackendUserCheckupRecord body = new BackendUserCheckupRecord();
+        body.userId = userId;
+        body.measureDate = todayAt00String();
+        body.steps = lastSteps;
+        body.heartRate = lastHeart;
+        body.spo2 = lastSpo2;
+        body.lowBloodPressure = lastBpLow;
+        body.highBloodPressure = lastBpHigh;
+        body.bloodGlucose = new BigDecimal(String.valueOf(lastBloodGlucose));
+
+        body.sleepQuality = lastSleepQuality;
+        body.wakeCount = lastWakeCount;
+        body.deepSleepTime = lastDeepSleepTime;
+        body.lightSleepTime = lastLightSleepTime;
+        body.allSleepTime = lastSleep;
+
+        body.sleepDown = formatDateToISO(lastSleepDown);
+        body.sleepUp = formatDateToISO(lastSleepUp);
+
+        body.adminId = adminId;
+        body.isDeleted = false;
+
+        String url = ApiConfig.API_CHECKUP_RECORD_SAVE;
+        log("准备发送请求到: " + url);
+
+        RequestBody requestBody = RequestBody.create(
+                MediaType.parse("application/json; charset=utf-8"),
+                gson.toJson(body)
+        );
+        Request req = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+
+        log("=== 开始发送HTTP请求 ===");
+        // 使用 FragmentSafetyManager 的安全回调
+        http.newCall(req).enqueue(
+                FragmentSafetyManager.createSafeCallback(
+                        this,
+                        // 成功回调
+                        (responseBody) -> {
+                            log("体检记录上传成功，响应: " + responseBody);
+                            // 体检记录上传成功后，增加积分
+                            addPointsForCheckupWithSafety();
+                        },
+                        // 失败回调 - 上传失败不影响体检完成状态
+                        (errorMessage) -> {
+                            log("体检记录上传失败：" + errorMessage);
+                            // 即使上传失败，也不显示错误给用户，因为体检数据已经完成
+                        }
+                )
+        );
+        log("=== HTTP请求已提交 ===");
+    }
+
+    /**
+     * 体检完成后增加积分（使用 FragmentSafetyManager 安全处理）
+     */
+    private void addPointsForCheckupWithSafety() {
+        log("=== 开始体检积分增加流程 ===");
+
+        int points = UserUtils.getPointForTaskType(requireContext(), Contants.USER_TASK_TYPE_CHECKUP_02);
+        log("体检任务对应积分数: " + points);
+
+        if (points <= 0) {
+            log("没有配置体检任务的积分规则，跳过积分增加");
+            return;
+        }
+
+        if (TextUtils.isEmpty(userId)) {
+            log("用户ID为空，无法增加积分");
+            return;
+        }
+
+        log("开始调用积分API，用户ID: " + userId + "，积分: " + points);
+
+        // 使用 FragmentSafetyManager 安全调用积分API
+        UserUtils.addPointsToUserApi(userId, points,
+                FragmentSafetyManager.createSafeCallback(
+                        this,
+                        // 成功回调
+                        (responseBody) -> {
+                            log("体检积分API响应内容: " + responseBody);
+                            try {
+                                int newTotal = Integer.parseInt(responseBody.trim());
+                                if (newTotal == -1) {
+                                    log("用户账户被锁定或已过期，无法获得体检积分");
+                                } else {
+                                    log("体检积分增加成功: +" + points + "，新的总积分: " + newTotal);
+                                    // 在UI线程中显示积分获得提示
+                                    showPointsEarnedMessage(points);
+                                }
+                            } catch (NumberFormatException e) {
+                                log("解析体检积分响应失败: " + e.getMessage());
+                            }
+                        },
+                        // 失败回调 - 积分失败不影响体检完成状态
+                        (errorMessage) -> {
+                            log("体检积分增加失败: " + errorMessage);
+                            // 积分增加失败不影响体检完成状态，只记录日志
+                        }
+                )
+        );
+    }
+
+    /**
+     * 显示积分获得消息
+     */
+    private void showPointsEarnedMessage(int earnedPoints) {
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            // 用积分消息覆盖"体检完成！"状态显示
+            tvMeasureStatus.setText("体检完成！获得积分 +" + earnedPoints);
+            log("已显示积分获得消息: " + earnedPoints + " 分");
+        });
+    }
+
+    // ===== 体检结果缓存相关 =====
+    private static class CheckupResultData {
+        public int steps;
+        public int heartRate;
+        public int spo2;
+        public int bpHigh;
+        public int bpLow;
+        public float bloodGlucose;
+        public int sleep;
+    }
+
+    private void saveCheckupResultToCache() {
+        if (TextUtils.isEmpty(userId)) {
+            return;
+        }
+
+        try {
+            CheckupResultData resultData = new CheckupResultData();
+            resultData.steps = lastSteps;
+            resultData.heartRate = lastHeart;
+            resultData.spo2 = lastSpo2;
+            resultData.bpHigh = lastBpHigh;
+            resultData.bpLow = lastBpLow;
+            resultData.bloodGlucose = lastBloodGlucose;
+            resultData.sleep = lastSleep;
+
+            String dataJson = gson.toJson(resultData);
+            String conclusion = tvResult.getText().toString();
+            String checkupTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
+
+            UserUtils.saveCheckupResultCache(requireContext(), userId, dataJson, conclusion, checkupTime);
+            log("体检结果已保存到缓存: " + checkupTime);
+        } catch (Exception e) {
+            log("保存体检结果到缓存失败: " + e.getMessage());
+        }
+    }
+
+    private void loadCheckupResultFromCache() {
+        if (TextUtils.isEmpty(userId)) {
+            return;
+        }
+
+        try {
+            String dataJson = UserUtils.getCheckupResultDataJson(requireContext(), userId);
+            String conclusion = UserUtils.getCheckupResultConclusion(requireContext(), userId);
+            String checkupTime = UserUtils.getCheckupResultTime(requireContext(), userId);
+
+            if (dataJson != null && checkupTime != null) {
+                CheckupResultData resultData = gson.fromJson(dataJson, CheckupResultData.class);
+
+                FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+                    tvSteps.setText("步数：" + resultData.steps + " 步");
+                    tvHeart.setText("心率：" + resultData.heartRate + " 次/分");
+                    tvSpo2.setText("血氧：" + resultData.spo2 + "%");
+                    tvBp.setText("血压：" + resultData.bpHigh + "/" + resultData.bpLow + " mmHg");
+                    tvBloodGlucose.setText("血糖：" + resultData.bloodGlucose + " mmol/L");
+                    tvSleep.setText("睡眠时长：" + formatMinutes(resultData.sleep));
+
+                    if (conclusion != null && !conclusion.isEmpty()) {
+                        tvResult.setText(conclusion);
+                        cardResult.setVisibility(View.VISIBLE);
+                    }
+
+                    tvMeasureStatus.setText("上次体检时间：" + checkupTime);
+                    updateCheckupUI(CheckupStatus.FINISHED, "上次体检时间：" + checkupTime);
+                });
+
+                log("已从缓存读取上次体检结果: " + checkupTime);
+            }
+        } catch (Exception e) {
+            log("从缓存读取体检结果失败: " + e.getMessage());
+        }
+    }
+
+    // ========= 辅助方法 =========
     private CheckupStandard findStandard(String itemCode) {
         for (CheckupStandard s : standardList) {
             if (itemCode.equalsIgnoreCase(s.itemCode)) return s;
@@ -801,25 +1006,126 @@ public class SmartwatchCheckupFragment extends Fragment {
     }
 
     private void updateCheckupUI(CheckupStatus status, String msg) {
-        this.checkupStatus = status;
-        switch (status) {
-            case BEFORE:
-                btnSync.setText("开始体检");
-                btnSync.setEnabled(true);
-                tvStatus.setText(TextUtils.isEmpty(msg) ? "请点击开始体检同步数据" : msg);
-                if (cardResult != null) cardResult.setVisibility(View.GONE);
-                break;
-            case IN_PROGRESS:
-                btnSync.setText("正在体检。。");
-                btnSync.setEnabled(false);
-                tvStatus.setText(TextUtils.isEmpty(msg) ? "正在采集数据，请等待…" : msg);
-                if (cardResult != null) cardResult.setVisibility(View.GONE);
-                break;
-            case FINISHED:
-                btnSync.setText("重新体检");
-                btnSync.setEnabled(true);
-                tvStatus.setText(TextUtils.isEmpty(msg) ? "体检完成！" : msg);
-                break;
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            this.checkupStatus = status;
+            switch (status) {
+                case BEFORE:
+                    btnSync.setText("开始体检");
+                    btnSync.setEnabled(true);
+                    tvStatus.setText(TextUtils.isEmpty(msg) ? "请点击开始体检同步数据" : msg);
+                    if (cardResult != null) cardResult.setVisibility(View.GONE);
+                    break;
+                case IN_PROGRESS:
+                    btnSync.setText("正在体检。。");
+                    btnSync.setEnabled(false);
+                    tvStatus.setText(TextUtils.isEmpty(msg) ? "正在采集数据，请等待…" : msg);
+                    if (cardResult != null) cardResult.setVisibility(View.GONE);
+                    break;
+                case FINISHED:
+                    btnSync.setText("重新体检");
+                    btnSync.setEnabled(true);
+                    tvStatus.setText(TextUtils.isEmpty(msg) ? "体检完成！" : msg);
+                    break;
+            }
+        });
+    }
+
+    @SuppressLint("MissingPermission")
+    private void resetAll() {
+        hideAllProgressBars();
+
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            tvSteps.setText("步数：-");
+            tvHeart.setText("心率：-");
+            tvSpo2.setText("血氧：-");
+            tvBp.setText("血压：-");
+            tvBloodGlucose.setText("血糖：-");
+            tvSleep.setText("睡眠：-");
+        });
+
+        lastSteps = lastHeart = lastSpo2 = lastBpHigh = lastBpLow = lastSleep = 0;
+        lastBloodGlucose = 0f;
+        lastSleepQuality = 0;
+        lastWakeCount = 0;
+        lastDeepSleepTime = 0;
+        lastLightSleepTime = 0;
+        lastSleepDown = null;
+        lastSleepUp = null;
+
+        heartRateList.clear();
+        spo2hList.clear();
+        hasRetrieved = false;
+
+        FragmentSafetyManager.safeExecuteOnUI(this, () -> {
+            if (cardResult != null) cardResult.setVisibility(View.GONE);
+        });
+    }
+
+    private void log(String msg) {
+        Log.d("SmartwatchCheckup", msg);
+        System.out.println("SmartwatchCheckup: " + msg);
+    }
+
+    private void safeUi(Runnable r) {
+        if (isAdded()) {
+            uiHandler.post(r);
+        }
+    }
+
+    private String formatMinutes(int min) {
+        int h = min / 60, m = min % 60;
+        return h + "小时" + m + "分";
+    }
+
+    private String todayAt00String() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        return sdf.format(cal.getTime());
+    }
+
+    private String formatDateToISO(Date date) {
+        if (date == null) {
+            return null;
+        }
+
+        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+        String result = isoFormat.format(date);
+        log("日期格式化: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date) + " -> " + result);
+        return result;
+    }
+
+    private Date adjustSleepTime(TimeData timeData, boolean isSleepDown) {
+        try {
+            Calendar cal = Calendar.getInstance();
+            Calendar today = Calendar.getInstance();
+            today.set(Calendar.HOUR_OF_DAY, 0);
+            today.set(Calendar.MINUTE, 0);
+            today.set(Calendar.SECOND, 0);
+            today.set(Calendar.MILLISECOND, 0);
+
+            cal.setTime(today.getTime());
+            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
+            cal.set(Calendar.MINUTE, timeData.getMinute());
+            cal.set(Calendar.SECOND, timeData.getSecond());
+
+            if (isSleepDown && timeData.getHour() < 6) {
+                cal.add(Calendar.DAY_OF_MONTH, -1);
+            } else if (!isSleepDown && timeData.getHour() > 18) {
+                cal.add(Calendar.DAY_OF_MONTH, 1);
+            }
+
+            Date result = cal.getTime();
+            log((isSleepDown ? "入睡" : "起床") + "时间处理: " + timeData.getHour() + ":" + timeData.getMinute() +
+                    " -> " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(result));
+            return result;
+        } catch (Exception e) {
+            log("睡眠时间处理失败: " + e.getMessage());
+            return null;
         }
     }
 
@@ -847,382 +1153,5 @@ public class SmartwatchCheckupFragment extends Fragment {
             targetMac = null;
         }
         hasRetrieved = false;
-    }
-
-    @SuppressLint("MissingPermission")
-    private void resetAll() {
-        hideAllProgressBars();
-        tvSteps.setText("步数：-");
-        tvHeart.setText("心率：-");
-        tvSpo2.setText("血氧：-");
-        tvBp.setText("血压：-");
-        tvBloodGlucose.setText("血糖：-");
-        tvSleep.setText("睡眠：-");
-        lastSteps = lastHeart = lastSpo2 = lastBpHigh = lastBpLow = lastSleep = 0;
-        lastBloodGlucose = 0f;
-
-        // ===== 重置新增的睡眠相关变量 =====
-        lastSleepQuality = 0;
-        lastWakeCount = 0;
-        lastDeepSleepTime = 0;
-        lastLightSleepTime = 0;
-        lastSleepDown = null;
-        lastSleepUp = null;
-
-        heartRateList.clear();
-        spo2hList.clear();
-        hasRetrieved = false;
-        if (cardResult != null) cardResult.setVisibility(View.GONE);
-    }
-
-    // 修改log方法，确保日志能正常输出
-    private void log(String msg) {
-        Log.d("SmartwatchCheckup", msg);
-        System.out.println("SmartwatchCheckup: " + msg);
-    }
-
-    private void safeUi(Runnable r) {
-        uiHandler.post(() -> {
-            if (isAdded()) r.run();
-        });
-    }
-
-    private String formatMinutes(int min) {
-        int h = min / 60, m = min % 60;
-        return h + "小时" + m + "分";
-    }
-
-    // 修改 todayAt00() 方法，返回 yyyy-MM-dd 格式的字符串
-    private String todayAt00String() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-
-        // 返回 yyyy-MM-dd 格式
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        return sdf.format(cal.getTime());
-    }
-
-    // ===== 修改：uploadTodayRecord方法，添加积分功能 =====
-    private void uploadTodayRecord() {
-        log("=== uploadTodayRecord 方法开始执行 ===");
-        log("当前userId: " + userId);
-        log("当前测量数据: steps=" + lastSteps + ", heart=" + lastHeart + ", spo2=" + lastSpo2
-                + ", bpHigh=" + lastBpHigh + ", bpLow=" + lastBpLow + ", glucose=" + lastBloodGlucose
-                + ", sleep=" + lastSleep);
-
-        if (TextUtils.isEmpty(userId)) {
-            log("未登录用户，跳过上传");
-            return;
-        }
-
-        // 确保从UserAccount获取完整信息，包括adminId
-        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
-        if (userAccount == null) {
-            log("获取用户账户信息失败，跳过上传");
-            return;
-        }
-
-        String adminId = userAccount.getAdminId();
-        log("获取到的adminId: " + (adminId != null ? adminId : "null"));
-
-        BackendUserCheckupRecord body = new BackendUserCheckupRecord();
-        body.userId = userId;
-        body.measureDate = todayAt00String();    // 使用 yyyy-MM-dd 格式
-        body.steps = lastSteps;
-        body.heartRate = lastHeart;
-        body.spo2 = lastSpo2;
-        body.lowBloodPressure = lastBpLow;
-        body.highBloodPressure = lastBpHigh;
-
-        // 使用 BigDecimal
-        body.bloodGlucose = new BigDecimal(String.valueOf(lastBloodGlucose));
-
-        // 设置睡眠相关数据
-        body.sleepQuality = lastSleepQuality;
-        body.wakeCount = lastWakeCount;
-        body.deepSleepTime = lastDeepSleepTime;
-        body.lightSleepTime = lastLightSleepTime;
-        body.allSleepTime = lastSleep;
-
-        // 修复：将Date转换为ISO格式字符串
-        body.sleepDown = formatDateToISO(lastSleepDown);
-        body.sleepUp = formatDateToISO(lastSleepUp);
-
-        // 确保正确设置adminId
-        body.adminId = adminId;
-        body.isDeleted = false;
-
-        String url = ApiConfig.API_CHECKUP_RECORD_SAVE;
-        log("准备发送请求到: " + url);
-        log("请求体JSON: " + gson.toJson(body));
-
-        Request req = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(
-                        MediaType.parse("application/json; charset=utf-8"),
-                        gson.toJson(body)
-                ))
-                .build();
-
-        log("=== 开始发送HTTP请求 ===");
-        http.newCall(req).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                log("体检记录上传失败：" + e.getMessage());
-                e.printStackTrace();
-
-                // 即使上传失败，也不显示错误给用户，因为体检数据已经完成
-                safeUi(() -> {
-                    log("体检记录上传失败，但不影响用户体验");
-                });
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                boolean successful = response.isSuccessful();
-                String responseBody = response.body() != null ? response.body().string() : "";
-
-                if (!successful) {
-                    log("体检记录上传失败，code=" + response.code() + ", message=" + response.message() + ", body=" + responseBody);
-                    safeUi(() -> {
-                        log("体检记录上传失败，但不影响用户体验");
-                    });
-                } else {
-                    log("体检记录上传成功，响应: " + responseBody);
-                    // 体检记录上传成功后，增加积分
-                    addPointsForCheckup();
-                }
-            }
-        });
-        log("=== HTTP请求已提交 ===");
-    }
-
-    /**
-     * 体检完成后增加积分
-     */
-    private void addPointsForCheckup() {
-        log("=== 开始体检积分增加流程 ===");
-
-        // 获取体检任务对应的积分数（任务类型"02"）
-        int points = UserUtils.getPointForTaskType(requireContext(), Contants.USER_TASK_TYPE_CHECKUP_02);
-        log("体检任务对应积分数: " + points);
-
-        if (points <= 0) {
-            log("没有配置体检任务的积分规则，跳过积分增加");
-            return;
-        }
-
-        if (TextUtils.isEmpty(userId)) {
-            log("用户ID为空，无法增加积分");
-            return;
-        }
-
-        log("开始调用积分API，用户ID: " + userId + "，积分: " + points);
-
-        // 调用积分API
-        UserUtils.addPointsToUserApi(userId, points, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                log("体检积分增加网络请求失败: " + e.getMessage());
-                e.printStackTrace();
-                // 积分增加失败不影响体检完成状态，只记录日志
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                log("体检积分API响应状态码: " + response.code());
-
-                boolean successful = response.isSuccessful();
-                String responseBody;
-                try {
-                    responseBody = response.body().string();
-                    log("体检积分API响应内容: " + responseBody);
-                } finally {
-                    response.close();
-                }
-
-                if (successful) {
-                    try {
-                        int newTotal = Integer.parseInt(responseBody.trim());
-
-                        if (newTotal == -1) {
-                            log("用户账户被锁定或已过期，无法获得体检积分");
-                        } else {
-                            log("体检积分增加成功: +" + points + "，新的总积分: " + newTotal);
-
-                            // 在UI线程中显示积分获得提示
-                            safeUi(() -> {
-                                showPointsEarnedMessage(points);
-                            });
-                        }
-                    } catch (NumberFormatException e) {
-                        log("解析体检积分响应失败: " + e.getMessage());
-                    }
-                } else if (response.code() == 404) {
-                    log("用户不存在，无法获得体检积分");
-                } else {
-                    log("体检积分增加失败，状态码: " + response.code());
-                }
-            }
-        });
-    }
-
-    /**
-     * 显示积分获得消息
-     */
-    private void showPointsEarnedMessage(int earnedPoints) {
-        if (!isAdded()) {
-            log("Fragment已分离，无法显示积分消息");
-            return;
-        }
-
-        // 用积分消息覆盖"体检完成！"状态显示
-        tvMeasureStatus.setText("体检完成！获得积分 +" + earnedPoints);
-        log("已显示积分获得消息: " + earnedPoints + " 分");
-    }
-
-    // ===== 体检结果缓存相关 =====
-
-    /**
-     * 体检结果数据模型
-     */
-    private static class CheckupResultData {
-        public int steps;
-        public int heartRate;
-        public int spo2;
-        public int bpHigh;
-        public int bpLow;
-        public float bloodGlucose;
-        public int sleep;
-    }
-
-    /**
-     * 保存体检结果到缓存
-     */
-    private void saveCheckupResultToCache() {
-        if (TextUtils.isEmpty(userId)) {
-            return;
-        }
-
-        try {
-            // 构建体检数据
-            CheckupResultData resultData = new CheckupResultData();
-            resultData.steps = lastSteps;
-            resultData.heartRate = lastHeart;
-            resultData.spo2 = lastSpo2;
-            resultData.bpHigh = lastBpHigh;
-            resultData.bpLow = lastBpLow;
-            resultData.bloodGlucose = lastBloodGlucose;
-            resultData.sleep = lastSleep;
-
-            // 转换为JSON
-            String dataJson = gson.toJson(resultData);
-            String conclusion = tvResult.getText().toString();
-            String checkupTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
-
-            // 使用UserUtils保存
-            UserUtils.saveCheckupResultCache(requireContext(), userId, dataJson, conclusion, checkupTime);
-
-            log("体检结果已保存到缓存: " + checkupTime);
-        } catch (Exception e) {
-            log("保存体检结果到缓存失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 从缓存读取并显示上次体检结果
-     */
-    private void loadCheckupResultFromCache() {
-        if (TextUtils.isEmpty(userId)) {
-            return;
-        }
-
-        try {
-            // 使用UserUtils读取缓存
-            String dataJson = UserUtils.getCheckupResultDataJson(requireContext(), userId);
-            String conclusion = UserUtils.getCheckupResultConclusion(requireContext(), userId);
-            String checkupTime = UserUtils.getCheckupResultTime(requireContext(), userId);
-
-            if (dataJson != null && checkupTime != null) {
-                // 解析体检数据
-                CheckupResultData resultData = gson.fromJson(dataJson, CheckupResultData.class);
-
-                // 显示体检数据
-                tvSteps.setText("步数：" + resultData.steps + " 步");
-                tvHeart.setText("心率：" + resultData.heartRate + " 次/分");
-                tvSpo2.setText("血氧：" + resultData.spo2 + "%");
-                tvBp.setText("血压：" + resultData.bpHigh + "/" + resultData.bpLow + " mmHg");
-                tvBloodGlucose.setText("血糖：" + resultData.bloodGlucose + " mmol/L");
-                tvSleep.setText("睡眠时长：" + formatMinutes(resultData.sleep));
-
-                // 显示结论
-                if (conclusion != null && !conclusion.isEmpty()) {
-                    tvResult.setText(conclusion);
-                    cardResult.setVisibility(View.VISIBLE);
-                }
-
-                // 显示上次体检时间
-                tvMeasureStatus.setText("上次体检时间：" + checkupTime);
-
-                // 更新UI状态为已完成
-                updateCheckupUI(CheckupStatus.FINISHED, "上次体检时间：" + checkupTime);
-
-                log("已从缓存读取上次体检结果: " + checkupTime);
-            }
-        } catch (Exception e) {
-            log("从缓存读取体检结果失败: " + e.getMessage());
-        }
-    }
-
-    // 新增：日期格式化为ISO字符串的辅助方法
-    private String formatDateToISO(Date date) {
-        if (date == null) {
-            return null;
-        }
-
-        // 使用本地时区格式化，不转换为UTC
-        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-        String result = isoFormat.format(date);
-        log("日期格式化: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date) + " -> " + result);
-        return result;
-    }
-
-    // 新增：如果需要特定处理睡眠时间跨日问题
-    private Date adjustSleepTime(TimeData timeData, boolean isSleepDown) {
-        try {
-            Calendar cal = Calendar.getInstance();
-
-            // 获取今天的日期
-            Calendar today = Calendar.getInstance();
-            today.set(Calendar.HOUR_OF_DAY, 0);
-            today.set(Calendar.MINUTE, 0);
-            today.set(Calendar.SECOND, 0);
-            today.set(Calendar.MILLISECOND, 0);
-
-            cal.setTime(today.getTime());
-            cal.set(Calendar.HOUR_OF_DAY, timeData.getHour());
-            cal.set(Calendar.MINUTE, timeData.getMinute());
-            cal.set(Calendar.SECOND, timeData.getSecond());
-
-            // 如果是入睡时间且在早上6点之前，认为是昨天晚上
-            if (isSleepDown && timeData.getHour() < 6) {
-                cal.add(Calendar.DAY_OF_MONTH, -1);
-            }
-            // 如果是起床时间且在晚上18点之后，认为是明天早上
-            else if (!isSleepDown && timeData.getHour() > 18) {
-                cal.add(Calendar.DAY_OF_MONTH, 1);
-            }
-
-            Date result = cal.getTime();
-            log((isSleepDown ? "入睡" : "起床") + "时间处理: " + timeData.getHour() + ":" + timeData.getMinute() +
-                    " -> " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(result));
-            return result;
-        } catch (Exception e) {
-            log("睡眠时间处理失败: " + e.getMessage());
-            return null;
-        }
     }
 }

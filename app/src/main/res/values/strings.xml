@@ -88,8 +88,8 @@
     <string name="rehabilitation_training_series">康复训练系列</string>
 
     <!-- 任务相关 -->
-    <string name="daily_tasks">每日任务</string>
-    <string name="user_info">用户信息</string>
+    <string name="daily_tasks">任务区</string>
+    <string name="user_info">功能区</string>
     <string name="task_list">任务列表</string>
 
     <!-- 错误消息 -->
