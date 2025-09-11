@@ -54,7 +54,7 @@ public class BannerActionManager {
             Log.d(TAG, "准备处理ActionType: " + banner.getActionType());
             switch (banner.getActionType()) {
                 case 1: // 网页链接
-                    Log.d(TAG, "处理网页点击");
+                    Log.d(TAG, "处理网页图片链接");
                     handleWebClick(actionData);
                     break;
                 case 2: // App内页面
@@ -62,11 +62,11 @@ public class BannerActionManager {
                     handleInternalClick(actionData);
                     break;
                 case 3: // 外部App
-                    Log.d(TAG, "处理外部App点击");
+                    Log.d(TAG, "处理外部App跳转");
                     handleExternalAppClick(actionData);
                     break;
                 case 4: // 直播
-                    Log.d(TAG, "处理直播点击");
+                    Log.d(TAG, "处理直播间点击");
                     handleLiveClick(actionData);
                     break;
                 case 5: // 下载

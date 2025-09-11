@@ -19,8 +19,6 @@ public class AppBanner {
     @SerializedName("imageUrl")  // 修改：改为驼峰格式
     private String imageUrl;
 
-    @SerializedName("bannerType")  // 修改：改为驼峰格式
-    private int bannerType;
 
     @SerializedName("actionType")  // 修改：改为驼峰格式
     private int actionType;
@@ -105,14 +103,6 @@ public class AppBanner {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
-    }
-
-    public int getBannerType() {
-        return bannerType;
-    }
-
-    public void setBannerType(int bannerType) {
-        this.bannerType = bannerType;
     }
 
     public int getActionType() {
