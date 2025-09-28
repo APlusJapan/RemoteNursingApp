@@ -1,6 +1,8 @@
 package com.aplus.remotenursing;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -17,7 +19,11 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.viewpager2.widget.ViewPager2;
-
+import android.content.Context;
+import android.util.Log;
+import com.aplus.remotenursing.common.InfoPopup;
+import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.adapters.BannerAdapter;
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
 import com.aplus.remotenursing.common.Contants;
@@ -76,6 +82,11 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     private String cachedNoticeContent = null;
     private long noticeLastUpdateTime = 0; // 记录最后更新时间
     private static final long NOTICE_CACHE_DURATION = 1 * 60 * 1000; // 缓存5分钟
+    // 添加设备验证相关常量
+    private static final String PREFS_NAME = "device_info";
+    private static final String KEY_DEVICE_ID = "device_id";
+    private static final String KEY_LAST_LOGIN_PHONE = "last_login_phone";
+    private static final String KEY_DEVICE_ACTIVATED = "device_activated";
 
     @Nullable
     @Override
@@ -1235,4 +1246,152 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
                     .commit();
         }
     }
+    /**
+     * 验证当前设备ID是否与保存的一致
+     * 如果不一致，提示用户重新登录
+     */
+    private void verifyDeviceConsistency() {
+        Log.d(TAG, "开始验证设备一致性");
+
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        if (userAccount == null) {
+            Log.d(TAG, "用户未登录，跳过设备验证");
+            return;
+        }
+
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String savedDeviceId = prefs.getString(KEY_DEVICE_ID, "");
+        boolean deviceActivated = prefs.getBoolean(KEY_DEVICE_ACTIVATED, false);
+        String currentDeviceId = getCurrentDeviceId();
+
+        Log.d(TAG, "设备ID验证 - 保存的设备ID: " + savedDeviceId);
+        Log.d(TAG, "设备ID验证 - 当前设备ID: " + currentDeviceId);
+        Log.d(TAG, "设备ID验证 - 设备已激活: " + deviceActivated);
+
+        // 如果没有保存的设备ID，或者设备未激活，跳过验证
+        if (savedDeviceId.isEmpty() || !deviceActivated) {
+            Log.d(TAG, "设备未激活或无保存的设备ID，跳过验证");
+            return;
+        }
+
+        // 如果设备ID不一致，提示重新登录
+        if (!savedDeviceId.equals(currentDeviceId)) {
+            Log.w(TAG, "设备ID不一致，需要重新登录");
+            showDeviceChangedDialog();
+        } else {
+            Log.d(TAG, "设备ID验证通过");
+        }
+    }
+
+    /**
+     * 显示设备更换提示对话框
+     */
+    private void showDeviceChangedDialog() {
+        if (getActivity() == null || !isAdded()) {
+            return;
+        }
+
+        requireActivity().runOnUiThread(() -> {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("设备安全提醒")
+                    .setMessage("检测到您的设备信息已更改，为了账户安全，请重新登录验证身份。")
+                    .setPositiveButton("立即登录", (dialog, which) -> {
+                        dialog.dismiss();
+                        // 清除本地用户信息和设备激活状态
+                        clearUserDataAndNavigateToLogin();
+                    })
+                    .setNegativeButton("稍后处理", (dialog, which) -> {
+                        dialog.dismiss();
+                        // 用户选择稍后处理，但标记需要重新验证
+                        markDeviceNeedReauth();
+                    })
+                    .setCancelable(false) // 不允许点击外部取消
+                    .show();
+        });
+    }
+
+    /**
+     * 清除用户数据并跳转到登录页面
+     */
+    private void clearUserDataAndNavigateToLogin() {
+        Log.d(TAG, "清除用户数据并跳转登录页面");
+
+        // 清除SharedPreferences中的设备激活数据
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+                .remove(KEY_DEVICE_ID)
+                .remove(KEY_LAST_LOGIN_PHONE)
+                .putBoolean(KEY_DEVICE_ACTIVATED, false)
+                .remove("device_need_reauth")
+                .remove("reauth_remind_time")
+                .apply();
+
+        // 使用UserUtils的logout方法清除所有用户相关数据
+        UserUtils.logout(requireContext());
+
+        Log.d(TAG, "所有用户数据已清除");
+
+        // 跳转到登录页面
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            // 切换到用户信息Tab，通常那里有登录入口
+            mainActivity.switchToTab(R.id.navigation_myInfo);
+
+            // 显示提示信息
+            new Handler().postDelayed(() -> {
+                if (getActivity() != null) {
+                    InfoPopup.showError(requireContext(), "您的设备信息已更改，重新登录以确保账户安全");
+                }
+            }, 500);
+        } else {
+            // 如果不是MainActivity，尝试启动登录Fragment
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new UserLoginFragment())
+                    .addToBackStack(null)
+                    .commit();
+        }
+    }
+
+    /**
+     * 标记设备需要重新认证（用户选择稍后处理时）
+     */
+    private void markDeviceNeedReauth() {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean("device_need_reauth", true)
+                .putLong("reauth_remind_time", System.currentTimeMillis())
+                .apply();
+        Log.d(TAG, "已标记设备需要重新认证");
+    }
+
+    /**
+     * 获取当前设备ID（与UserLoginFragment中的方法保持一致）
+     */
+    private String getCurrentDeviceId() {
+        try {
+            String androidId = android.provider.Settings.Secure.getString(
+                    requireContext().getContentResolver(),
+                    android.provider.Settings.Secure.ANDROID_ID);
+
+            String manufacturer = android.os.Build.MANUFACTURER;
+            String model = android.os.Build.MODEL;
+            String serial = android.os.Build.SERIAL;
+
+            String deviceInfo = manufacturer + "_" + model + "_" + serial;
+
+            if (androidId != null && !androidId.isEmpty() && !"9774d56d682e549c".equals(androidId)) {
+                return androidId + "_" + deviceInfo.hashCode();
+            } else {
+                return String.valueOf(deviceInfo.hashCode());
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "获取设备ID失败: " + e.getMessage());
+            long timestamp = System.currentTimeMillis();
+            int random = (int) (Math.random() * 10000);
+            return "device_" + timestamp + "_" + random;
+        }
+    }
+
 }

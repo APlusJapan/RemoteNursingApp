@@ -5,7 +5,7 @@ package com.aplus.remotenursing.common;
  */
 public class ApiConfig {
     /** Base server address (must end with a slash) */
-    public static final String BASE_URL = "http://192.168.2.25:8080/api/";
+    public static final String BASE_URL = "http://192.168.2.24:8080/api/";
     public static final String ALIYUN_OSS_PRIVACY_URL =  "https://bucket-copd-pr-vedios.oss-cn-hangzhou.aliyuncs.com/privacy/privacy.htm";
 
     public static final String API_VIDEO_TASK_BY_USER = BASE_URL + "video-task/user/";
@@ -39,5 +39,10 @@ public class ApiConfig {
     public static final String API_GET_BANNERS = BASE_URL + "banner/list";
     public static final String API_BANNER_CLICK = BASE_URL + "banner/click";
     public static final String API_BANNER_VIEW = BASE_URL + "banner/view";
+    // 快捷登录API（已激活设备无需激活码）
+    public static final String API_ACCOUNT_QUICK_LOGIN = BASE_URL + "account/quick-login";
+
+    public static final String API_AUTH_OTP_REQUEST = BASE_URL + "account/auth/otp/request";
+    public static final String API_AUTH_OTP_VERIFY  = BASE_URL + "account/auth/otp/verify";
 
 }

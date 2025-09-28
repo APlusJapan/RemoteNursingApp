@@ -72,6 +72,7 @@ public class BannerActionManager {
                 case 5: // 下载
                     Log.d(TAG, "处理下载点击");
                     handleDownloadClick(actionData);
+
                     break;
                 case 6: // 分享
                     Log.d(TAG, "处理分享点击");

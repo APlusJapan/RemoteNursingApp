@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@drawable/bg_dialog_round"
+    android:minHeight="320dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="快捷登录"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#222222"
+        android:layout_gravity="center"
+        android:layout_marginBottom="28dp"/>
+
+    <TextView
+        android:id="@+id/tv_quick_login_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="22sp"
+        android:textColor="#333333"
+        android:gravity="center"
+        android:layout_gravity="center"
+        android:lineSpacingExtra="8dp"
+        android:layout_marginBottom="32dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp"
+        android:minHeight="80dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="16dp"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp">
+
+        <Button
+            android:id="@+id/btn_quick_login_no"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:text="重新登录"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#716868"
+            android:background="@drawable/bg_btn_primary_round"
+            android:layout_marginEnd="2dp"
+            android:minHeight="64dp"/>
+
+        <Button
+            android:id="@+id/btn_quick_login_yes"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:text="直接登录"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/bg_btn_primary_round"
+            android:layout_marginStart="2dp"
+            android:minHeight="64dp"/>
+    </LinearLayout>
+
+</LinearLayout>
