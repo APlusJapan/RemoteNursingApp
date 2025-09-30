@@ -60,4 +60,9 @@
     <!-- 底部导航项目颜色状态 -->
     <color name="bottom_nav_selected">#2196F3</color>
     <color name="bottom_nav_unselected">#80000000</color>
+
+    <!-- 未分组 Chip 颜色 (蛋黄色) -->
+    <!-- 只添加基础颜色,不要添加 selector -->
+    <color name="chip_stroke_not_grouped">#F39C12</color>
+    <color name="chip_bg_not_grouped_checked">#FFF8E1</color>
 </resources>

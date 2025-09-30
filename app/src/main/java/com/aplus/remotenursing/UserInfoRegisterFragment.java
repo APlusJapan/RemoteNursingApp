@@ -1,6 +1,7 @@
 package com.aplus.remotenursing;
 
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
@@ -22,6 +23,7 @@ import com.google.gson.Gson;
 import com.google.android.material.datepicker.MaterialDatePicker;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -39,9 +41,11 @@ public class UserInfoRegisterFragment extends Fragment {
     private TextView tvGender, tvBirth, tvMarital, tvEducation, tvLiving, tvJob, tvIncome, tvInsurance;
     private final Gson gson = new Gson();
     private MaterialDatePicker<Long> birthdayPicker;
+    private DatePickerDialog datePickerDialog; // 添加传统DatePicker作为备选
     private AlertDialog progressDialog;
     private TextView loadingTextView;
-    private boolean isRequesting = false; // 防止请求期间页面被pop
+    private boolean isRequesting = false;
+    private boolean isDatePickerShowing = false; // 防止重复打开
 
     @Nullable
     @Override
@@ -55,12 +59,62 @@ public class UserInfoRegisterFragment extends Fragment {
                     .setTitleText("请选择生日")
                     .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
                     .build();
+
             birthdayPicker.addOnPositiveButtonClickListener(selection -> {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                 String dateStr = sdf.format(new Date((Long) selection));
                 tvBirth.setText(dateStr);
+                tvBirth.setTextColor(getResources().getColor(android.R.color.black)); // 设置选中后的颜色
+                isDatePickerShowing = false;
+                Log.d("DatePicker", "日期选择完成: " + dateStr);
+            });
+
+            birthdayPicker.addOnNegativeButtonClickListener(selection -> {
+                isDatePickerShowing = false;
+                Log.d("DatePicker", "取消日期选择");
+            });
+
+            birthdayPicker.addOnCancelListener(dialog -> {
+                isDatePickerShowing = false;
+                Log.d("DatePicker", "日期选择器取消");
+            });
+
+            birthdayPicker.addOnDismissListener(dialog -> {
+                isDatePickerShowing = false;
+                Log.d("DatePicker", "日期选择器关闭");
             });
         }
+    }
+
+    // 初始化传统DatePicker作为备选方案
+    private void initTraditionalDatePicker() {
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+        datePickerDialog = new DatePickerDialog(
+                requireContext(),
+                (view, selectedYear, selectedMonth, selectedDay) -> {
+                    String dateStr = String.format(Locale.getDefault(), "%04d-%02d-%02d",
+                            selectedYear, selectedMonth + 1, selectedDay);
+                    tvBirth.setText(dateStr);
+                    tvBirth.setTextColor(getResources().getColor(android.R.color.black));
+                    isDatePickerShowing = false;
+                    Log.d("DatePicker", "传统日期选择完成: " + dateStr);
+                },
+                year, month, day
+        );
+
+        datePickerDialog.setOnCancelListener(dialog -> {
+            isDatePickerShowing = false;
+            Log.d("DatePicker", "传统日期选择器取消");
+        });
+
+        datePickerDialog.setOnDismissListener(dialog -> {
+            isDatePickerShowing = false;
+            Log.d("DatePicker", "传统日期选择器关闭");
+        });
     }
 
     @Override
@@ -92,6 +146,29 @@ public class UserInfoRegisterFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         isRequesting = false;
+        isDatePickerShowing = false;
+
+        // 清理MaterialDatePicker
+        if (birthdayPicker != null && birthdayPicker.isVisible()) {
+            try {
+                birthdayPicker.dismiss();
+            } catch (Exception e) {
+                Log.w("DatePicker", "MaterialDatePicker dismiss error: " + e.getMessage());
+            }
+        }
+        birthdayPicker = null;
+
+        // 清理传统DatePicker
+        if (datePickerDialog != null && datePickerDialog.isShowing()) {
+            try {
+                datePickerDialog.dismiss();
+            } catch (Exception e) {
+                Log.w("DatePicker", "DatePickerDialog dismiss error: " + e.getMessage());
+            }
+        }
+        datePickerDialog = null;
+
+        // 清理ProgressDialog
         if (progressDialog != null && progressDialog.isShowing()) {
             progressDialog.dismiss();
         }
@@ -107,13 +184,30 @@ public class UserInfoRegisterFragment extends Fragment {
         tvIncome.setOnClickListener(v -> showSingle(tvIncome, R.array.income_options));
         tvInsurance.setOnClickListener(v -> showSingle(tvInsurance, R.array.insurance_options));
         tvLiving.setOnClickListener(v -> showMulti(tvLiving, R.array.living_options));
-        tvBirth.setOnClickListener(v -> showDate(tvBirth));
+
+        // 优化生日选择的点击监听
+        tvBirth.setOnClickListener(v -> {
+            Log.d("DatePicker", "生日TextView被点击");
+            showDateOptimized();
+        });
+
+        // 为整个生日行添加点击监听，增加点击区域
+        View llBirth = getView().findViewById(R.id.ll_birth);
+        if (llBirth != null) {
+            llBirth.setOnClickListener(v -> {
+                Log.d("DatePicker", "生日行被点击");
+                showDateOptimized();
+            });
+        }
     }
 
     private void showSingle(TextView target, int arrayRes) {
         String[] items = getResources().getStringArray(arrayRes);
         new AlertDialog.Builder(getActivitySafe())
-                .setItems(items, (d, which) -> target.setText(items[which]))
+                .setItems(items, (d, which) -> {
+                    target.setText(items[which]);
+                    target.setTextColor(getResources().getColor(android.R.color.black));
+                })
                 .show();
     }
 
@@ -131,13 +225,55 @@ public class UserInfoRegisterFragment extends Fragment {
                         }
                     }
                     target.setText(sb.toString());
+                    target.setTextColor(getResources().getColor(android.R.color.black));
                 })
                 .show();
     }
 
+    // 优化的日期选择方法
+    private void showDateOptimized() {
+        // 防止重复打开
+        if (isDatePickerShowing) {
+            Log.d("DatePicker", "日期选择器已在显示，忽略重复点击");
+            return;
+        }
+
+        isDatePickerShowing = true;
+        Log.d("DatePicker", "开始显示日期选择器");
+
+        // 优先使用MaterialDatePicker，如果失败则使用传统DatePicker
+        try {
+            initBirthdayPicker();
+            if (birthdayPicker != null && !birthdayPicker.isAdded()) {
+                birthdayPicker.show(getParentFragmentManager(), "MATERIAL_DATE_PICKER");
+                Log.d("DatePicker", "MaterialDatePicker显示成功");
+            } else {
+                Log.w("DatePicker", "MaterialDatePicker已添加或为null，使用传统方式");
+                showTraditionalDatePicker();
+            }
+        } catch (Exception e) {
+            Log.e("DatePicker", "MaterialDatePicker显示失败: " + e.getMessage());
+            showTraditionalDatePicker();
+        }
+    }
+
+    // 显示传统DatePicker
+    private void showTraditionalDatePicker() {
+        try {
+            initTraditionalDatePicker();
+            if (datePickerDialog != null) {
+                datePickerDialog.show();
+                Log.d("DatePicker", "传统DatePicker显示成功");
+            }
+        } catch (Exception e) {
+            Log.e("DatePicker", "传统DatePicker显示失败: " + e.getMessage());
+            isDatePickerShowing = false;
+            showErrorSafe("日期选择器打开失败，请重试");
+        }
+    }
+
     private void showDate(TextView target) {
-        initBirthdayPicker();
-        birthdayPicker.show(getParentFragmentManager(), "MATERIAL_DATE_PICKER");
+        showDateOptimized();
     }
 
     private void showLoading(String text) {
@@ -155,6 +291,7 @@ public class UserInfoRegisterFragment extends Fragment {
         }
         progressDialog.show();
     }
+
     private void hideLoading() {
         isRequesting = false;
         if (progressDialog != null && progressDialog.isShowing()) {

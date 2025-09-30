@@ -12,6 +12,7 @@ public class ApiConfig {
     public static final String API_VIDEO_DETAIL_BY_SERIES_ID = BASE_URL + "video-detail/series/";
     public static final String API_USER_TASK = BASE_URL + "usertask";
     public static final String API_USER_INFO = BASE_URL + "userinfo/";       // requires userId after slash
+    public static final String API_USERINFO_SEARCH_BY_PARAM = BASE_URL + "userinfo/searchByParam/";
     public static final String API_UPDATE_USER_INFO = BASE_URL + "updateUserinfo/"; // requires userId after slash
     public static final String API_CREATE_USER_INFO = BASE_URL + "createUserinfo";
     public static final String API_ACCOUNT_REGISTER = BASE_URL + "account/register";
@@ -44,5 +45,8 @@ public class ApiConfig {
 
     public static final String API_AUTH_OTP_REQUEST = BASE_URL + "account/auth/otp/request";
     public static final String API_AUTH_OTP_VERIFY  = BASE_URL + "account/auth/otp/verify";
+    public static final String API_PROJECT  = BASE_URL + "project-team-master/project/admin/";
+
+    public static final String API_PROJECT_TEAM  = BASE_URL + "project-team-master/project/team/";
 
 }

@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.aplus.remotenursing.common.Contants;
 import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.R;
 import com.aplus.remotenursing.UserLoginFragment;
@@ -15,8 +17,8 @@ public class LoginCheckerManager {
     // 静态方法，传入fragment和回调
     public static boolean checkLogin(Fragment fragment) {
         Context context = fragment.requireContext();
-        SharedPreferences sp = context.getSharedPreferences("user_account", Context.MODE_PRIVATE);
-        String userJson = sp.getString("data", null);
+        SharedPreferences sp = context.getSharedPreferences(Contants.LOCAL_FILE_NAME, Context.MODE_PRIVATE);
+        String userJson = sp.getString(Contants.LOCAL_FILE_JSON_KEY, null);
         boolean isLoggedIn = userJson != null && !userJson.isEmpty();
         if (!isLoggedIn) {
             InfoPopup.showError(context, "请先登录");

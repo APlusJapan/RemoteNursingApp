@@ -23,6 +23,7 @@ import android.content.Context;
 import android.util.Log;
 import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.manager.LoginCheckerManager;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.adapters.BannerAdapter;
 import com.aplus.remotenursing.adapters.UserTaskAdapter;
@@ -100,7 +101,11 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "=== onViewCreated 开始 ===");
-
+        // **首先检查登录状态**
+        if (!LoginCheckerManager.checkLogin(this)) {
+            Log.d(TAG, "用户未登录,已跳转登录页面");
+            return; // 未登录则直接返回,不继续初始化
+        }
         // 每次都重新初始化所有组件
         initViews(view);
         forceSetupRecyclerView(); // 强制重新设置RecyclerView
@@ -592,8 +597,8 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
         UserAccount userAccount = UserUtils.getUserAccount(requireContext());
 
-        String projectId = "PJT1001";
-        String teamId = "T001";
+        String projectId = userAccount.getProjectId();
+        String teamId = userAccount.getTeamId();
 
         if (userAccount != null) {
             if (userAccount.getProjectId() != null && !userAccount.getProjectId().isEmpty()) {
@@ -723,9 +728,9 @@ public class UserTaskFragment extends Fragment implements UserTaskAdapter.OnTask
 
         Log.d(TAG, "开始设置Banner ViewPager，Banner数量: " + banners.size());
 
-        BannerActionManager actionManager = new BannerActionManager(requireContext());
+        BannerActionManager actionManager = new BannerActionManager(getContext());
 
-        BannerAdapter adapter = BannerAdapter.createWithBanners(requireContext(), banners);
+        BannerAdapter adapter = BannerAdapter.createWithBanners(getContext(), banners);
         currentBannerAdapter = adapter;
 
         adapter.setOnBannerClickListener(new BannerAdapter.OnBannerClickListener() {

@@ -1,7 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    // 如果你用了 Kotlin，也要加：
-    // alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -24,9 +22,17 @@ android {
                     'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // 这是正确的配置，保留这个
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 }
 
@@ -47,7 +53,7 @@ dependencies {
     implementation files('libs/vpbluetooth-1.14.aar')
     implementation files('libs/vpprotocol-2.3.08.15.aar')
 
-    // JiaoZiVideoPlayer 主库 + Exo 插件（记得版本号要配对）
+    // JiaoZiVideoPlayer 主库 + Exo 插件
     implementation "cn.jzvd:jiaozivideoplayer:7.4.2"
     implementation "com.google.android.exoplayer:exoplayer:2.18.5"
     implementation 'com.google.android.exoplayer:exoplayer-ui:2.18.5'
@@ -63,6 +69,12 @@ dependencies {
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
+    // Retrofit 网络库
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
 
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit

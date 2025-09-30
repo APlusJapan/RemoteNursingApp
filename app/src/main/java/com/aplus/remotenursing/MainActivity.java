@@ -102,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
 
         navMyinfo.setOnClickListener(v -> {
             if (currentSelectedTab != 1) {
-                showFragment(new MyInfoFragment());
+                showFragment(new AppManageFragment());
                 updateNavSelection(1);
                 currentSelectedTab = 1;
             }
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
             currentSelectedTab = 0;
         } else if (tabIndex == 1 && currentSelectedTab != 1) {
             // 切换到个人信息页面
-            showFragment(new MyInfoFragment());
+            showFragment(new AppManageFragment());
             updateNavSelection(1);
             currentSelectedTab = 1;
         }
