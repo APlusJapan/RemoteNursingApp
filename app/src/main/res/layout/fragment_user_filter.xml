@@ -95,6 +95,8 @@
                             app:chipStrokeWidth="2dp"
                             app:checkedIconVisible="false" />
 
+
+
                     </com.google.android.material.chip.ChipGroup>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>

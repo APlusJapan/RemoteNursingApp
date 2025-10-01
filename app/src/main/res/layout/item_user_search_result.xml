@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:card_view="http://schemas.android.com/apk/res-auto"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     card_view:cardUseCompatPadding="true"
@@ -11,33 +12,174 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/tv_name_gender"
+        <!-- 第1行：姓名/性别 + 状态 -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <!-- 姓名 / 性别 -->
+            <TextView
+                android:id="@+id/tv_name_gender"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/chip_status"
+                android:layout_marginEnd="8dp"
+                android:text="姓名 / 性别"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="#2C3E50"
+                android:textIsSelectable="true" />
+
+            <!-- 激活状态 Chip -->
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="已激活"
+                android:textSize="15sp"
+                android:checkable="false"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                app:chipMinHeight="26dp"
+                app:chipBackgroundColor="@color/chip_background_activated"
+                app:chipStrokeColor="#27AE60"
+                app:chipStrokeWidth="2dp"
+                app:checkedIconVisible="false" />
+
+        </RelativeLayout>
+
+        <!-- 第2行：电话 + 复制按钮 + 录入日期 -->
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="姓名 / 性别"
-            android:textStyle="bold"
-            android:textSize="16sp" />
+            android:layout_marginTop="-4dp">
 
-        <TextView
-            android:id="@+id/tv_phone"
+            <!-- 左侧：电话图标 + 电话号码 -->
+            <LinearLayout
+                android:id="@+id/ll_phone_left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/tv_login_date"
+                android:layout_marginEnd="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_phone_24"
+                    app:tint="#3498DB"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/tv_phone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="18642638292"
+                    android:textSize="15sp"
+                    android:textColor="#2C3E50"
+                    android:textIsSelectable="true" />
+
+                <!-- 复制按钮 -->
+                <ImageView
+                    android:id="@+id/btn_copy_phone"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_copy_24"
+                    android:padding="6dp"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#3498DB"
+                    android:contentDescription="复制电话" />
+
+            </LinearLayout>
+
+            <!-- 右侧：录入日期 -->
+            <TextView
+                android:id="@+id/tv_login_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="录入: 2025-01-01"
+                android:textSize="13sp"
+                android:textColor="#7F8C8D"
+                android:textIsSelectable="true" />
+
+        </RelativeLayout>
+
+        <!-- 分隔线 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="6dp"
+            android:background="#E0E0E0" />
+
+        <!-- 课题（始终显示） -->
+        <LinearLayout
+            android:id="@+id/ll_project"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="电话" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tv_login_status"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="课题: "
+                android:textSize="15sp"
+                android:textColor="#7F8C8D" />
+
+            <TextView
+                android:id="@+id/tv_project"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textSize="15sp"
+                android:textColor="#2C3E50"
+                android:textIsSelectable="true" />
+
+        </LinearLayout>
+
+        <!-- 分组（始终显示） -->
+        <LinearLayout
+            android:id="@+id/ll_team"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="登录状态" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
 
-        <TextView
-            android:id="@+id/tv_project_team"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="课题 / 分组" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="分组: "
+                android:textSize="15sp"
+                android:textColor="#7F8C8D" />
+
+            <TextView
+                android:id="@+id/tv_team"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textSize="15sp"
+                android:textColor="#2C3E50"
+                android:textIsSelectable="true" />
+
+        </LinearLayout>
 
         <!-- 操作区 -->
         <LinearLayout
@@ -45,7 +187,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
 
             <Button
                 android:id="@+id/btn_action1"

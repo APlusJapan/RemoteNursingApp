@@ -1,99 +1,169 @@
 package com.aplus.remotenursing.adapters;
 
-import android.util.Log;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.aplus.remotenursing.R;
 import com.aplus.remotenursing.models.UserInfoAccount;
+import com.google.android.material.chip.Chip;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.VH> {
-    private static final String TAG = "UserSearchAdapter";
+public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.ViewHolder> {
+
+    private List<UserInfoAccount> dataList = new ArrayList<>();
+    private OnActionListener listener;
 
     public interface OnActionListener {
         void onAction1(UserInfoAccount item, int position);
         void onAction2(UserInfoAccount item, int position);
     }
 
-    private final List<UserInfoAccount> data = new ArrayList<>();
-    private OnActionListener listener;
-
-    public void setOnActionListener(OnActionListener l) {
-        this.listener = l;
+    public void setOnActionListener(OnActionListener listener) {
+        this.listener = listener;
     }
 
     public void setData(List<UserInfoAccount> list) {
-        Log.d(TAG, "========== setData 被调用 ==========");
-        Log.d(TAG, "当前data大小: " + data.size());
-        Log.d(TAG, "新list大小: " + (list != null ? list.size() : "null"));
-
-        data.clear();
-        if (list != null) {
-            data.addAll(list);
-            Log.d(TAG, "数据已添加到data,新data大小: " + data.size());
-        }
-
+        this.dataList = list != null ? list : new ArrayList<>();
         notifyDataSetChanged();
-        Log.d(TAG, "notifyDataSetChanged已调用");
-        Log.d(TAG, "========================================");
     }
 
-    @NonNull @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext())
+    @NonNull
+    @Override
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_user_search_result, parent, false);
-        return new VH(v);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull VH h, int pos) {
-        UserInfoAccount it = data.get(pos);
-        Log.d(TAG, "绑定第" + pos + "项: " + it.userName + " - " + it.loginStatus);
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        UserInfoAccount user = dataList.get(position);
+        Context context = holder.itemView.getContext();
 
-        h.tvNameGender.setText(safe(it.userName) + " / " + safe(it.gender));
-        h.tvPhone.setText("电话：" + safe(it.phone));
-        h.tvLoginStatus.setText("登录状态：" + safe(it.loginStatus));
-        h.tvProjectTeam.setText("课题/分组：" + safe(it.projectName) + " / " + safe(it.teamName));
+        // 姓名 / 性别
+        String nameGender = (user.userName != null ? user.userName : "未命名") +
+                " / " +
+                (user.gender != null ? user.gender : "未知");
+        holder.tvNameGender.setText(nameGender);
 
-        h.btn1.setOnClickListener(v -> {
-            if (listener != null) listener.onAction1(it, pos);
+        // 激活状态 Chip
+        if ("已激活".equals(user.loginStatus)) {
+            holder.chipStatus.setText("已激活");
+            holder.chipStatus.setChipBackgroundColorResource(R.color.chip_background_activated);
+            holder.chipStatus.setChipStrokeColorResource(R.color.chip_text_color_activated);
+            holder.chipStatus.setTextColor(context.getResources()
+                    .getColor(R.color.chip_text_color_activated));
+        } else {
+            holder.chipStatus.setText("未激活");
+            holder.chipStatus.setChipBackgroundColorResource(R.color.chip_background_not_activated);
+            holder.chipStatus.setChipStrokeColorResource(R.color.chip_text_color_not_activated);
+            holder.chipStatus.setTextColor(context.getResources()
+                    .getColor(R.color.chip_text_color_not_activated));
+        }
+
+        // 录入日期
+        String loginDateText = "录入: 未知";
+        if (user.createdTime != null && !TextUtils.isEmpty(user.createdTime.toString())) {
+            try {
+                String dateTimeStr = user.createdTime.toString();
+                if (dateTimeStr.length() >= 10) {
+                    String dateStr = dateTimeStr.substring(0, 10);
+                    loginDateText = "录入: " + dateStr;
+                }
+            } catch (Exception e) {
+                loginDateText = "录入: 格式错误";
+            }
+        }
+        holder.tvLoginDate.setText(loginDateText);
+
+        // 电话
+        holder.tvPhone.setText(user.phone != null ? user.phone : "未填写");
+
+        // 课题 - 始终显示，为空时显示 "-"
+        holder.llProject.setVisibility(View.VISIBLE);
+        if (!TextUtils.isEmpty(user.projectName)) {
+            holder.tvProject.setText(user.projectName);
+        } else {
+            holder.tvProject.setText("-");
+        }
+
+        // 分组 - 始终显示，为空时显示 "-"
+        holder.llTeam.setVisibility(View.VISIBLE);
+        if (!TextUtils.isEmpty(user.teamName)) {
+            holder.tvTeam.setText(user.teamName);
+        } else {
+            holder.tvTeam.setText("-");
+        }
+
+        // 复制电话按钮
+        holder.btnCopyPhone.setOnClickListener(v -> {
+            if (user.phone != null && !TextUtils.isEmpty(user.phone)) {
+                copyToClipboard(context, user.phone);
+                Toast.makeText(context, "已复制: " + user.phone, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(context, "无电话号码可复制", Toast.LENGTH_SHORT).show();
+            }
         });
-        h.btn2.setOnClickListener(v -> {
-            if (listener != null) listener.onAction2(it, pos);
-        });
+
+        // 操作按钮（需要时显示）
+        if (listener != null) {
+            holder.opArea.setVisibility(View.VISIBLE);
+            holder.btnAction1.setOnClickListener(v -> listener.onAction1(user, position));
+            holder.btnAction2.setOnClickListener(v -> listener.onAction2(user, position));
+        } else {
+            holder.opArea.setVisibility(View.GONE);
+        }
     }
 
     @Override
     public int getItemCount() {
-        int count = data.size();
-        Log.d(TAG, "getItemCount() 返回: " + count);
-        return count;
+        return dataList.size();
     }
 
-    static class VH extends RecyclerView.ViewHolder {
-        TextView tvNameGender, tvPhone, tvLoginStatus, tvProjectTeam;
-        Button btn1, btn2;
-        VH(@NonNull View itemView) {
-            super(itemView);
-            tvNameGender = itemView.findViewById(R.id.tv_name_gender);
-            tvPhone = itemView.findViewById(R.id.tv_phone);
-            tvLoginStatus = itemView.findViewById(R.id.tv_login_status);
-            tvProjectTeam = itemView.findViewById(R.id.tv_project_team);
-            btn1 = itemView.findViewById(R.id.btn_action1);
-            btn2 = itemView.findViewById(R.id.btn_action2);
+    private void copyToClipboard(Context context, String text) {
+        ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("phone", text);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(clip);
         }
     }
 
-    private static String safe(String s) {
-        return s == null ? "" : s;
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView tvNameGender, tvPhone, tvProject, tvTeam, tvLoginDate;
+        Chip chipStatus;
+        ImageView btnCopyPhone;
+        LinearLayout llProject, llTeam, opArea;
+        Button btnAction1, btnAction2;
+
+        ViewHolder(@NonNull View itemView) {
+            super(itemView);
+            tvNameGender = itemView.findViewById(R.id.tv_name_gender);
+            tvPhone = itemView.findViewById(R.id.tv_phone);
+            tvProject = itemView.findViewById(R.id.tv_project);
+            tvTeam = itemView.findViewById(R.id.tv_team);
+            tvLoginDate = itemView.findViewById(R.id.tv_login_date);
+            chipStatus = itemView.findViewById(R.id.chip_status);
+            btnCopyPhone = itemView.findViewById(R.id.btn_copy_phone);
+            llProject = itemView.findViewById(R.id.ll_project);
+            llTeam = itemView.findViewById(R.id.ll_team);
+            opArea = itemView.findViewById(R.id.op_area);
+            btnAction1 = itemView.findViewById(R.id.btn_action1);
+            btnAction2 = itemView.findViewById(R.id.btn_action2);
+        }
     }
 }

@@ -248,19 +248,17 @@ public class UserFilterFragment extends Fragment {
         // 快速筛选Chip监听
         chipGroupQuickFilter.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == View.NO_ID) {
-                spinnerLoginStatus.setSelection(0);
+                return;
             } else if (checkedId == R.id.chip_activated) {
-                spinnerLoginStatus.setSelection(1);
-                applyQuickFilter("已激活");
+                applyQuickFilter("已激活", null);
             } else if (checkedId == R.id.chip_not_activated) {
-                spinnerLoginStatus.setSelection(2);
-                applyQuickFilter("未激活");
+                applyQuickFilter("未激活", null);
             }
         });
     }
 
-    private void applyQuickFilter(String loginStatus) {
-        // ===== 输入验证 =====
+    private void applyQuickFilter(String loginStatus, String teamId) {
+        // 输入验证
         String username = getText(etUsername);
         if (!TextUtils.isEmpty(username) && username.length() > 6) {
             InfoPopup.showError(requireContext(), "姓名不能超过6个字");
@@ -290,7 +288,6 @@ public class UserFilterFragment extends Fragment {
             InfoPopup.showError(requireContext(), "开始日期不能大于结束日期");
             return;
         }
-        // ====================
 
         UserSearchFragment.FilterCondition filter = new UserSearchFragment.FilterCondition();
 
@@ -306,7 +303,16 @@ public class UserFilterFragment extends Fragment {
             filter.teamName = selectedTeam.getTeamName();
         }
 
-        filter.loginStatus = loginStatus;
+        // 设置快速筛选条件
+        if (loginStatus != null) {
+            filter.loginStatus = loginStatus;
+        }
+
+        if ("NOT_GROUPED".equals(teamId)) {  // 新增:未分组
+            filter.teamId = "NOT_GROUPED";
+            filter.teamName = "未分组";
+        }
+
         filter.username = TextUtils.isEmpty(username) ? null : username;
         filter.phone = TextUtils.isEmpty(phone) ? null : phone;
 

@@ -239,6 +239,10 @@ public class UserSearchFragment extends Fragment {
                 } else {
                     currentFilter.projectId = null;
                     currentFilter.projectName = null;
+                    if (!"NOT_GROUPED".equals(currentFilter.teamId)) {
+                        currentFilter.teamId = null;
+                        currentFilter.teamName = null;
+                    }
                     currentFilter.teamId = null;
                     currentFilter.teamName = null;
                     teamList.clear();
@@ -269,8 +273,10 @@ public class UserSearchFragment extends Fragment {
                     currentFilter.teamId = selectedTeam.getTeamId();
                     currentFilter.teamName = selectedTeam.getTeamName();
                 } else {
-                    currentFilter.teamId = null;
-                    currentFilter.teamName = null;
+                    if (!"NOT_GROUPED".equals(currentFilter.teamId)) {
+                        currentFilter.teamId = null;
+                        currentFilter.teamName = null;
+                    }
                 }
 
                 if (currentFilter.projectId != null) {
@@ -450,9 +456,15 @@ public class UserSearchFragment extends Fragment {
 
             // 团队筛选
             if (!TextUtils.isEmpty(currentFilter.teamId)) {
-                matchTeam = currentFilter.teamName != null &&
-                        user.teamName != null &&
-                        user.teamName.equals(currentFilter.teamName);
+                if ("NOT_GROUPED".equals(currentFilter.teamId)) {
+                    // 未分组:teamName为null或空
+                    matchTeam = TextUtils.isEmpty(user.teamName);
+                } else {
+                    // 正常分组筛选
+                    matchTeam = currentFilter.teamName != null &&
+                            user.teamName != null &&
+                            user.teamName.equals(currentFilter.teamName);
+                }
             }
 
             // 姓名筛选
@@ -564,6 +576,14 @@ public class UserSearchFragment extends Fragment {
         Log.d(TAG, "========== 同步筛选条件到Spinner ==========");
 
         isUpdatingSpinners = true;
+
+        // ===== 特殊处理:未分组 =====
+        if ("NOT_GROUPED".equals(currentFilter.teamId)) {
+            // 未分组不需要同步Spinner,直接更新标签
+            isUpdatingSpinners = false;
+            updateFilterTags();
+            return;
+        }
 
         // 同步课题
         if (!TextUtils.isEmpty(currentFilter.projectId)) {
