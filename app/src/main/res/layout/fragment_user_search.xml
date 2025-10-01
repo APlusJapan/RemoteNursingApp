@@ -30,7 +30,7 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <!-- 标题行 -->
+                    <!-- 标题行：用户管理 + 新增用户 -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -47,16 +47,17 @@
                             android:textStyle="bold"
                             android:textColor="#2C3E50" />
 
+                        <!-- 新增用户按钮 -->
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_filter"
+                            android:id="@+id/btn_add_user"
                             android:layout_width="wrap_content"
                             android:layout_height="48dp"
-                            android:text="筛选"
+                            android:text="新增用户"
                             android:textSize="14sp"
                             android:textColor="@android:color/white"
-                            app:backgroundTint="#3498DB"
+                            app:backgroundTint="#27AE60"
                             app:cornerRadius="20dp"
-                            app:icon="@drawable/ic_filter_24"
+                            app:icon="@drawable/ic_add_24"
                             app:iconTint="@android:color/white"
                             app:iconSize="22dp"
                             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
@@ -122,7 +123,42 @@
 
                     </LinearLayout>
 
-                    <!-- 新增：筛选条件标签显示区域 -->
+                    <!-- 筛选按钮（右对齐，宽度为分组框的一半） -->
+                    <!-- 筛选按钮（右对齐，宽度为分组框宽度） -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="hor
+                        izontal"
+                        android:weightSum="3">
+
+                        <!-- 左侧占位 -->
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="2" />
+
+                        <!-- 右侧筛选按钮，占一半宽度 -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_filter"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="8dp"
+                            android:text="筛选"
+                            android:textSize="14sp"
+                            android:textColor="@android:color/white"
+                            app:backgroundTint="#3498DB"
+                            app:cornerRadius="8dp"
+                            app:icon="@drawable/ic_filter_24"
+                            app:iconTint="@android:color/white"
+                            app:iconSize="22dp"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                    </LinearLayout>
+
+                    <!-- 筛选条件标签显示区域 -->
                     <LinearLayout
                         android:id="@+id/ll_filter_tags"
                         android:layout_width="match_parent"
@@ -139,7 +175,6 @@
                             android:textColor="#7F8C8D"
                             android:layout_marginBottom="6dp" />
 
-                        <!-- 使用FlowLayout显示筛选标签 -->
                         <com.google.android.material.chip.ChipGroup
                             android:id="@+id/chip_group_filters"
                             android:layout_width="match_parent"

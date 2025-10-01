@@ -63,7 +63,7 @@ public class UserSearchFragment extends Fragment {
     }
 
     private Spinner spinnerProject, spinnerTeam;
-    private MaterialButton btnFilter;
+    private MaterialButton btnFilter, btnAddUser;
     private RecyclerView rv;
     private View emptyView;
     private TextView tvResultCount;
@@ -149,6 +149,7 @@ public class UserSearchFragment extends Fragment {
         spinnerProject = v.findViewById(R.id.spinner_project);
         spinnerTeam = v.findViewById(R.id.spinner_team);
         btnFilter = v.findViewById(R.id.btn_filter);
+        btnAddUser = v.findViewById(R.id.btn_add_user);
         rv = v.findViewById(R.id.rv_users);
         emptyView = v.findViewById(R.id.empty_view);
         tvResultCount = v.findViewById(R.id.tv_result_count);
@@ -293,6 +294,7 @@ public class UserSearchFragment extends Fragment {
 
     private void setupClickListeners() {
         btnFilter.setOnClickListener(v -> openFilterFragment());
+        btnAddUser.setOnClickListener(v -> openAddUserFragment());
     }
 
     private void loadInitialData() {
@@ -570,7 +572,23 @@ public class UserSearchFragment extends Fragment {
                     .commit();
         }
     }
+    private void openAddUserFragment() {
+        UserInfoRegisterFragment registerFragment = new UserInfoRegisterFragment();
 
+        if (getActivity() != null) {
+            getActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .setCustomAnimations(
+                            R.anim.slide_in_right,
+                            R.anim.slide_out_left,
+                            R.anim.slide_in_left,
+                            R.anim.slide_out_right
+                    )
+                    .replace(R.id.fragment_container, registerFragment)
+                    .addToBackStack(null)
+                    .commit();
+        }
+    }
     // ========== 核心方法:将筛选条件同步到Spinner ==========
     private void syncFilterToSpinners() {
         Log.d(TAG, "========== 同步筛选条件到Spinner ==========");
