@@ -593,13 +593,6 @@ public class UserInfoRegisterFragment extends Fragment {
             showErrorSafe("姓名不能大于5个字");
             return false;
         }
-        if (TextUtils.isEmpty(selectedProvince) ||
-                TextUtils.isEmpty(selectedCity) ||
-                TextUtils.isEmpty(selectedDistrict)) {
-            showErrorSafe("请选择所属城市");
-            return false;
-        }
-
         if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
             showErrorSafe("请填写手机号");
             return false;
@@ -608,6 +601,13 @@ public class UserInfoRegisterFragment extends Fragment {
             showErrorSafe("手机号必须为11位");
             return false;
         }
+        if (TextUtils.isEmpty(selectedProvince) ||
+                TextUtils.isEmpty(selectedCity) ||
+                TextUtils.isEmpty(selectedDistrict)) {
+            showErrorSafe("请选择所属城市");
+            return false;
+        }
+
         String gender = tvGender.getText().toString();
         if (TextUtils.isEmpty(gender) || gender.equals("请选择")) {
             showErrorSafe("请选择性别");

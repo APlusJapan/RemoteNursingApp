@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -23,6 +24,7 @@ import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.InfoPopup;
 import com.aplus.remotenursing.common.UserUtils;
 import com.aplus.remotenursing.helper.ApiClientHelper;
+import com.aplus.remotenursing.models.PageResult;
 import com.aplus.remotenursing.models.UserAccount;
 import com.aplus.remotenursing.models.UserInfoAccount;
 import com.aplus.remotenursing.models.Project;
@@ -68,8 +70,18 @@ public class UserSearchFragment extends Fragment {
     private LinearLayout llFilterTags;
     private ChipGroup chipGroupFilters;
     private CircularProgressIndicator progressLoading;
-    private SwipeRefreshLayout swipeRefresh; // 新增
+    private SwipeRefreshLayout swipeRefresh;
     private UserSearchAdapter adapter;
+
+    // 分页相关控件 - 顶部
+    private LinearLayout llPaginationTop;
+    private TextView tvPageInfoTop;
+    private Button btnPrevTop, btnNextTop;
+
+    // 分页相关控件 - 底部
+    private LinearLayout llPaginationBottom;
+    private TextView tvPageInfoBottom;
+    private Button btnPrevBottom, btnNextBottom;
 
     private String currentAdminId;
     private List<Project> projectList = new ArrayList<>();
@@ -84,6 +96,12 @@ public class UserSearchFragment extends Fragment {
     private FilterCondition currentFilter = new FilterCondition();
 
     private boolean isUpdatingSpinners = false;
+
+    // 分页参数
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalCount = 0;
+    private int totalPages = 0;
 
     @Override
     public void onCreate(@Nullable Bundle s) {
@@ -110,7 +128,8 @@ public class UserSearchFragment extends Fragment {
         setupRecyclerView();
         setupSpinners();
         setupClickListeners();
-        setupSwipeRefresh(); // 新增
+        setupSwipeRefresh();
+        setupPagination();
 
         if (allUserList.isEmpty()) {
             Log.d(TAG, "首次创建,加载初始数据");
@@ -124,34 +143,35 @@ public class UserSearchFragment extends Fragment {
             }
 
             if (currentFilter.projectId != null || currentFilter.teamId != null) {
-                Log.d(TAG, "恢复Spinner状态: projectId=" + currentFilter.projectId + ", teamId=" + currentFilter.teamId);
-
+                Log.d(TAG, "恢复Spinner状态");
                 spinnerProject.postDelayed(() -> {
                     if (projectList.size() > 1) {
                         syncFilterToSpinners();
-                    } else {
-                        Log.e(TAG, "projectList仍然为空,无法恢复Spinner");
                     }
                 }, 200);
             }
 
-            doLocalFilter();
+            loadUsersByAdmin();
         }
     }
 
-    // ===== 新增:在onResume时刷新数据 =====
     @Override
     public void onResume() {
         super.onResume();
-        // 从其他页面返回时重新加载数据
         if (!allUserList.isEmpty()) {
             Log.d(TAG, "onResume: 刷新数据");
             refreshData();
         }
     }
-    // ====================================
 
     private void initViews(View v) {
+        v.findViewById(R.id.btn_back).setOnClickListener(view -> {
+            if (getActivity() != null) {
+                getActivity().getSupportFragmentManager().popBackStack();
+            }
+        });
+        spinnerProject = v.findViewById(R.id.spinner_project);
+        spinnerTeam = v.findViewById(R.id.spinner_team);
         spinnerProject = v.findViewById(R.id.spinner_project);
         spinnerTeam = v.findViewById(R.id.spinner_team);
         btnFilter = v.findViewById(R.id.btn_filter);
@@ -162,10 +182,21 @@ public class UserSearchFragment extends Fragment {
         llFilterTags = v.findViewById(R.id.ll_filter_tags);
         chipGroupFilters = v.findViewById(R.id.chip_group_filters);
         progressLoading = v.findViewById(R.id.progress_loading);
-        swipeRefresh = v.findViewById(R.id.swipe_refresh); // 新增
+        swipeRefresh = v.findViewById(R.id.swipe_refresh);
+
+        // 分页控件 - 顶部
+        llPaginationTop = v.findViewById(R.id.ll_pagination_top);
+        tvPageInfoTop = v.findViewById(R.id.tv_page_info_top);
+        btnPrevTop = v.findViewById(R.id.btn_prev_top);
+        btnNextTop = v.findViewById(R.id.btn_next_top);
+
+        // 分页控件 - 底部
+        llPaginationBottom = v.findViewById(R.id.ll_pagination_bottom);
+        tvPageInfoBottom = v.findViewById(R.id.tv_page_info_bottom);
+        btnPrevBottom = v.findViewById(R.id.btn_prev_bottom);
+        btnNextBottom = v.findViewById(R.id.btn_next_bottom);
     }
 
-    // ===== 新增:配置下拉刷新 =====
     private void setupSwipeRefresh() {
         swipeRefresh.setColorSchemeResources(
                 R.color.colorPrimary,
@@ -178,21 +209,71 @@ public class UserSearchFragment extends Fragment {
             refreshData();
         });
     }
-    // ===============================
 
-    // ===== 新增:刷新数据方法 =====
+    private void setupPagination() {
+        // 顶部分页按钮
+        btnPrevTop.setOnClickListener(v -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadUsersByAdmin();
+                rv.smoothScrollToPosition(0); // 滚动到顶部
+            }
+        });
+
+        btnNextTop.setOnClickListener(v -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadUsersByAdmin();
+                rv.smoothScrollToPosition(0);
+            }
+        });
+
+        // 底部分页按钮
+        btnPrevBottom.setOnClickListener(v -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadUsersByAdmin();
+                rv.smoothScrollToPosition(0);
+            }
+        });
+
+        btnNextBottom.setOnClickListener(v -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadUsersByAdmin();
+                rv.smoothScrollToPosition(0);
+            }
+        });
+    }
+
+    private void updatePaginationUI() {
+        totalPages = (int) Math.ceil((double) totalCount / pageSize);
+
+        String pageInfo = "第 " + currentPage + " / " + totalPages + " 页";
+        tvPageInfoTop.setText(pageInfo);
+        tvPageInfoBottom.setText(pageInfo);
+
+        // 更新按钮状态
+        btnPrevTop.setEnabled(currentPage > 1);
+        btnNextTop.setEnabled(currentPage < totalPages);
+        btnPrevBottom.setEnabled(currentPage > 1);
+        btnNextBottom.setEnabled(currentPage < totalPages);
+
+        // 显示/隐藏分页控件
+        boolean showPagination = totalCount > 0;
+        llPaginationTop.setVisibility(showPagination ? View.VISIBLE : View.GONE);
+        llPaginationBottom.setVisibility(showPagination ? View.VISIBLE : View.GONE);
+    }
+
     private void refreshData() {
-        Log.d(TAG, "refreshData: 根据当前筛选条件重新加载数据");
-
-        // 重新加载用户数据
+        Log.d(TAG, "refreshData: 重新加载数据");
+        currentPage = 1; // 重置到第一页
         loadUsersByAdmin();
 
-        // 如果下拉刷新触发的,停止刷新动画
         if (swipeRefresh.isRefreshing()) {
             swipeRefresh.postDelayed(() -> swipeRefresh.setRefreshing(false), 1000);
         }
     }
-    // ===============================
 
     private void setupRecyclerView() {
         adapter = new UserSearchAdapter();
@@ -256,8 +337,8 @@ public class UserSearchFragment extends Fragment {
                             showLoading(false);
                             if (success) {
                                 InfoPopup.showSuccess(requireContext(), "删除成功");
-                                allUserList.remove(user);
-                                doLocalFilter();
+                                // 删除后重新加载当前页
+                                loadUsersByAdmin();
                             } else {
                                 InfoPopup.showError(requireContext(), "删除失败");
                             }
@@ -283,18 +364,11 @@ public class UserSearchFragment extends Fragment {
         args.putString("userId", userId);
 
         if (user != null) {
-            for (Project p : projectList) {
-                if (p.getProjectName().equals(user.getProjectName())) {
-                    args.putString("projectId", p.getProjectId());
-                    break;
-                }
+            if (!TextUtils.isEmpty(user.projectId)) {
+                args.putString("projectId", user.projectId);
             }
-
-            for (Team t : teamList) {
-                if (t.getTeamName().equals(user.getTeamName())) {
-                    args.putString("teamId", t.getTeamId());
-                    break;
-                }
+            if (!TextUtils.isEmpty(user.teamId)) {
+                args.putString("teamId", user.teamId);
             }
         }
 
@@ -362,10 +436,7 @@ public class UserSearchFragment extends Fragment {
         spinnerProject.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (isUpdatingSpinners) {
-                    Log.d(TAG, "spinnerProject跳过(正在更新)");
-                    return;
-                }
+                if (isUpdatingSpinners) return;
 
                 if (position > 0) {
                     Project selectedProject = projectList.get(position);
@@ -375,10 +446,6 @@ public class UserSearchFragment extends Fragment {
                 } else {
                     currentFilter.projectId = null;
                     currentFilter.projectName = null;
-                    if (!"NOT_GROUPED".equals(currentFilter.teamId)) {
-                        currentFilter.teamId = null;
-                        currentFilter.teamName = null;
-                    }
                     currentFilter.teamId = null;
                     currentFilter.teamName = null;
                     teamList.clear();
@@ -387,21 +454,18 @@ public class UserSearchFragment extends Fragment {
                     spinnerTeam.setSelection(0);
                 }
                 updateFilterTags();
-                doLocalFilter();
+                currentPage = 1; // 重置到第一页
+                loadUsersByAdmin();
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
 
         spinnerTeam.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (isUpdatingSpinners) {
-                    Log.d(TAG, "spinnerTeam跳过(正在更新)");
-                    return;
-                }
+                if (isUpdatingSpinners) return;
 
                 if (teamList.size() > position && position > 0) {
                     Team selectedTeam = teamList.get(position);
@@ -416,13 +480,13 @@ public class UserSearchFragment extends Fragment {
 
                 if (currentFilter.projectId != null) {
                     updateFilterTags();
-                    doLocalFilter();
+                    currentPage = 1; // 重置到第一页
+                    loadUsersByAdmin();
                 }
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 
@@ -458,8 +522,7 @@ public class UserSearchFragment extends Fragment {
 
                         try {
                             String resp = response.body().string();
-                            Type listType = new TypeToken<List<Project>>() {
-                            }.getType();
+                            Type listType = new TypeToken<List<Project>>() {}.getType();
                             List<Project> projects = gson.fromJson(resp, listType);
 
                             runUiSafe(() -> {
@@ -498,8 +561,7 @@ public class UserSearchFragment extends Fragment {
 
                         try {
                             String resp = response.body().string();
-                            Type listType = new TypeToken<List<Team>>() {
-                            }.getType();
+                            Type listType = new TypeToken<List<Team>>() {}.getType();
                             List<Team> teams = gson.fromJson(resp, listType);
 
                             runUiSafe(() -> {
@@ -520,7 +582,10 @@ public class UserSearchFragment extends Fragment {
     }
 
     private void loadUsersByAdmin() {
-        String url = ApiConfig.API_USERINFO_SEARCH_BY_PARAM + currentAdminId;
+        String url = ApiConfig.API_USERINFO_SEARCH_BY_PARAM + currentAdminId
+                + "?pageNum=" + currentPage + "&pageSize=" + pageSize;
+
+        Log.d(TAG, "加载用户数据, URL: " + url);
 
         client.newCall(new Request.Builder().url(url).get().build())
                 .enqueue(new Callback() {
@@ -542,16 +607,22 @@ public class UserSearchFragment extends Fragment {
 
                         try {
                             String resp = response.body().string();
-                            Type listType = new TypeToken<List<UserInfoAccount>>() {
-                            }.getType();
-                            List<UserInfoAccount> users = gson.fromJson(resp, listType);
+                            Log.d(TAG, "分页响应: " + resp);
+
+                            Type pageType = new TypeToken<PageResult<UserInfoAccount>>() {}.getType();
+                            PageResult<UserInfoAccount> pageResult = gson.fromJson(resp, pageType);
 
                             runUiSafe(() -> {
                                 showLoading(false);
                                 allUserList.clear();
-                                if (users != null) {
-                                    allUserList.addAll(users);
+                                if (pageResult != null && pageResult.getData() != null) {
+                                    allUserList.addAll(pageResult.getData());
+                                    totalCount = pageResult.getTotal();
+                                } else {
+                                    totalCount = 0;
                                 }
+
+                                updatePaginationUI();
                                 doLocalFilter();
                             });
                         } catch (Exception e) {
@@ -570,7 +641,6 @@ public class UserSearchFragment extends Fragment {
 
     private void doLocalFilter() {
         Log.d(TAG, "========== 开始筛选 ==========");
-        Log.d(TAG, "筛选条件: projectId=" + currentFilter.projectId + ", teamId=" + currentFilter.teamId);
 
         List<UserInfoAccount> filteredList = new ArrayList<>();
 
@@ -623,14 +693,9 @@ public class UserSearchFragment extends Fragment {
                 matchDate = false;
                 if (user.createdTime != null) {
                     try {
-                        String userDateStr = null;
                         String dateTimeStr = user.createdTime.toString();
-
                         if (dateTimeStr.length() >= 10) {
-                            userDateStr = dateTimeStr.substring(0, 10);
-                        }
-
-                        if (userDateStr != null) {
+                            String userDateStr = dateTimeStr.substring(0, 10);
                             boolean afterStart = true;
                             boolean beforeEnd = true;
 
@@ -642,10 +707,6 @@ public class UserSearchFragment extends Fragment {
                             }
 
                             matchDate = afterStart && beforeEnd;
-
-                            Log.d(TAG, "用户 " + user.userName + " 日期: " + userDateStr +
-                                    ", 范围: " + currentFilter.dateStart + "~" + currentFilter.dateEnd +
-                                    ", 匹配: " + matchDate);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "日期比较失败: " + e.getMessage());
@@ -670,7 +731,8 @@ public class UserSearchFragment extends Fragment {
             Log.d(TAG, "========== 接收筛选结果 ==========");
             currentFilter = filter;
             syncFilterToSpinners();
-            doLocalFilter();
+            currentPage = 1; // 重置到第一页
+            loadUsersByAdmin();
         });
 
         if (getActivity() != null) {
@@ -707,8 +769,6 @@ public class UserSearchFragment extends Fragment {
     }
 
     private void syncFilterToSpinners() {
-        Log.d(TAG, "========== 同步筛选条件到Spinner ==========");
-
         isUpdatingSpinners = true;
 
         if ("NOT_GROUPED".equals(currentFilter.teamId)) {
@@ -720,7 +780,6 @@ public class UserSearchFragment extends Fragment {
         if (!TextUtils.isEmpty(currentFilter.projectId)) {
             for (int i = 0; i < projectList.size(); i++) {
                 if (projectList.get(i).getProjectId().equals(currentFilter.projectId)) {
-                    Log.d(TAG, "设置课题position: " + i);
                     spinnerProject.setSelection(i);
 
                     if (!TextUtils.isEmpty(currentFilter.teamId)) {
@@ -756,8 +815,7 @@ public class UserSearchFragment extends Fragment {
 
                         try {
                             String resp = response.body().string();
-                            Type listType = new TypeToken<List<Team>>() {
-                            }.getType();
+                            Type listType = new TypeToken<List<Team>>() {}.getType();
                             List<Team> teams = gson.fromJson(resp, listType);
 
                             runUiSafe(() -> {
@@ -771,14 +829,10 @@ public class UserSearchFragment extends Fragment {
                                 for (int i = 0; i < teamList.size(); i++) {
                                     if (teamList.get(i).getTeamId().equals(teamId)) {
                                         final int position = i;
-                                        Log.d(TAG, "设置团队position: " + position);
-
                                         spinnerTeam.post(() -> {
                                             spinnerTeam.setSelection(position);
-
                                             spinnerTeam.postDelayed(() -> {
                                                 isUpdatingSpinners = false;
-                                                Log.d(TAG, "Spinner状态同步完成");
                                                 updateFilterTags();
                                             }, 100);
                                         });
@@ -895,13 +949,13 @@ public class UserSearchFragment extends Fragment {
         spinnerProject.postDelayed(() -> isUpdatingSpinners = false, 100);
 
         updateFilterTags();
-        doLocalFilter();
+        currentPage = 1; // 重置到第一页
+        loadUsersByAdmin();
     }
 
     private void updateResultUI(List<UserInfoAccount> list) {
         if (adapter != null) {
             adapter.setData(new ArrayList<>());
-
             rv.postDelayed(() -> {
                 adapter.setData(list);
                 rv.invalidate();
@@ -922,7 +976,8 @@ public class UserSearchFragment extends Fragment {
 
     private void updateResultCount(int count) {
         if (tvResultCount != null) {
-            tvResultCount.setText(count + " 条");
+            String countText = "用户数:" + totalCount + "  当前页:" + count;
+            tvResultCount.setText(countText);
         }
     }
 

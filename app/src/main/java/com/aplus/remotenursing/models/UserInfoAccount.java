@@ -8,8 +8,26 @@ public class UserInfoAccount {
     public String createdTime;
     public String lastLoginTime;
     public String loginStatus;
+    public String projectId;      // 新增
     public String projectName;
+    public String teamId;          // 新增
     public String teamName;
+
+    // 无参构造函数
+    public UserInfoAccount() {}
+
+    // 全参构造函数
+    public UserInfoAccount(String userId, String userName, String gender, String phone,
+                           String createdTime, String loginStatus, String projectName, String teamName) {
+        this.userId = userId;
+        this.userName = userName;
+        this.gender = gender;
+        this.phone = phone;
+        this.createdTime = createdTime;
+        this.loginStatus = loginStatus;
+        this.projectName = projectName;
+        this.teamName = teamName;
+    }
 
     // Getter 方法
     public String getUserId() {
@@ -40,8 +58,16 @@ public class UserInfoAccount {
         return loginStatus;
     }
 
+    public String getProjectId() {
+        return projectId;
+    }
+
     public String getProjectName() {
         return projectName;
+    }
+
+    public String getTeamId() {
+        return teamId;
     }
 
     public String getTeamName() {
@@ -77,8 +103,16 @@ public class UserInfoAccount {
         this.loginStatus = loginStatus;
     }
 
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
+    }
+
     public void setProjectName(String projectName) {
         this.projectName = projectName;
+    }
+
+    public void setTeamId(String teamId) {
+        this.teamId = teamId;
     }
 
     public void setTeamName(String teamName) {
