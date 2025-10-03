@@ -75,6 +75,12 @@ public class UserInfoRegisterFragment extends Fragment {
     private OkHttpClient client = ApiClientHelper.get();
     private boolean isLoadingSpinners = false;
 
+    // 新增:是否为查看详情模式
+    private boolean isViewMode = false;
+
+    // 新增:保存原始姓名,用于重置时恢复
+    private String originalUserName = "";
+
     // 城市信息
     private String selectedProvince = "";
     private String selectedCity = "";
@@ -113,9 +119,11 @@ public class UserInfoRegisterFragment extends Fragment {
 
         if (currentUserId != null && !currentUserId.isEmpty()) {
             Log.d(TAG, "查看详情模式");
+            isViewMode = true;  // 设置为查看模式
             fetchUserInfoById(currentUserId);
         } else {
             Log.d(TAG, "新增用户模式");
+            isViewMode = false;  // 设置为新增模式
         }
     }
 
@@ -142,6 +150,85 @@ public class UserInfoRegisterFragment extends Fragment {
         spinnerTeam = view.findViewById(R.id.spinner_team);
 
         view.findViewById(R.id.btn_save).setOnClickListener(v -> saveInfo());
+
+        view.findViewById(R.id.btn_reset).setOnClickListener(v -> {
+            if (isRequesting) {
+                showErrorSafe("操作进行中，请稍候");
+                return;
+            }
+            showResetConfirmDialog();
+        });
+    }
+
+    private void showResetConfirmDialog() {
+        new AlertDialog.Builder(getActivitySafe())
+                .setTitle("确认重置")
+                .setMessage("确定要重置所有内容吗？")
+                .setPositiveButton("确定", (dialog, which) -> resetForm())
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void resetForm() {
+        Log.d(TAG, "重置表单,isViewMode: " + isViewMode);
+
+        // 只有在新增模式下才清空姓名
+        if (!isViewMode) {
+            etName.setText("");
+        } else {
+            // 查看模式下恢复原始姓名
+            etName.setText(originalUserName);
+        }
+
+        // 清空手机号
+        etPhone.setText("");
+
+        // 重置所有TextView为默认状态
+        resetTextView(tvGender, "请选择");
+        resetTextView(tvBirth, "请选择");
+        resetTextView(tvMarital, "请选择");
+        resetTextView(tvEducation, "请选择");
+        resetTextView(tvLiving, "请选择");
+        resetTextView(tvJob, "请选择");
+        resetTextView(tvIncome, "请选择");
+        resetTextView(tvInsurance, "请选择");
+        resetTextView(tvCity, "请选择");
+
+        // 重置城市信息
+        selectedProvince = "";
+        selectedCity = "";
+        selectedDistrict = "";
+
+        // 重置Spinner到初始状态
+        isLoadingSpinners = true;
+
+        // 如果有默认课题,选择默认课题
+        boolean hasDefaultProject = false;
+        for (int i = 0; i < projectList.size(); i++) {
+            if (projectList.get(i).getDefaultFlg()) {
+                spinnerProject.setSelection(i);
+                loadTeamsAndSelect(projectList.get(i).getProjectId(), null);
+                hasDefaultProject = true;
+                break;
+            }
+        }
+
+        // 如果没有默认课题,重置为"请选择课题"
+        if (!hasDefaultProject) {
+            spinnerProject.setSelection(0);
+            teamList.clear();
+            teamList.add(new Team("", "请先选择课题"));
+            teamAdapter.notifyDataSetChanged();
+            spinnerTeam.setSelection(0);
+            isLoadingSpinners = false;
+        }
+
+        InfoPopup.showSuccess(getActivitySafe(), "已重置");
+    }
+
+    private void resetTextView(TextView textView, String defaultText) {
+        textView.setText(defaultText);
+        textView.setTextColor(getResources().getColor(android.R.color.darker_gray));
     }
 
     private void setupSpinners() {
@@ -487,7 +574,6 @@ public class UserInfoRegisterFragment extends Fragment {
     }
 
     private boolean checkInput(UserInfo info) {
-
         int projectPosition = spinnerProject.getSelectedItemPosition();
         int teamPosition = spinnerTeam.getSelectedItemPosition();
 
@@ -499,13 +585,6 @@ public class UserInfoRegisterFragment extends Fragment {
             showErrorSafe("请选择分组");
             return false;
         }
-        // 检查所属城市
-        if (TextUtils.isEmpty(selectedProvince) ||
-                TextUtils.isEmpty(selectedCity) ||
-                TextUtils.isEmpty(selectedDistrict)) {
-            showErrorSafe("请选择所属城市");
-            return false;
-        }
         if (info.getUserName() == null || info.getUserName().trim().isEmpty()) {
             showErrorSafe("请填写姓名");
             return false;
@@ -514,11 +593,13 @@ public class UserInfoRegisterFragment extends Fragment {
             showErrorSafe("姓名不能大于5个字");
             return false;
         }
-        if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
-            showErrorSafe("请填写手机号");
+        if (TextUtils.isEmpty(selectedProvince) ||
+                TextUtils.isEmpty(selectedCity) ||
+                TextUtils.isEmpty(selectedDistrict)) {
+            showErrorSafe("请选择所属城市");
             return false;
         }
-        // 检查手机号
+
         if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
             showErrorSafe("请填写手机号");
             return false;
@@ -543,7 +624,8 @@ public class UserInfoRegisterFragment extends Fragment {
     private void fetchUserInfoById(String userId) {
         showLoading("正在加载用户信息...");
         String url = ApiConfig.API_USER_INFO + userId;
-        Log.d(TAG, "加载用户信息, URL: " + url);
+        Log.d(TAG, "===== 开始加载用户信息 =====");
+        Log.d(TAG, "URL: " + url);
 
         client.newCall(new Request.Builder().url(url).get().build())
                 .enqueue(new Callback() {
@@ -566,13 +648,29 @@ public class UserInfoRegisterFragment extends Fragment {
                         try {
                             if (response.isSuccessful()) {
                                 String resp = response.body().string();
-                                Log.d(TAG, "API响应: " + resp);
+                                Log.d(TAG, "===== API原始响应 =====");
+                                Log.d(TAG, resp);
+
                                 UserInfo info = gson.fromJson(resp, UserInfo.class);
+
+                                Log.d(TAG, "===== 解析后的对象 =====");
+                                Log.d(TAG, "userId: " + info.getUserId());
+                                Log.d(TAG, "userName: " + info.getUserName());
+                                Log.d(TAG, "projectId: " + info.getProjectId());
+                                Log.d(TAG, "teamId: " + info.getTeamId());
 
                                 runUiSafe(() -> {
                                     hideLoading();
                                     if (info != null && info.getUserId() != null) {
+                                        passedProjectId = info.getProjectId();
+                                        passedTeamId = info.getTeamId();
+
+                                        Log.d(TAG, "更新 passedProjectId: " + passedProjectId);
+                                        Log.d(TAG, "更新 passedTeamId: " + passedTeamId);
+
                                         fillUserInfo(info);
+                                        selectProjectAndTeam();
+
                                         Log.d(TAG, "成功填充用户信息");
                                     } else {
                                         showErrorSafe("未找到用户信息");
@@ -591,11 +689,57 @@ public class UserInfoRegisterFragment extends Fragment {
                 });
     }
 
+    private void selectProjectAndTeam() {
+        Log.d(TAG, "===== 开始选择课题和分组 =====");
+        Log.d(TAG, "projectList size: " + projectList.size());
+        Log.d(TAG, "passedProjectId: " + passedProjectId);
+        Log.d(TAG, "passedTeamId: " + passedTeamId);
+
+        if (TextUtils.isEmpty(passedProjectId)) {
+            Log.d(TAG, "passedProjectId 为空,跳过选择");
+            return;
+        }
+
+        isLoadingSpinners = true;
+
+        for (int i = 0; i < projectList.size(); i++) {
+            if (projectList.get(i).getProjectId().equals(passedProjectId)) {
+                Log.d(TAG, "找到匹配的课题,position: " + i);
+                final int position = i;
+
+                spinnerProject.post(() -> {
+                    spinnerProject.setSelection(position);
+                    Log.d(TAG, "已设置课题 Spinner position: " + position);
+
+                    if (!TextUtils.isEmpty(passedTeamId)) {
+                        loadTeamsAndSelect(passedProjectId, passedTeamId);
+                    } else {
+                        loadTeamsByProject(passedProjectId);
+                        isLoadingSpinners = false;
+                    }
+                });
+                return;
+            }
+        }
+
+        Log.d(TAG, "未找到匹配的课题");
+        isLoadingSpinners = false;
+    }
+
     private void fillUserInfo(UserInfo info) {
-        Log.d(TAG, "[DEBUG] 填充用户信息");
+        Log.d(TAG, "[DEBUG] 填充用户信息, isViewMode: " + isViewMode);
 
         etName.setText(info.getUserName());
         etPhone.setText(info.getPhone());
+
+        // 如果是查看详情模式,保存原始姓名并禁用编辑
+        if (isViewMode) {
+            originalUserName = info.getUserName() != null ? info.getUserName() : "";
+            etName.setEnabled(false);
+            etName.setTextColor(getResources().getColor(android.R.color.darker_gray));
+            etName.setBackgroundColor(getResources().getColor(android.R.color.transparent));
+            Log.d(TAG, "查看模式: 姓名设为只读,保存原始姓名: " + originalUserName);
+        }
 
         if (!TextUtils.isEmpty(info.getGender())) {
             tvGender.setText(info.getGender());
@@ -630,7 +774,6 @@ public class UserInfoRegisterFragment extends Fragment {
             tvInsurance.setTextColor(getResources().getColor(R.color.colorPrimary));
         }
 
-        // 填充城市信息
         if (!TextUtils.isEmpty(info.getProvince()) &&
                 !TextUtils.isEmpty(info.getCity()) &&
                 !TextUtils.isEmpty(info.getDistrict())) {
@@ -650,41 +793,32 @@ public class UserInfoRegisterFragment extends Fragment {
         info.setUserName(etName.getText().toString().trim());
         info.setPhone(etPhone.getText().toString().trim());
 
-        // 处理性别 - 过滤"请选择"
         String gender = tvGender.getText().toString().trim();
         info.setGender(gender.equals("请选择") ? null : gender);
 
-        // 处理生日 - 过滤"请选择"
         String birth = tvBirth.getText().toString().trim();
         info.setBirthDate(birth.equals("请选择") ? null : birth);
 
-        // 处理婚姻状况 - 过滤"请选择"
         String marital = tvMarital.getText().toString().trim();
         info.setMaritalStatus(marital.equals("请选择") ? null : marital);
 
-        // 处理受教育水平 - 过滤"请选择"
         String education = tvEducation.getText().toString().trim();
         info.setEducationLevel(education.equals("请选择") ? null : education);
 
-        // 处理居住情况 - 过滤"请选择"
         String living = tvLiving.getText().toString().trim();
         info.setLivingStatus(living.equals("请选择") ? null : living);
 
-        // 处理职业状态 - 过滤"请选择"
         String job = tvJob.getText().toString().trim();
         info.setJobStatus(job.equals("请选择") ? null : job);
 
-        // 处理家庭月收入 - 过滤"请选择"
         String income = tvIncome.getText().toString().trim();
         info.setIncomePerCapita(income.equals("请选择") ? null : income);
 
-        // 处理保险类型 - 过滤"请选择"
         String insurance = tvInsurance.getText().toString().trim();
         info.setInsuranceType(insurance.equals("请选择") ? null : insurance);
 
         info.setAdminId(currentAdminId);
 
-        // 保存城市信息 - 只有全部选择了才保存,否则设为null
         if (!TextUtils.isEmpty(selectedProvince) &&
                 !TextUtils.isEmpty(selectedCity) &&
                 !TextUtils.isEmpty(selectedDistrict) &&

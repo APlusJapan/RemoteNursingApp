@@ -188,7 +188,27 @@
                             android:textColor="#2C3E50" />
 
                     </LinearLayout>
+                    <!-- 姓名 -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="姓名 *"
+                            android:maxLength="5"
+                            android:inputType="textPersonName" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
                     <!-- 所属城市 -->
                     <LinearLayout
                         android:id="@+id/ll_city"
@@ -219,27 +239,7 @@
                             android:drawablePadding="8dp" />
                     </LinearLayout>
 
-                    <!-- 姓名 -->
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        app:boxBackgroundMode="outline"
-                        app:boxCornerRadiusTopStart="8dp"
-                        app:boxCornerRadiusTopEnd="8dp"
-                        app:boxCornerRadiusBottomStart="8dp"
-                        app:boxCornerRadiusBottomEnd="8dp"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_name"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:hint="姓名 *"
-                            android:maxLength="5"
-                            android:inputType="textPersonName" />
-
-                    </com.google.android.material.textfield.TextInputLayout>
 
                     <!-- 手机号 -->
                     <com.google.android.material.textfield.TextInputLayout
@@ -518,17 +518,44 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- 保存按钮 -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_save"
+    <!-- 底部按钮区域 -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="保存"
-        android:textSize="16sp"
-        android:textColor="@android:color/white"
-        app:backgroundTint="#3498DB"
-        app:cornerRadius="8dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:layout_margin="16dp"
-        style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+        android:gravity="center">
+
+        <!-- 重置按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_reset"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="重置"
+            android:textSize="16sp"
+            android:textColor="#E74C3C"
+            app:backgroundTint="@android:color/white"
+            app:strokeColor="#E74C3C"
+            app:strokeWidth="2dp"
+            app:cornerRadius="8dp"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        <!-- 保存按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_save"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="保存"
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            app:backgroundTint="#3498DB"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="8dp"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+    </LinearLayout>
 
 </LinearLayout>
