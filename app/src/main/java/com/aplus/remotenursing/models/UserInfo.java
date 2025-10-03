@@ -36,9 +36,31 @@ public class UserInfo {
     @SerializedName(value = "insuranceType", alternate = {"insurance_type"})
     private String insuranceType;
 
+    @SerializedName(value = "projectId", alternate = {"project_id"})
+    private String projectId;
+    // 新增：课题和分组字段
+    @SerializedName("adminId")
+    private String adminId;
+
+    @SerializedName(value = "projectName", alternate = {"project_name"})
+    private String projectName;
+
+    @SerializedName(value = "teamId", alternate = {"team_id"})
+    private String teamId;
+
+    @SerializedName(value = "teamName", alternate = {"team_name"})
+    private String teamName;
+    @SerializedName("province")
+    private String province;
+
+    @SerializedName("city")
+    private String city;
+
+    @SerializedName("district")
+    private String district;
     public UserInfo() {}
 
-    // ---- Getter & Setter (全部用驼峰风格，和字段保持一致) ----
+    // ---- Getter & Setter ----
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
 
@@ -71,4 +93,27 @@ public class UserInfo {
 
     public String getInsuranceType() { return insuranceType; }
     public void setInsuranceType(String insuranceType) { this.insuranceType = insuranceType; }
+    public String getAdminId() { return adminId; }
+    public void setAdminId(String adminId) { this.adminId = adminId; }
+
+    // 新增：课题和分组的 Getter & Setter
+    public String getProjectId() { return projectId; }
+    public void setProjectId(String projectId) { this.projectId = projectId; }
+
+    public String getProjectName() { return projectName; }
+    public void setProjectName(String projectName) { this.projectName = projectName; }
+
+    public String getTeamId() { return teamId; }
+    public void setTeamId(String teamId) { this.teamId = teamId; }
+
+    public String getTeamName() { return teamName; }
+    public void setTeamName(String teamName) { this.teamName = teamName; }
+    public String getProvince() { return province; }
+    public void setProvince(String province) { this.province = province; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+
+    public String getDistrict() { return district; }
+    public void setDistrict(String district) { this.district = district; }
 }

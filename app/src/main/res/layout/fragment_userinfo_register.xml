@@ -3,28 +3,24 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:background="#F8F8F8"
+    android:background="#F5F7FA"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:layout_height="match_parent">
 
-    <!-- 所有内容区域可滚动 -->
-    <ScrollView
+    <!-- 顶部标题栏 -->
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
+        android:layout_height="wrap_content"
+        android:background="@android:color/white"
+        app:elevation="2dp">
 
-        <LinearLayout
-            android:orientation="vertical"
+        <androidx.appcompat.widget.Toolbar
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="56dp">
 
-            <!-- 顶部Bar -->
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:background="#FFF">
+                android:layout_height="match_parent">
 
                 <ImageButton
                     android:id="@+id/btn_back"
@@ -34,353 +30,505 @@
                     android:src="@drawable/ic_arrow_back"
                     android:layout_centerVertical="true"
                     android:layout_alignParentStart="true"
-                    android:layout_marginStart="8dp"
                     android:contentDescription="返回" />
-            </RelativeLayout>
 
-            <!-- 头像+昵称 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:paddingTop="16dp"
-                android:paddingBottom="8dp"
-                android:background="#FFF">
-                <ImageView
-                    android:id="@+id/img_avatar"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
-                    android:src="@drawable/ic_default_avatar"
-                    android:scaleType="centerCrop"
-                    android:background="@drawable/bg_circle_avatar"
-                    android:layout_gravity="center_horizontal"/>
                 <TextView
-                    android:id="@+id/tv_nickname"
-                    android:layout_marginTop="8dp"
+                    android:id="@+id/tv_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="基本信息"
-                    android:textColor="#666"
-                    android:textSize="16sp"
-                    android:layout_gravity="center_horizontal"/>
-            </LinearLayout>
+                    android:text="用户信息"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#2C3E50"
+                    android:layout_centerInParent="true" />
 
-            <!-- 卡片表单 -->
+            </RelativeLayout>
+
+        </androidx.appcompat.widget.Toolbar>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- 可滚动内容区域 -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp">
+
+            <!-- 课题与分组 Card -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="2dp">
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@android:color/white">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="0dp">
+                    android:padding="16dp">
 
-                    <!-- 姓名 -->
+                    <!-- 标题 -->
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true">
+                        android:layout_marginBottom="12dp">
+
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="20dp"
+                            android:background="#3498DB"
+                            android:layout_marginEnd="8dp" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="姓名"
+                            android:text="项目信息"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
-                        <EditText
+                            android:textStyle="bold"
+                            android:textColor="#2C3E50" />
+
+                    </LinearLayout>
+
+                    <!-- 课题选择 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="课题 *"
+                            android:textSize="14sp"
+                            android:textColor="#7F8C8D"
+                            android:layout_marginBottom="8dp" />
+
+                        <Spinner
+                            android:id="@+id/spinner_project"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:background="@drawable/spinner_background"
+                            android:padding="12dp" />
+
+                    </LinearLayout>
+
+                    <!-- 分组选择 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="分组 *"
+                            android:textSize="14sp"
+                            android:textColor="#7F8C8D"
+                            android:layout_marginBottom="8dp" />
+
+                        <Spinner
+                            android:id="@+id/spinner_team"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:background="@drawable/spinner_background"
+                            android:padding="12dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- 基本信息 Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@android:color/white">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- 标题 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <View
+                            android:layout_width="4dp"
+                            android:layout_height="20dp"
+                            android:background="#27AE60"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="基本信息"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="#2C3E50" />
+
+                    </LinearLayout>
+
+                    <!-- 所属城市 -->
+                    <LinearLayout
+                        android:id="@+id/ll_city"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="所在区域 *"
+                            android:textSize="16sp"
+                            android:textColor="#2C3E50" />
+
+                        <TextView
+                            android:id="@+id/tv_city"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="请选择"
+                            android:textSize="15sp"
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+                    </LinearLayout>
+
+                    <!-- 姓名 -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_name"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="32dp"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#222"
-                            android:textSize="15sp"
-                            android:maxLength="20"
-                            android:background="@android:color/transparent"
-                            android:hint="请输入姓名"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
+                            android:hint="姓名 *"
+                            android:maxLength="5"
+                            android:inputType="textPersonName" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
 
                     <!-- 手机号 -->
-                    <LinearLayout
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="手机号"
-                            android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
-                        <EditText
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_phone"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="32dp"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#222"
-                            android:textSize="15sp"
-                            android:inputType="phone"
-                            android:maxLength="20"
-                            android:background="@android:color/transparent"
-                            android:hint="请输入手机号"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
+                            android:hint="手机号 *"
+                            android:maxLength="11"
+                            android:inputType="phone" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
 
                     <!-- 性别 -->
                     <LinearLayout
+                        android:id="@+id/ll_gender"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_gender">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
-                            android:text="性别"
+                            android:text="性别 *"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_gender"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 生日 -->
                     <LinearLayout
+                        android:id="@+id/ll_birth"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_birth">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
-                            android:text="生日"
+                            android:text="生日 *"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_birth"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 婚姻状况 -->
                     <LinearLayout
+                        android:id="@+id/ll_marital"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_marital">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="婚姻状况"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_marital"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 受教育水平 -->
                     <LinearLayout
+                        android:id="@+id/ll_education"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_education">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="受教育水平"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_education"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 居住情况 -->
                     <LinearLayout
+                        android:id="@+id/ll_living"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_living">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="居住情况"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_living"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 职业状态 -->
                     <LinearLayout
+                        android:id="@+id/ll_job"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_job">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="职业状态"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_job"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 家庭月收入 -->
                     <LinearLayout
+                        android:id="@+id/ll_income"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_income">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginBottom="12dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="家庭月收入"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_income"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F1F1F1"/>
 
                     <!-- 医疗保险类型 -->
                     <LinearLayout
+                        android:id="@+id/ll_insurance"
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
+                        android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:id="@+id/ll_insurance">
+                        android:background="@drawable/selector_field_background"
+                        android:paddingHorizontal="16dp">
+
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="保险类型"
                             android:textSize="16sp"
-                            android:textColor="#444"
-                            android:layout_marginStart="16dp"/>
+                            android:textColor="#2C3E50" />
+
                         <TextView
                             android:id="@+id/tv_insurance"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="end|center_vertical"
-                            android:textColor="#888"
+                            android:text="请选择"
                             android:textSize="15sp"
-                            android:layout_marginEnd="32dp"
-                            android:hint="请选择"/>
+                            android:textColor="#95A5A6"
+                            android:drawableEnd="@drawable/ic_arrow_right"
+                            android:drawablePadding="8dp" />
+
                     </LinearLayout>
+
                 </LinearLayout>
+
             </androidx.cardview.widget.CardView>
 
         </LinearLayout>
-    </ScrollView>
 
-    <!-- 保存按钮独立一行，永远在页面底部 -->
-    <Button
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- 保存按钮 -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_save"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="56dp"
         android:text="保存"
-        android:textColor="#FFF"
-        android:background="@drawable/bg_btn_orange"
-        android:textSize="18sp"
-        android:layout_marginTop="8dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:layout_marginBottom="16dp"
-        android:layout_gravity="center_horizontal"/>
+        android:textSize="16sp"
+        android:textColor="@android:color/white"
+        app:backgroundTint="#3498DB"
+        app:cornerRadius="8dp"
+        android:layout_margin="16dp"
+        style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
 </LinearLayout>

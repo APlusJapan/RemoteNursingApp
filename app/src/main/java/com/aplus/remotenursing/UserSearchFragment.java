@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.InfoPopup;
@@ -37,11 +38,8 @@ import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Type;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -70,6 +68,7 @@ public class UserSearchFragment extends Fragment {
     private LinearLayout llFilterTags;
     private ChipGroup chipGroupFilters;
     private CircularProgressIndicator progressLoading;
+    private SwipeRefreshLayout swipeRefresh; // 新增
     private UserSearchAdapter adapter;
 
     private String currentAdminId;
@@ -111,6 +110,7 @@ public class UserSearchFragment extends Fragment {
         setupRecyclerView();
         setupSpinners();
         setupClickListeners();
+        setupSwipeRefresh(); // 新增
 
         if (allUserList.isEmpty()) {
             Log.d(TAG, "首次创建,加载初始数据");
@@ -118,32 +118,38 @@ public class UserSearchFragment extends Fragment {
         } else {
             Log.d(TAG, "数据已存在,执行筛选");
 
-            // ===== 修改:先检查projectList是否为空 =====
             if (projectList.isEmpty() || projectList.size() == 1) {
-                // projectList为空或只有"全部课题",需要重新加载
                 Log.d(TAG, "projectList为空,重新加载");
                 loadProjects();
             }
-            // ==========================================
 
-            // 恢复Spinner状态
             if (currentFilter.projectId != null || currentFilter.teamId != null) {
                 Log.d(TAG, "恢复Spinner状态: projectId=" + currentFilter.projectId + ", teamId=" + currentFilter.teamId);
 
-                // ===== 延迟执行,确保projectList加载完成 =====
                 spinnerProject.postDelayed(() -> {
-                    if (projectList.size() > 1) {  // 确认已加载
+                    if (projectList.size() > 1) {
                         syncFilterToSpinners();
                     } else {
                         Log.e(TAG, "projectList仍然为空,无法恢复Spinner");
                     }
                 }, 200);
-                // ========================================
             }
 
             doLocalFilter();
         }
     }
+
+    // ===== 新增:在onResume时刷新数据 =====
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 从其他页面返回时重新加载数据
+        if (!allUserList.isEmpty()) {
+            Log.d(TAG, "onResume: 刷新数据");
+            refreshData();
+        }
+    }
+    // ====================================
 
     private void initViews(View v) {
         spinnerProject = v.findViewById(R.id.spinner_project);
@@ -156,7 +162,37 @@ public class UserSearchFragment extends Fragment {
         llFilterTags = v.findViewById(R.id.ll_filter_tags);
         chipGroupFilters = v.findViewById(R.id.chip_group_filters);
         progressLoading = v.findViewById(R.id.progress_loading);
+        swipeRefresh = v.findViewById(R.id.swipe_refresh); // 新增
     }
+
+    // ===== 新增:配置下拉刷新 =====
+    private void setupSwipeRefresh() {
+        swipeRefresh.setColorSchemeResources(
+                R.color.colorPrimary,
+                R.color.colorAccent,
+                android.R.color.holo_blue_dark
+        );
+
+        swipeRefresh.setOnRefreshListener(() -> {
+            Log.d(TAG, "下拉刷新触发");
+            refreshData();
+        });
+    }
+    // ===============================
+
+    // ===== 新增:刷新数据方法 =====
+    private void refreshData() {
+        Log.d(TAG, "refreshData: 根据当前筛选条件重新加载数据");
+
+        // 重新加载用户数据
+        loadUsersByAdmin();
+
+        // 如果下拉刷新触发的,停止刷新动画
+        if (swipeRefresh.isRefreshing()) {
+            swipeRefresh.postDelayed(() -> swipeRefresh.setRefreshing(false), 1000);
+        }
+    }
+    // ===============================
 
     private void setupRecyclerView() {
         adapter = new UserSearchAdapter();
@@ -165,19 +201,121 @@ public class UserSearchFragment extends Fragment {
 
         adapter.setOnActionListener(new UserSearchAdapter.OnActionListener() {
             @Override
-            public void onAction1(UserInfoAccount item, int position) {
-                // TODO: 实现编辑功能
+            public void onDeleteClick(UserInfoAccount item, int position) {
+                if ("已激活".equals(item.getLoginStatus())) {
+                    InfoPopup.showError(requireContext(), "只能删除未激活的用户");
+                    return;
+                }
+                showDeleteConfirmDialog(item, position);
             }
 
             @Override
-            public void onAction2(UserInfoAccount item, int position) {
-                // TODO: 实现查看详情功能
+            public void onDetailClick(UserInfoAccount item, int position) {
+                String userId = item.getUserId();
+                Log.d(TAG, "查看用户详细, userId=" + userId);
+                if (userId == null || userId.isEmpty()) {
+                    InfoPopup.showError(requireContext(), "用户ID为空，无法查看详细");
+                    return;
+                }
+                openUserDetailFragment(userId);
             }
         });
     }
 
+    private void showDeleteConfirmDialog(UserInfoAccount user, int position) {
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("确认删除")
+                .setMessage("确定要删除用户 " + user.getUserName() + " 吗？")
+                .setPositiveButton("删除", (dialog, which) -> deleteUser(user, position))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void deleteUser(UserInfoAccount user, int position) {
+        showLoading(true);
+
+        String url = ApiConfig.API_DELETE_USER_INFO + user.getUserId();
+        Log.d(TAG, "删除用户, URL: " + url);
+
+        client.newCall(new Request.Builder().url(url).delete().build())
+                .enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runUiSafe(() -> {
+                            showLoading(false);
+                            InfoPopup.showError(requireContext(), "删除失败: " + e.getMessage());
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        boolean success = response.isSuccessful();
+                        response.close();
+
+                        runUiSafe(() -> {
+                            showLoading(false);
+                            if (success) {
+                                InfoPopup.showSuccess(requireContext(), "删除成功");
+                                allUserList.remove(user);
+                                doLocalFilter();
+                            } else {
+                                InfoPopup.showError(requireContext(), "删除失败");
+                            }
+                        });
+                    }
+                });
+    }
+
+    private void openUserDetailFragment(String userId) {
+        Log.d(TAG, "准备跳转到用户详情, userId=" + userId);
+
+        UserInfoAccount user = null;
+        for (UserInfoAccount u : allUserList) {
+            if (u.getUserId().equals(userId)) {
+                user = u;
+                break;
+            }
+        }
+
+        UserInfoRegisterFragment detailFragment = new UserInfoRegisterFragment();
+
+        Bundle args = new Bundle();
+        args.putString("userId", userId);
+
+        if (user != null) {
+            for (Project p : projectList) {
+                if (p.getProjectName().equals(user.getProjectName())) {
+                    args.putString("projectId", p.getProjectId());
+                    break;
+                }
+            }
+
+            for (Team t : teamList) {
+                if (t.getTeamName().equals(user.getTeamName())) {
+                    args.putString("teamId", t.getTeamId());
+                    break;
+                }
+            }
+        }
+
+        detailFragment.setArguments(args);
+
+        if (getActivity() != null) {
+            getActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .setCustomAnimations(
+                            R.anim.slide_in_right,
+                            R.anim.slide_out_left,
+                            R.anim.slide_in_left,
+                            R.anim.slide_out_right
+                    )
+                    .replace(R.id.fragment_container, detailFragment)
+                    .addToBackStack(null)
+                    .commit();
+        }
+    }
+
     private void setupSpinners() {
-        // 课题 Adapter
         projectAdapter = new ArrayAdapter<Project>(requireContext(),
                 android.R.layout.simple_spinner_item, projectList) {
             @Override
@@ -197,7 +335,6 @@ public class UserSearchFragment extends Fragment {
         projectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerProject.setAdapter(projectAdapter);
 
-        // 团队 Adapter
         teamAdapter = new ArrayAdapter<Team>(requireContext(),
                 android.R.layout.simple_spinner_item, teamList) {
             @Override
@@ -217,13 +354,11 @@ public class UserSearchFragment extends Fragment {
         teamAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerTeam.setAdapter(teamAdapter);
 
-        // 初始化团队列表
         if (teamList.isEmpty()) {
             teamList.add(new Team("", "请先选择课题"));
             teamAdapter.notifyDataSetChanged();
         }
 
-        // 课题选择监听
         spinnerProject.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -260,7 +395,6 @@ public class UserSearchFragment extends Fragment {
             }
         });
 
-        // 团队选择监听
         spinnerTeam.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -449,61 +583,49 @@ public class UserSearchFragment extends Fragment {
             boolean matchLoginStatus = true;
             boolean matchDate = true;
 
-            // 课题筛选
             if (!TextUtils.isEmpty(currentFilter.projectId)) {
                 matchProject = currentFilter.projectName != null &&
                         user.projectName != null &&
                         user.projectName.equals(currentFilter.projectName);
             }
 
-            // 团队筛选
             if (!TextUtils.isEmpty(currentFilter.teamId)) {
                 if ("NOT_GROUPED".equals(currentFilter.teamId)) {
-                    // 未分组:teamName为null或空
                     matchTeam = TextUtils.isEmpty(user.teamName);
                 } else {
-                    // 正常分组筛选
                     matchTeam = currentFilter.teamName != null &&
                             user.teamName != null &&
                             user.teamName.equals(currentFilter.teamName);
                 }
             }
 
-            // 姓名筛选
             if (!TextUtils.isEmpty(currentFilter.username)) {
                 matchUsername = user.userName != null &&
                         user.userName.toLowerCase().contains(currentFilter.username.toLowerCase());
             }
 
-            // 电话筛选
             if (!TextUtils.isEmpty(currentFilter.phone)) {
                 matchPhone = user.phone != null &&
                         user.phone.contains(currentFilter.phone);
             }
 
-            // 性别筛选
             if (!TextUtils.isEmpty(currentFilter.gender)) {
                 matchGender = user.gender != null &&
                         user.gender.equals(currentFilter.gender);
             }
 
-            // 激活状态筛选
             if (!TextUtils.isEmpty(currentFilter.loginStatus)) {
                 matchLoginStatus = user.loginStatus != null &&
                         user.loginStatus.equals(currentFilter.loginStatus);
             }
 
-            // 日期筛选
             if (!TextUtils.isEmpty(currentFilter.dateStart) || !TextUtils.isEmpty(currentFilter.dateEnd)) {
                 matchDate = false;
                 if (user.createdTime != null) {
                     try {
                         String userDateStr = null;
-
-                        // createdTime 是 String 类型,格式如: "2025-08-08T07:09:05.000+00:00"
                         String dateTimeStr = user.createdTime.toString();
 
-                        // 提取日期部分 yyyy-MM-dd (前10个字符)
                         if (dateTimeStr.length() >= 10) {
                             userDateStr = dateTimeStr.substring(0, 10);
                         }
@@ -521,7 +643,6 @@ public class UserSearchFragment extends Fragment {
 
                             matchDate = afterStart && beforeEnd;
 
-                            // 调试日志
                             Log.d(TAG, "用户 " + user.userName + " 日期: " + userDateStr +
                                     ", 范围: " + currentFilter.dateStart + "~" + currentFilter.dateEnd +
                                     ", 匹配: " + matchDate);
@@ -547,14 +668,8 @@ public class UserSearchFragment extends Fragment {
 
         filterFragment.setOnFilterAppliedListener(filter -> {
             Log.d(TAG, "========== 接收筛选结果 ==========");
-
-            // 保存筛选条件
             currentFilter = filter;
-
-            // 同步到Spinner
             syncFilterToSpinners();
-
-            // 执行筛选
             doLocalFilter();
         });
 
@@ -572,6 +687,7 @@ public class UserSearchFragment extends Fragment {
                     .commit();
         }
     }
+
     private void openAddUserFragment() {
         UserInfoRegisterFragment registerFragment = new UserInfoRegisterFragment();
 
@@ -589,28 +705,24 @@ public class UserSearchFragment extends Fragment {
                     .commit();
         }
     }
-    // ========== 核心方法:将筛选条件同步到Spinner ==========
+
     private void syncFilterToSpinners() {
         Log.d(TAG, "========== 同步筛选条件到Spinner ==========");
 
         isUpdatingSpinners = true;
 
-        // ===== 特殊处理:未分组 =====
         if ("NOT_GROUPED".equals(currentFilter.teamId)) {
-            // 未分组不需要同步Spinner,直接更新标签
             isUpdatingSpinners = false;
             updateFilterTags();
             return;
         }
 
-        // 同步课题
         if (!TextUtils.isEmpty(currentFilter.projectId)) {
             for (int i = 0; i < projectList.size(); i++) {
                 if (projectList.get(i).getProjectId().equals(currentFilter.projectId)) {
                     Log.d(TAG, "设置课题position: " + i);
                     spinnerProject.setSelection(i);
 
-                    // 加载并同步团队
                     if (!TextUtils.isEmpty(currentFilter.teamId)) {
                         loadTeamsAndSync(currentFilter.projectId, currentFilter.teamId);
                     } else {
@@ -621,7 +733,6 @@ public class UserSearchFragment extends Fragment {
             }
         }
 
-        // 如果没有课题筛选条件,重置Spinner
         spinnerProject.setSelection(0);
         isUpdatingSpinners = false;
     }
@@ -645,7 +756,8 @@ public class UserSearchFragment extends Fragment {
 
                         try {
                             String resp = response.body().string();
-                            Type listType = new TypeToken<List<Team>>() {}.getType();
+                            Type listType = new TypeToken<List<Team>>() {
+                            }.getType();
                             List<Team> teams = gson.fromJson(resp, listType);
 
                             runUiSafe(() -> {
@@ -656,7 +768,6 @@ public class UserSearchFragment extends Fragment {
                                 }
                                 teamAdapter.notifyDataSetChanged();
 
-                                // 设置团队选中
                                 for (int i = 0; i < teamList.size(); i++) {
                                     if (teamList.get(i).getTeamId().equals(teamId)) {
                                         final int position = i;
@@ -668,17 +779,13 @@ public class UserSearchFragment extends Fragment {
                                             spinnerTeam.postDelayed(() -> {
                                                 isUpdatingSpinners = false;
                                                 Log.d(TAG, "Spinner状态同步完成");
-
-                                                // ===== 新增:同步完成后更新筛选标签 =====
                                                 updateFilterTags();
-                                                // ========================================
                                             }, 100);
                                         });
                                         return;
                                     }
                                 }
 
-                                // 如果没找到teamId,也要重置标志
                                 isUpdatingSpinners = false;
                             });
                         } catch (Exception e) {

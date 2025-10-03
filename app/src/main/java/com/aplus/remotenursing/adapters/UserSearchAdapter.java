@@ -29,8 +29,8 @@ public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.Vi
     private OnActionListener listener;
 
     public interface OnActionListener {
-        void onAction1(UserInfoAccount item, int position);
-        void onAction2(UserInfoAccount item, int position);
+        void onDeleteClick(UserInfoAccount item, int position);
+        void onDetailClick(UserInfoAccount item, int position);
     }
 
     public void setOnActionListener(OnActionListener listener) {
@@ -120,14 +120,22 @@ public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.Vi
             }
         });
 
-        // 操作按钮（需要时显示）
-        if (listener != null) {
-            holder.opArea.setVisibility(View.VISIBLE);
-            holder.btnAction1.setOnClickListener(v -> listener.onAction1(user, position));
-            holder.btnAction2.setOnClickListener(v -> listener.onAction2(user, position));
-        } else {
-            holder.opArea.setVisibility(View.GONE);
-        }
+        // 操作按钮（始终显示）
+        holder.opArea.setVisibility(View.VISIBLE);
+
+        // 删除按钮
+        holder.btnDelete.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onDeleteClick(user, position);
+            }
+        });
+
+        // 查看详细按钮
+        holder.btnDetail.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onDetailClick(user, position);
+            }
+        });
     }
 
     @Override
@@ -148,7 +156,7 @@ public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.Vi
         Chip chipStatus;
         ImageView btnCopyPhone;
         LinearLayout llProject, llTeam, opArea;
-        Button btnAction1, btnAction2;
+        Button btnDelete, btnDetail;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -162,8 +170,8 @@ public class UserSearchAdapter extends RecyclerView.Adapter<UserSearchAdapter.Vi
             llProject = itemView.findViewById(R.id.ll_project);
             llTeam = itemView.findViewById(R.id.ll_team);
             opArea = itemView.findViewById(R.id.op_area);
-            btnAction1 = itemView.findViewById(R.id.btn_action1);
-            btnAction2 = itemView.findViewById(R.id.btn_action2);
+            btnDelete = itemView.findViewById(R.id.btn_action1);
+            btnDetail = itemView.findViewById(R.id.btn_action2);
         }
     }
 }

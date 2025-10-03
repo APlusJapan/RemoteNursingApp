@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="选择城市"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#2C3E50"
+        android:layout_marginBottom="16dp" />
+
+    <!-- 省份 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="省份"
+        android:textSize="14sp"
+        android:textColor="#7F8C8D"
+        android:layout_marginBottom="4dp" />
+
+    <Spinner
+        android:id="@+id/spinner_province"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/spinner_background"
+        android:layout_marginBottom="12dp" />
+
+    <!-- 城市 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="城市"
+        android:textSize="14sp"
+        android:textColor="#7F8C8D"
+        android:layout_marginBottom="4dp" />
+
+    <Spinner
+        android:id="@+id/spinner_city"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/spinner_background"
+        android:layout_marginBottom="12dp" />
+
+    <!-- 区县 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="区县"
+        android:textSize="14sp"
+        android:textColor="#7F8C8D"
+        android:layout_marginBottom="4dp" />
+
+    <Spinner
+        android:id="@+id/spinner_district"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/spinner_background"
+        android:layout_marginBottom="16dp" />
+
+    <!-- 按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_cancel"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="取消"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        <Button
+            android:id="@+id/btn_confirm"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="确定"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

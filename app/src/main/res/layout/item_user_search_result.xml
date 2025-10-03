@@ -188,25 +188,33 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="8dp"
-            android:visibility="gone">
+            android:visibility="visible">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_action1"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:text="操作1"/>
+                android:text="删除"
+                android:textColor="@android:color/white"
+                app:backgroundTint="#E74C3C"
+                app:cornerRadius="8dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
 
             <View
                 android:layout_width="8dp"
                 android:layout_height="0dp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_action2"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:text="操作2"/>
+                android:text="查看详细"
+                android:textColor="@android:color/white"
+                app:backgroundTint="#3498DB"
+                app:cornerRadius="8dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

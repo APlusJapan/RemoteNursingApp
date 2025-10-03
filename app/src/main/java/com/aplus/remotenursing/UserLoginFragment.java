@@ -22,6 +22,8 @@ import com.aplus.remotenursing.common.ApiConfig;
 import com.aplus.remotenursing.common.UserUtils;
 import com.aplus.remotenursing.models.PointRuleTaskType;
 import com.aplus.remotenursing.models.UserAccount;
+import com.aplus.remotenursing.helper.DeviceInfoHelper;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
@@ -105,7 +107,7 @@ public class UserLoginFragment extends Fragment {
         String savedDeviceId = prefs.getString(KEY_DEVICE_ID, "");
         String lastLoginPhone = prefs.getString(KEY_LAST_LOGIN_PHONE, "");
         boolean deviceActivated = prefs.getBoolean(KEY_DEVICE_ACTIVATED, false);
-        String currentDeviceId = getDeviceId();
+        String currentDeviceId = DeviceInfoHelper.getDeviceId(getContext());
 
         Log.d("UserLogin", "设备状态检查 - 保存的设备ID: " + savedDeviceId + ", 当前设备ID: " + currentDeviceId + ", 已激活: " + deviceActivated);
 
@@ -175,7 +177,7 @@ public class UserLoginFragment extends Fragment {
         OkHttpClient client = new OkHttpClient();
         JsonObject obj = new JsonObject();
         obj.addProperty("phone_number", phoneNumber);
-        obj.addProperty("device_id", getDeviceId());
+        obj.addProperty("device_id", DeviceInfoHelper.getDeviceId(getContext()));
         obj.addProperty("quick_login", true);
 
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
@@ -225,7 +227,7 @@ public class UserLoginFragment extends Fragment {
 
                             if (userAccount.getUserId() != null && !userAccount.getUserId().isEmpty()) {
                                 // 验证后端返回的设备ID与本地设备ID是否一致
-                                String currentDeviceId = getDeviceId();
+                                String currentDeviceId = DeviceInfoHelper.getDeviceId(getContext());
                                 String serverDeviceId = jsonResponse.has("device_id") ? jsonResponse.get("device_id").getAsString() : "";
 
                                 Log.d("QuickLogin", "设备ID验证 - 当前设备ID: " + currentDeviceId);
@@ -432,7 +434,7 @@ public class UserLoginFragment extends Fragment {
         JsonObject obj = new JsonObject();
         obj.addProperty("phone", phoneNumber);
         obj.addProperty("otp", otp);
-        obj.addProperty("deviceId", getDeviceId());
+        obj.addProperty("deviceId", DeviceInfoHelper.getDeviceId(getContext()));
 
         RequestBody body = RequestBody.create(obj.toString(), MediaType.get("application/json; charset=utf-8"));
         Request request = new Request.Builder()
@@ -613,41 +615,41 @@ public class UserLoginFragment extends Fragment {
     private void saveDeviceActivation(String phoneNumber) {
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
-                .putString(KEY_DEVICE_ID, getDeviceId())
+                .putString(KEY_DEVICE_ID, DeviceInfoHelper.getDeviceId(getContext()))
                 .putString(KEY_LAST_LOGIN_PHONE, phoneNumber)
                 .putBoolean(KEY_DEVICE_ACTIVATED, true)
                 .apply();
-        Log.d("UserLogin", "设备激活信息已保存: deviceId=" + getDeviceId() + ", phone=" + phoneNumber + ", activated=true");
+        Log.d("UserLogin", "设备激活信息已保存: deviceId=" + DeviceInfoHelper.getDeviceId(getContext()) + ", phone=" + phoneNumber + ", activated=true");
     }
 
     /**
      * 获取设备ID
      */
-    private String getDeviceId() {
-        try {
-            String androidId = android.provider.Settings.Secure.getString(
-                    requireContext().getContentResolver(),
-                    android.provider.Settings.Secure.ANDROID_ID);
-
-            String manufacturer = android.os.Build.MANUFACTURER;
-            String model = android.os.Build.MODEL;
-            String serial = android.os.Build.SERIAL;
-
-            String deviceInfo = manufacturer + "_" + model + "_" + serial;
-
-            if (androidId != null && !androidId.isEmpty() && !"9774d56d682e549c".equals(androidId)) {
-                return androidId + "_" + deviceInfo.hashCode();
-            } else {
-                return String.valueOf(deviceInfo.hashCode());
-            }
-
-        } catch (Exception e) {
-            Log.e("UserLogin", "获取设备ID失败: " + e.getMessage());
-            long timestamp = System.currentTimeMillis();
-            int random = (int) (Math.random() * 10000);
-            return "device_" + timestamp + "_" + random;
-        }
-    }
+//    private String getDeviceId() {
+//        try {
+//            String androidId = android.provider.Settings.Secure.getString(
+//                    requireContext().getContentResolver(),
+//                    android.provider.Settings.Secure.ANDROID_ID);
+//
+//            String manufacturer = android.os.Build.MANUFACTURER;
+//            String model = android.os.Build.MODEL;
+//            String serial = android.os.Build.SERIAL;
+//
+//            String deviceInfo = manufacturer + "_" + model + "_" + serial;
+//
+//            if (androidId != null && !androidId.isEmpty() && !"9774d56d682e549c".equals(androidId)) {
+//                return androidId + "_" + deviceInfo.hashCode();
+//            } else {
+//                return String.valueOf(deviceInfo.hashCode());
+//            }
+//
+//        } catch (Exception e) {
+//            Log.e("UserLogin", "获取设备ID失败: " + e.getMessage());
+//            long timestamp = System.currentTimeMillis();
+//            int random = (int) (Math.random() * 10000);
+//            return "device_" + timestamp + "_" + random;
+//        }
+//    }
 
     /**
      * 手机号校验（国内）

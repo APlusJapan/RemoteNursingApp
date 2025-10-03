@@ -1,17 +1,38 @@
 package com.aplus.remotenursing.models;
 
+import com.google.gson.annotations.SerializedName;
 import java.io.Serializable;
 
 public class Project implements Serializable {
+    @SerializedName("id")
     private Long id;
+
+    @SerializedName(value = "adminId", alternate = {"admin_id"})
     private Long adminId;
+
+    @SerializedName(value = "projectId", alternate = {"project_id"})
     private String projectId;
+
+    @SerializedName(value = "projectName", alternate = {"project_name"})
     private String projectName;
+
+    @SerializedName("description")
     private String description;
+
+    @SerializedName("status")
     private Integer status;
+
+    // 关键：支持后端的 default_flg 字段
+    @SerializedName(value = "defaultFlg", alternate = {"default_flg"})
     private Boolean defaultFlg;
+
+    @SerializedName(value = "isDeleted", alternate = {"is_deleted"})
     private Boolean isDeleted;
+
+    @SerializedName(value = "createTime", alternate = {"create_time"})
     private String createTime;
+
+    @SerializedName(value = "updatedTime", alternate = {"updated_time"})
     private String updatedTime;
 
     // 默认构造函数
@@ -21,38 +42,94 @@ public class Project implements Serializable {
     public Project(String projectId, String projectName) {
         this.projectId = projectId;
         this.projectName = projectName;
+        this.defaultFlg = false;
     }
 
     // Getter 和 Setter 方法
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public Long getAdminId() { return adminId; }
-    public void setAdminId(Long adminId) { this.adminId = adminId; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getProjectId() { return projectId; }
-    public void setProjectId(String projectId) { this.projectId = projectId; }
+    public Long getAdminId() {
+        return adminId;
+    }
 
-    public String getProjectName() { return projectName; }
-    public void setProjectName(String projectName) { this.projectName = projectName; }
+    public void setAdminId(Long adminId) {
+        this.adminId = adminId;
+    }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    public String getProjectId() {
+        return projectId;
+    }
 
-    public Integer getStatus() { return status; }
-    public void setStatus(Integer status) { this.status = status; }
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
+    }
 
-    public Boolean getDefaultFlg() { return defaultFlg; }
-    public void setDefaultFlg(Boolean defaultFlg) { this.defaultFlg = defaultFlg; }
+    public String getProjectName() {
+        return projectName;
+    }
 
-    public Boolean getIsDeleted() { return isDeleted; }
-    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
+    }
 
-    public String getCreateTime() { return createTime; }
-    public void setCreateTime(String createTime) { this.createTime = createTime; }
+    public String getDescription() {
+        return description;
+    }
 
-    public String getUpdatedTime() { return updatedTime; }
-    public void setUpdatedTime(String updatedTime) { this.updatedTime = updatedTime; }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public Boolean getDefaultFlg() {
+        return defaultFlg;
+    }
+
+    public void setDefaultFlg(Boolean defaultFlg) {
+        this.defaultFlg = defaultFlg;
+    }
+
+    // 添加便捷方法：判断是否为默认课题
+    public boolean isDefaultFlag() {
+        return defaultFlg != null && defaultFlg;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    public String getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(String createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getUpdatedTime() {
+        return updatedTime;
+    }
+
+    public void setUpdatedTime(String updatedTime) {
+        this.updatedTime = updatedTime;
+    }
 
     // 用于Spinner显示的方法
     public String getDisplayName() {

@@ -3,26 +3,40 @@ package com.aplus.remotenursing;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import com.aplus.remotenursing.common.InfoPopup;
-import com.aplus.remotenursing.models.UserInfo;
-import com.aplus.remotenursing.common.ApiConfig;
-import com.aplus.remotenursing.common.UserUtils;
-import com.google.gson.Gson;
-import com.google.android.material.datepicker.MaterialDatePicker;
 
+import com.aplus.remotenursing.common.ApiConfig;
+import com.aplus.remotenursing.common.InfoPopup;
+import com.aplus.remotenursing.common.UserUtils;
+import com.aplus.remotenursing.helper.ApiClientHelper;
+import com.aplus.remotenursing.helper.CityPickerHelper;
+import com.aplus.remotenursing.models.Project;
+import com.aplus.remotenursing.models.Team;
+import com.aplus.remotenursing.models.UserAccount;
+import com.aplus.remotenursing.models.UserInfo;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import okhttp3.Call;
@@ -32,16 +46,56 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import java.io.IOException;
 
 public class UserInfoRegisterFragment extends Fragment {
+    private static final String ARG_USER_ID = "userId";
+    private static final String ARG_PROJECT_ID = "projectId";
+    private static final String ARG_TEAM_ID = "teamId";
+    private static final String TAG = "UserInfoRegister";
+
     private EditText etName, etPhone;
-    private TextView tvGender, tvBirth, tvMarital, tvEducation, tvLiving, tvJob, tvIncome, tvInsurance;
+    private TextView tvGender, tvBirth, tvMarital, tvEducation, tvLiving, tvJob, tvIncome, tvInsurance, tvCity;
+    private Spinner spinnerProject, spinnerTeam;
     private final Gson gson = new Gson();
     private MaterialDatePicker<Long> birthdayPicker;
     private AlertDialog progressDialog;
     private TextView loadingTextView;
-    private boolean isRequesting = false; // 防止请求期间页面被pop
+    private boolean isRequesting = false;
+
+    private String currentUserId;
+    private String passedProjectId;
+    private String passedTeamId;
+
+    private String currentAdminId;
+    private List<Project> projectList = new ArrayList<>();
+    private List<Team> teamList = new ArrayList<>();
+    private ArrayAdapter<Project> projectAdapter;
+    private ArrayAdapter<Team> teamAdapter;
+
+    private OkHttpClient client = ApiClientHelper.get();
+    private boolean isLoadingSpinners = false;
+
+    // 城市信息
+    private String selectedProvince = "";
+    private String selectedCity = "";
+    private String selectedDistrict = "";
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        UserAccount userAccount = UserUtils.getUserAccount(requireContext());
+        if (userAccount != null) {
+            currentAdminId = userAccount.getAdminId();
+        }
+
+        if (getArguments() != null) {
+            currentUserId = getArguments().getString(ARG_USER_ID);
+            passedProjectId = getArguments().getString(ARG_PROJECT_ID);
+            passedTeamId = getArguments().getString(ARG_TEAM_ID);
+            Log.d(TAG, "接收参数 - userId: " + currentUserId + ", projectId: " + passedProjectId + ", teamId: " + passedTeamId);
+        }
+    }
 
     @Nullable
     @Override
@@ -49,24 +103,25 @@ public class UserInfoRegisterFragment extends Fragment {
         return inflater.inflate(R.layout.fragment_userinfo_register, container, false);
     }
 
-    private void initBirthdayPicker() {
-        if (birthdayPicker == null) {
-            birthdayPicker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText("请选择生日")
-                    .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
-                    .build();
-            birthdayPicker.addOnPositiveButtonClickListener(selection -> {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                String dateStr = sdf.format(new Date((Long) selection));
-                tvBirth.setText(dateStr);
-            });
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        initViews(view);
+        setupSpinners();
+        setPickerListeners();
+
+        loadProjects();
+
+        if (currentUserId != null && !currentUserId.isEmpty()) {
+            Log.d(TAG, "查看详情模式");
+            fetchUserInfoById(currentUserId);
+        } else {
+            Log.d(TAG, "新增用户模式");
         }
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    private void initViews(View view) {
         view.findViewById(R.id.btn_back).setOnClickListener(v -> {
-            if (!isRequesting) // 正在请求时不允许pop
+            if (!isRequesting)
                 requireActivity().getSupportFragmentManager().popBackStack();
             else
                 showErrorSafe("操作进行中，请稍候");
@@ -82,10 +137,231 @@ public class UserInfoRegisterFragment extends Fragment {
         tvJob = view.findViewById(R.id.tv_job);
         tvIncome = view.findViewById(R.id.tv_income);
         tvInsurance = view.findViewById(R.id.tv_insurance);
+        tvCity = view.findViewById(R.id.tv_city);
+        spinnerProject = view.findViewById(R.id.spinner_project);
+        spinnerTeam = view.findViewById(R.id.spinner_team);
 
-        setPickerListeners();
-        fetchAndFillUserInfo();
         view.findViewById(R.id.btn_save).setOnClickListener(v -> saveInfo());
+    }
+
+    private void setupSpinners() {
+        projectAdapter = new ArrayAdapter<Project>(requireContext(),
+                android.R.layout.simple_spinner_item, projectList) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                view.setText(projectList.get(position).getDisplayName());
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getDropDownView(position, convertView, parent);
+                view.setText(projectList.get(position).getDisplayName());
+                return view;
+            }
+        };
+        projectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerProject.setAdapter(projectAdapter);
+
+        teamAdapter = new ArrayAdapter<Team>(requireContext(),
+                android.R.layout.simple_spinner_item, teamList) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                view.setText(teamList.get(position).getDisplayName());
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getDropDownView(position, convertView, parent);
+                view.setText(teamList.get(position).getDisplayName());
+                return view;
+            }
+        };
+        teamAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTeam.setAdapter(teamAdapter);
+
+        teamList.add(new Team("", "请先选择课题"));
+        teamAdapter.notifyDataSetChanged();
+
+        spinnerProject.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isLoadingSpinners) return;
+
+                if (position > 0) {
+                    Project selectedProject = projectList.get(position);
+                    loadTeamsByProject(selectedProject.getProjectId());
+                } else {
+                    teamList.clear();
+                    teamList.add(new Team("", "请先选择课题"));
+                    teamAdapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
+    private void loadProjects() {
+        if (TextUtils.isEmpty(currentAdminId)) return;
+
+        String url = ApiConfig.API_PROJECT + currentAdminId;
+
+        client.newCall(new Request.Builder().url(url).get().build())
+                .enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runUiSafe(() -> InfoPopup.showError(requireContext(), "加载课题列表失败"));
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (!isAdded() || getActivity() == null) {
+                            response.close();
+                            return;
+                        }
+
+                        try {
+                            String resp = response.body().string();
+                            Type listType = new TypeToken<List<Project>>() {}.getType();
+                            List<Project> projects = gson.fromJson(resp, listType);
+
+                            runUiSafe(() -> {
+                                projectList.clear();
+                                projectList.add(new Project("", "请选择课题"));
+                                if (projects != null) {
+                                    projectList.addAll(projects);
+                                }
+                                projectAdapter.notifyDataSetChanged();
+                                selectInitialProject();
+                            });
+                        } catch (Exception e) {
+                            Log.e(TAG, "解析课题列表异常: " + e.getMessage());
+                        } finally {
+                            response.close();
+                        }
+                    }
+                });
+    }
+
+    private void selectInitialProject() {
+        isLoadingSpinners = true;
+
+        if (!TextUtils.isEmpty(passedProjectId)) {
+            for (int i = 0; i < projectList.size(); i++) {
+                if (projectList.get(i).getProjectId().equals(passedProjectId)) {
+                    spinnerProject.setSelection(i);
+                    loadTeamsAndSelect(passedProjectId, passedTeamId);
+                    return;
+                }
+            }
+        } else {
+            for (int i = 0; i < projectList.size(); i++) {
+                if (projectList.get(i).getDefaultFlg()) {
+                    spinnerProject.setSelection(i);
+                    loadTeamsAndSelect(projectList.get(i).getProjectId(), null);
+                    return;
+                }
+            }
+        }
+
+        isLoadingSpinners = false;
+    }
+
+    private void loadTeamsAndSelect(String projectId, String teamId) {
+        String url = ApiConfig.API_PROJECT_TEAM + projectId;
+
+        client.newCall(new Request.Builder().url(url).get().build())
+                .enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runUiSafe(() -> {
+                            isLoadingSpinners = false;
+                            InfoPopup.showError(requireContext(), "加载分组列表失败");
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (!isAdded() || getActivity() == null) {
+                            response.close();
+                            return;
+                        }
+
+                        try {
+                            String resp = response.body().string();
+                            Type listType = new TypeToken<List<Team>>() {}.getType();
+                            List<Team> teams = gson.fromJson(resp, listType);
+
+                            runUiSafe(() -> {
+                                teamList.clear();
+                                teamList.add(new Team("", "请选择分组"));
+                                if (teams != null) {
+                                    teamList.addAll(teams);
+                                }
+                                teamAdapter.notifyDataSetChanged();
+
+                                if (!TextUtils.isEmpty(teamId)) {
+                                    for (int i = 0; i < teamList.size(); i++) {
+                                        if (teamList.get(i).getTeamId().equals(teamId)) {
+                                            spinnerTeam.setSelection(i);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                isLoadingSpinners = false;
+                            });
+                        } catch (Exception e) {
+                            runUiSafe(() -> isLoadingSpinners = false);
+                        } finally {
+                            response.close();
+                        }
+                    }
+                });
+    }
+
+    private void loadTeamsByProject(String projectId) {
+        String url = ApiConfig.API_PROJECT_TEAM + projectId;
+
+        client.newCall(new Request.Builder().url(url).get().build())
+                .enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        runUiSafe(() -> InfoPopup.showError(requireContext(), "加载分组列表失败"));
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (!isAdded() || getActivity() == null) {
+                            response.close();
+                            return;
+                        }
+
+                        try {
+                            String resp = response.body().string();
+                            Type listType = new TypeToken<List<Team>>() {}.getType();
+                            List<Team> teams = gson.fromJson(resp, listType);
+
+                            runUiSafe(() -> {
+                                teamList.clear();
+                                teamList.add(new Team("", "请选择分组"));
+                                if (teams != null) {
+                                    teamList.addAll(teams);
+                                }
+                                teamAdapter.notifyDataSetChanged();
+                            });
+                        } catch (Exception e) {
+                            Log.e(TAG, "解析分组列表异常: " + e.getMessage());
+                        } finally {
+                            response.close();
+                        }
+                    }
+                });
     }
 
     @Override
@@ -107,19 +383,48 @@ public class UserInfoRegisterFragment extends Fragment {
         tvIncome.setOnClickListener(v -> showSingle(tvIncome, R.array.income_options));
         tvInsurance.setOnClickListener(v -> showSingle(tvInsurance, R.array.insurance_options));
         tvLiving.setOnClickListener(v -> showMulti(tvLiving, R.array.living_options));
-        tvBirth.setOnClickListener(v -> showDate(tvBirth));
+        tvBirth.setOnClickListener(v -> showDate());
+        tvCity.setOnClickListener(v -> showCityPicker());
+    }
+
+    private void showCityPicker() {
+        CityPickerHelper.showCityPicker(requireContext(), (province, city, district) -> {
+            selectedProvince = province;
+            selectedCity = city;
+            selectedDistrict = district;
+
+            String cityText = province + " " + city + " " + district;
+            tvCity.setText(cityText);
+            tvCity.setTextColor(getResources().getColor(R.color.colorPrimary));
+        });
     }
 
     private void showSingle(TextView target, int arrayRes) {
         String[] items = getResources().getStringArray(arrayRes);
         new AlertDialog.Builder(getActivitySafe())
-                .setItems(items, (d, which) -> target.setText(items[which]))
+                .setItems(items, (d, which) -> {
+                    target.setText(items[which]);
+                    target.setTextColor(getResources().getColor(R.color.colorPrimary));
+                })
                 .show();
     }
 
     private void showMulti(TextView target, int arrayRes) {
         String[] items = getResources().getStringArray(arrayRes);
         boolean[] checks = new boolean[items.length];
+
+        String currentText = target.getText().toString();
+        if (!currentText.equals("请选择") && !TextUtils.isEmpty(currentText)) {
+            String[] selected = currentText.split(",");
+            for (String s : selected) {
+                for (int i = 0; i < items.length; i++) {
+                    if (items[i].equals(s.trim())) {
+                        checks[i] = true;
+                    }
+                }
+            }
+        }
+
         new AlertDialog.Builder(getActivitySafe())
                 .setMultiChoiceItems(items, checks, (d, which, isChecked) -> checks[which] = isChecked)
                 .setPositiveButton(android.R.string.ok, (d, w) -> {
@@ -130,12 +435,30 @@ public class UserInfoRegisterFragment extends Fragment {
                             sb.append(items[i]);
                         }
                     }
-                    target.setText(sb.toString());
+                    if (sb.length() > 0) {
+                        target.setText(sb.toString());
+                        target.setTextColor(getResources().getColor(R.color.colorPrimary));
+                    }
                 })
                 .show();
     }
 
-    private void showDate(TextView target) {
+    private void initBirthdayPicker() {
+        if (birthdayPicker == null) {
+            birthdayPicker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("请选择生日")
+                    .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
+                    .build();
+            birthdayPicker.addOnPositiveButtonClickListener(selection -> {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                String dateStr = sdf.format(new Date(selection));
+                tvBirth.setText(dateStr);
+                tvBirth.setTextColor(getResources().getColor(R.color.colorPrimary));
+            });
+        }
+    }
+
+    private void showDate() {
         initBirthdayPicker();
         birthdayPicker.show(getParentFragmentManager(), "MATERIAL_DATE_PICKER");
     }
@@ -155,6 +478,7 @@ public class UserInfoRegisterFragment extends Fragment {
         }
         progressDialog.show();
     }
+
     private void hideLoading() {
         isRequesting = false;
         if (progressDialog != null && progressDialog.isShowing()) {
@@ -163,63 +487,103 @@ public class UserInfoRegisterFragment extends Fragment {
     }
 
     private boolean checkInput(UserInfo info) {
+
+        int projectPosition = spinnerProject.getSelectedItemPosition();
+        int teamPosition = spinnerTeam.getSelectedItemPosition();
+
+        if (projectPosition == 0) {
+            showErrorSafe("请选择课题");
+            return false;
+        }
+        if (teamPosition == 0) {
+            showErrorSafe("请选择分组");
+            return false;
+        }
+        // 检查所属城市
+        if (TextUtils.isEmpty(selectedProvince) ||
+                TextUtils.isEmpty(selectedCity) ||
+                TextUtils.isEmpty(selectedDistrict)) {
+            showErrorSafe("请选择所属城市");
+            return false;
+        }
         if (info.getUserName() == null || info.getUserName().trim().isEmpty()) {
             showErrorSafe("请填写姓名");
+            return false;
+        }
+        if (info.getUserName().length() > 5) {
+            showErrorSafe("姓名不能大于5个字");
             return false;
         }
         if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
             showErrorSafe("请填写手机号");
             return false;
         }
+        // 检查手机号
+        if (info.getPhone() == null || info.getPhone().trim().isEmpty()) {
+            showErrorSafe("请填写手机号");
+            return false;
+        }
+        if (info.getPhone().length() != 11) {
+            showErrorSafe("手机号必须为11位");
+            return false;
+        }
+        String gender = tvGender.getText().toString();
+        if (TextUtils.isEmpty(gender) || gender.equals("请选择")) {
+            showErrorSafe("请选择性别");
+            return false;
+        }
+        String birth = tvBirth.getText().toString();
+        if (TextUtils.isEmpty(birth) || birth.equals("请选择")) {
+            showErrorSafe("请选择生日");
+            return false;
+        }
         return true;
     }
 
-    // ----------- 网络请求安全版 -----------
-    private void fetchAndFillUserInfo() {
-        String userId = UserUtils.loadUserId(requireContext());
-        if (userId == null || userId.isEmpty()) return;
-
-        showLoading("正在查询，请稍后");
-        OkHttpClient client = new OkHttpClient();
+    private void fetchUserInfoById(String userId) {
+        showLoading("正在加载用户信息...");
         String url = ApiConfig.API_USER_INFO + userId;
-        Log.d("fetchAndFillUserInfo", "fetchAndFillUserInfo, URL: " + url);
+        Log.d(TAG, "加载用户信息, URL: " + url);
 
         client.newCall(new Request.Builder().url(url).get().build())
                 .enqueue(new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
-                        Log.d("UserInfoDebug", "onFailure: " + e.getMessage());
-                        runUiSafe(() -> hideLoading());
+                        Log.e(TAG, "加载失败: " + e.getMessage());
+                        runUiSafe(() -> {
+                            hideLoading();
+                            showErrorSafe("加载用户信息失败: " + e.getMessage());
+                        });
                     }
+
                     @Override
                     public void onResponse(Call call, Response response) throws IOException {
                         if (!isAdded() || getActivity() == null) {
-                            Log.d("UserInfoDebug", "Fragment已销毁，不再回调UI");
                             response.close();
                             return;
                         }
-                        int code = response.code();
-                        try {
-                            String resp = response.body().string();
-                            Log.d("fetchAndFillUserInfo", "HTTP status: " + code + " body: " + resp);
 
-                            UserInfo info = null;
-                            try {
-                                info = gson.fromJson(resp, UserInfo.class);
-                                Log.d("fetchAndFillUserInfo", "解析后 info: " + info);
-                            } catch (Exception ignore) {
-                                Log.e("fetchAndFillUserInfo", "JSON解析异常: " + ignore.getMessage());
+                        try {
+                            if (response.isSuccessful()) {
+                                String resp = response.body().string();
+                                Log.d(TAG, "API响应: " + resp);
+                                UserInfo info = gson.fromJson(resp, UserInfo.class);
+
+                                runUiSafe(() -> {
+                                    hideLoading();
+                                    if (info != null && info.getUserId() != null) {
+                                        fillUserInfo(info);
+                                        Log.d(TAG, "成功填充用户信息");
+                                    } else {
+                                        showErrorSafe("未找到用户信息");
+                                    }
+                                });
+                            } else {
+                                runUiSafe(() -> {
+                                    hideLoading();
+                                    showErrorSafe("加载失败: " + response.code());
+                                });
                             }
-                            final UserInfo finalInfo = info;
-                            runUiSafe(() -> {
-                                hideLoading();
-                                if (finalInfo != null && finalInfo.getUserId() != null) {
-                                    Log.d("UserInfoDebug", "will call fillUserInfo");
-                                    fillUserInfo(finalInfo);
-                                } else {
-                                    showErrorSafe("未查到用户信息（" + code + "）");
-                                }
-                            });
                         } finally {
                             response.close();
                         }
@@ -228,144 +592,236 @@ public class UserInfoRegisterFragment extends Fragment {
     }
 
     private void fillUserInfo(UserInfo info) {
-        Log.d("UserInfo", "[DEBUG] userId=" + info.getUserId());
-        Log.d("UserInfo", "[DEBUG] userName=" + info.getUserName());
-        Log.d("UserInfo", "[DEBUG] gender=" + info.getGender());
-        Log.d("UserInfo", "[DEBUG] birthDate=" + info.getBirthDate());
-        Log.d("UserInfo", "[DEBUG] phone=" + info.getPhone());
-        Log.d("UserInfo", "[DEBUG] maritalStatus=" + info.getMaritalStatus());
-        Log.d("UserInfo", "[DEBUG] educationLevel=" + info.getEducationLevel());
-        Log.d("UserInfo", "[DEBUG] livingStatus=" + info.getLivingStatus());
-        Log.d("UserInfo", "[DEBUG] jobStatus=" + info.getJobStatus());
-        Log.d("UserInfo", "[DEBUG] incomePerCapita=" + info.getIncomePerCapita());
+        Log.d(TAG, "[DEBUG] 填充用户信息");
 
         etName.setText(info.getUserName());
         etPhone.setText(info.getPhone());
-        tvGender.setText(info.getGender());
-        tvBirth.setText(info.getBirthDate());
-        tvMarital.setText(info.getMaritalStatus());
-        tvEducation.setText(info.getEducationLevel());
-        tvLiving.setText(info.getLivingStatus());
-        tvJob.setText(info.getJobStatus());
-        tvIncome.setText(info.getIncomePerCapita());
-        tvInsurance.setText(info.getInsuranceType());
+
+        if (!TextUtils.isEmpty(info.getGender())) {
+            tvGender.setText(info.getGender());
+            tvGender.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getBirthDate())) {
+            tvBirth.setText(info.getBirthDate());
+            tvBirth.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getMaritalStatus())) {
+            tvMarital.setText(info.getMaritalStatus());
+            tvMarital.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getEducationLevel())) {
+            tvEducation.setText(info.getEducationLevel());
+            tvEducation.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getLivingStatus())) {
+            tvLiving.setText(info.getLivingStatus());
+            tvLiving.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getJobStatus())) {
+            tvJob.setText(info.getJobStatus());
+            tvJob.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getIncomePerCapita())) {
+            tvIncome.setText(info.getIncomePerCapita());
+            tvIncome.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+        if (!TextUtils.isEmpty(info.getInsuranceType())) {
+            tvInsurance.setText(info.getInsuranceType());
+            tvInsurance.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
+
+        // 填充城市信息
+        if (!TextUtils.isEmpty(info.getProvince()) &&
+                !TextUtils.isEmpty(info.getCity()) &&
+                !TextUtils.isEmpty(info.getDistrict())) {
+
+            selectedProvince = info.getProvince();
+            selectedCity = info.getCity();
+            selectedDistrict = info.getDistrict();
+
+            String cityText = selectedProvince + " " + selectedCity + " " + selectedDistrict;
+            tvCity.setText(cityText);
+            tvCity.setTextColor(getResources().getColor(R.color.colorPrimary));
+        }
     }
 
     private void saveInfo() {
         UserInfo info = new UserInfo();
-        info.setUserName(etName.getText().toString());
-        info.setPhone(etPhone.getText().toString());
-        info.setGender(tvGender.getText().toString());
-        info.setBirthDate(tvBirth.getText().toString());
-        info.setMaritalStatus(tvMarital.getText().toString());
-        info.setEducationLevel(tvEducation.getText().toString());
-        info.setLivingStatus(tvLiving.getText().toString());
-        info.setJobStatus(tvJob.getText().toString());
-        info.setIncomePerCapita(tvIncome.getText().toString());
-        info.setInsuranceType(tvInsurance.getText().toString());
+        info.setUserName(etName.getText().toString().trim());
+        info.setPhone(etPhone.getText().toString().trim());
 
-        String userId = UserUtils.loadUserId(requireContext());
-        if (userId != null && !userId.isEmpty()) {
-            info.setUserId(userId);
+        // 处理性别 - 过滤"请选择"
+        String gender = tvGender.getText().toString().trim();
+        info.setGender(gender.equals("请选择") ? null : gender);
+
+        // 处理生日 - 过滤"请选择"
+        String birth = tvBirth.getText().toString().trim();
+        info.setBirthDate(birth.equals("请选择") ? null : birth);
+
+        // 处理婚姻状况 - 过滤"请选择"
+        String marital = tvMarital.getText().toString().trim();
+        info.setMaritalStatus(marital.equals("请选择") ? null : marital);
+
+        // 处理受教育水平 - 过滤"请选择"
+        String education = tvEducation.getText().toString().trim();
+        info.setEducationLevel(education.equals("请选择") ? null : education);
+
+        // 处理居住情况 - 过滤"请选择"
+        String living = tvLiving.getText().toString().trim();
+        info.setLivingStatus(living.equals("请选择") ? null : living);
+
+        // 处理职业状态 - 过滤"请选择"
+        String job = tvJob.getText().toString().trim();
+        info.setJobStatus(job.equals("请选择") ? null : job);
+
+        // 处理家庭月收入 - 过滤"请选择"
+        String income = tvIncome.getText().toString().trim();
+        info.setIncomePerCapita(income.equals("请选择") ? null : income);
+
+        // 处理保险类型 - 过滤"请选择"
+        String insurance = tvInsurance.getText().toString().trim();
+        info.setInsuranceType(insurance.equals("请选择") ? null : insurance);
+
+        info.setAdminId(currentAdminId);
+
+        // 保存城市信息 - 只有全部选择了才保存,否则设为null
+        if (!TextUtils.isEmpty(selectedProvince) &&
+                !TextUtils.isEmpty(selectedCity) &&
+                !TextUtils.isEmpty(selectedDistrict) &&
+                !selectedProvince.equals("请选择") &&
+                !selectedCity.equals("请选择") &&
+                !selectedDistrict.equals("请选择")) {
+            info.setProvince(selectedProvince);
+            info.setCity(selectedCity);
+            info.setDistrict(selectedDistrict);
+        } else {
+            info.setProvince(null);
+            info.setCity(null);
+            info.setDistrict(null);
+        }
+
+        int projectPosition = spinnerProject.getSelectedItemPosition();
+        int teamPosition = spinnerTeam.getSelectedItemPosition();
+
+        if (projectPosition > 0) {
+            Project selectedProject = projectList.get(projectPosition);
+            info.setProjectId(selectedProject.getProjectId());
+            info.setProjectName(selectedProject.getProjectName());
+        }
+
+        if (teamPosition > 0) {
+            Team selectedTeam = teamList.get(teamPosition);
+            info.setTeamId(selectedTeam.getTeamId());
+            info.setTeamName(selectedTeam.getTeamName());
+        }
+
+        if (currentUserId != null && !currentUserId.isEmpty()) {
+            info.setUserId(currentUserId);
         }
 
         if (!checkInput(info)) return;
 
-        showLoading("正在保存，请稍后");
+        showLoading("正在保存...");
 
-        OkHttpClient client = new OkHttpClient();
-        String url = ApiConfig.API_USER_INFO + userId;
-        Request getRequest = new Request.Builder().url(url).get().build();
-
-        client.newCall(getRequest).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                runUiSafe(() -> {
-                    hideLoading();
-                    showErrorSafe("保存失败，请检查网络");
-                });
-            }
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                boolean exists = false;
-                try {
-                    if (response.isSuccessful()) {
-                        try {
-                            String resp = response.body().string();
-                            UserInfo infoRemote = gson.fromJson(resp, UserInfo.class);
-                            exists = (infoRemote != null && infoRemote.getUserId() != null);
-                        } catch (Exception ignore) { }
-                    }
-                } finally {
-                    response.close();
-                }
-                doSaveOrUpdate(info, exists);
-            }
-        });
-    }
-
-    private void doSaveOrUpdate(UserInfo info, boolean exists) {
-        OkHttpClient client = new OkHttpClient();
         String json = gson.toJson(info);
+        Log.d(TAG, "发送数据: " + json);
+
         RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
 
         Request request;
-        if (exists) {
+        if (currentUserId != null && !currentUserId.isEmpty()) {
             request = new Request.Builder()
-                    .url(ApiConfig.API_UPDATE_USER_INFO + info.getUserId())
+                    .url(ApiConfig.API_UPDATE_USER_INFO + currentUserId)
                     .put(body)
                     .build();
+            Log.d(TAG, "更新模式, URL: " + ApiConfig.API_UPDATE_USER_INFO + currentUserId);
         } else {
             request = new Request.Builder()
                     .url(ApiConfig.API_CREATE_USER_INFO)
                     .post(body)
                     .build();
+            Log.d(TAG, "新增模式, URL: " + ApiConfig.API_CREATE_USER_INFO);
         }
 
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "网络请求失败: " + e.getMessage());
                 runUiSafe(() -> {
                     hideLoading();
                     showErrorSafe("保存失败，请检查网络");
                 });
             }
+
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                boolean successful;
+                if (!isAdded() || getActivity() == null) {
+                    response.close();
+                    return;
+                }
+
                 try {
-                    successful = response.isSuccessful();
+                    String responseBody = response.body().string();
+                    Log.d(TAG, "服务器响应: " + responseBody);
+
+                    if (response.isSuccessful()) {
+                        try {
+                            org.json.JSONObject jsonObject = new org.json.JSONObject(responseBody);
+                            String message = jsonObject.optString("message", "保存成功");
+
+                            runUiSafe(() -> {
+                                hideLoading();
+
+                                if (message.contains("成功")) {
+                                    showSuccessSafe(message);
+                                    new android.os.Handler().postDelayed(() -> {
+                                        if (isAdded() && getActivity() != null) {
+                                            getActivity().getSupportFragmentManager().popBackStack();
+                                        }
+                                    }, 1000);
+                                } else {
+                                    showErrorSafe(message);
+                                }
+                            });
+                        } catch (org.json.JSONException e) {
+                            Log.e(TAG, "解析响应失败: " + e.getMessage());
+                            runUiSafe(() -> {
+                                hideLoading();
+                                showSuccessSafe("保存成功");
+                                if (isAdded() && getActivity() != null) {
+                                    getActivity().getSupportFragmentManager().popBackStack();
+                                }
+                            });
+                        }
+                    } else {
+                        Log.e(TAG, "HTTP错误: " + response.code());
+                        runUiSafe(() -> {
+                            hideLoading();
+
+                            try {
+                                org.json.JSONObject jsonObject = new org.json.JSONObject(responseBody);
+                                String message = jsonObject.optString("message", "服务器错误，保存失败");
+                                showErrorSafe(message);
+                            } catch (org.json.JSONException e) {
+                                showErrorSafe("服务器错误(代码: " + response.code() + ")");
+                            }
+                        });
+                    }
                 } finally {
                     response.close();
                 }
-                runUiSafe(() -> {
-                    hideLoading();
-                    if (successful) {
-                        showSuccessSafe("信息保存成功");
-                        if (isAdded() && getActivity() != null) {
-                            while (getActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
-                                getActivity().getSupportFragmentManager().popBackStackImmediate();
-                            }
-                        }
-                    } else {
-                        showErrorSafe("服务器错误，保存失败");
-                    }
-                });
             }
         });
     }
 
-    // ---- 工具方法 ----
     private Context getActivitySafe() {
         if (getActivity() != null) return getActivity();
         if (getContext() != null) return getContext();
-        throw new IllegalStateException("Fragment已分离，getActivity/getContext都为null");
+        throw new IllegalStateException("Fragment已分离");
     }
 
     private void runUiSafe(Runnable runnable) {
-        // 进一步优化：Fragment和Activity必须都活着才回调UI
         if (!isAdded() || getActivity() == null) {
-            Log.d("UserInfoDebug", "runUiSafe return, isAdded=" + isAdded() + " getActivity=" + getActivity());
             hideLoading();
             return;
         }
@@ -376,7 +832,9 @@ public class UserInfoRegisterFragment extends Fragment {
             }
             try {
                 runnable.run();
-            } catch (Throwable ignore) {}
+            } catch (Throwable e) {
+                Log.e(TAG, "runUiSafe执行异常", e);
+            }
         });
     }
 

@@ -15,6 +15,7 @@ public class ApiConfig {
     public static final String API_USERINFO_SEARCH_BY_PARAM = BASE_URL + "userinfo/searchByParam/";
     public static final String API_UPDATE_USER_INFO = BASE_URL + "updateUserinfo/"; // requires userId after slash
     public static final String API_CREATE_USER_INFO = BASE_URL + "createUserinfo";
+    public static final String API_DELETE_USER_INFO = BASE_URL + "deleteUserinfo/"; // requires userId after slash
     public static final String API_ACCOUNT_REGISTER = BASE_URL + "account/register";
     public static final String API_ACCOUNT_LOGIN = BASE_URL + "account/login";
     public static final String API_SEARCH_ACCOUNT = BASE_URL + "account/searchAccount"; // requires userId after slash
