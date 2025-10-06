@@ -201,7 +201,7 @@ public class UserUtils {
     private static final String CACHE_CHECKUP_PREFIX = "checkup_result_";
 
     /**
-     * 保存体检结果到缓存（通用方法）
+     * 保存体检结果到缓存（支持历史记录）
      * @param context 上下文
      * @param userId 用户ID
      * @param dataJson 体检数据JSON字符串
@@ -210,25 +210,55 @@ public class UserUtils {
      */
     public static void saveCheckupResultCache(Context context, String userId, String dataJson,
                                               String conclusion, String checkupTime) {
+        saveCheckupResultCacheWithCustomTime(context, userId, dataJson, conclusion, checkupTime, null);
+    }
+    /**
+     * 保存体检结果到缓存（支持自定义时间，用于测试）
+     * @param customDate 自定义日期（格式：yyyy-MM-dd），如果为null则使用当前时间
+     */
+    public static void saveCheckupResultCacheWithCustomTime(Context context, String userId, String dataJson,
+                                                            String conclusion, String checkupTime, String customDate) {
         if (context == null || userId == null || userId.isEmpty()) {
             Log.w(TAG, "saveCheckupResultCache: context或userId为空");
             return;
         }
 
         try {
-            SharedPreferences prefs = context.getSharedPreferences("checkup_cache", Context.MODE_PRIVATE);
-            prefs.edit()
+            SharedPreferences historyPrefs = context.getSharedPreferences("checkup_history", Context.MODE_PRIVATE);
+
+            String timeStamp;
+            if (customDate != null && !customDate.isEmpty()) {
+                java.text.SimpleDateFormat timeSdf = new java.text.SimpleDateFormat("HHmmss", java.util.Locale.getDefault());
+                String timeOnly = timeSdf.format(new java.util.Date());
+                String dateOnly = customDate.replace("-", "");
+                timeStamp = dateOnly + "_" + timeOnly;
+                Log.d(TAG, "使用自定义日期: " + customDate + ", 生成时间戳: " + timeStamp);
+            } else {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault());
+                timeStamp = sdf.format(new java.util.Date());
+            }
+
+            String dataKey = userId + "_data_" + timeStamp;
+            String conclusionKey = userId + "_conclusion_" + timeStamp;
+
+            historyPrefs.edit()
+                    .putString(dataKey, dataJson)
+                    .putString(conclusionKey, conclusion != null ? conclusion : "")
+                    .apply();
+
+            Log.d(TAG, "体检结果已保存到历史记录: " + dataKey);
+
+            SharedPreferences cachePrefs = context.getSharedPreferences("checkup_cache", Context.MODE_PRIVATE);
+            cachePrefs.edit()
                     .putString(CACHE_CHECKUP_PREFIX + "data_" + userId, dataJson)
                     .putString(CACHE_CHECKUP_PREFIX + "conclusion_" + userId, conclusion != null ? conclusion : "")
                     .putString(CACHE_CHECKUP_PREFIX + "time_" + userId, checkupTime)
                     .apply();
 
-            Log.d(TAG, "体检结果已保存到缓存: userId=" + userId + ", time=" + checkupTime);
         } catch (Exception e) {
             Log.e(TAG, "保存体检结果到缓存失败: " + e.getMessage());
         }
     }
-
     /**
      * 从缓存读取体检结果数据JSON
      * @param context 上下文
@@ -308,4 +338,44 @@ public class UserUtils {
         String dataJson = getCheckupResultDataJson(context, userId);
         return dataJson != null && !dataJson.isEmpty();
     }
+
+    /**
+     * 生成测试体检数据（用于开发测试）
+     */
+    public static void generateTestCheckupData(Context context, String userId, int daysAgo) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_MONTH, -daysAgo);
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+        String customDate = sdf.format(cal.getTime());
+
+        java.util.Random random = new java.util.Random();
+        int steps = 3000 + random.nextInt(7000);
+        int heartRate = 60 + random.nextInt(30);
+        int spo2 = 95 + random.nextInt(5);
+        int bpHigh = 110 + random.nextInt(30);
+        int bpLow = 70 + random.nextInt(20);
+        float bloodGlucose = 4.5f + random.nextFloat() * 2.5f;
+        int sleep = 360 + random.nextInt(180);
+
+        String dataJson = String.format(java.util.Locale.US,
+                "{\"steps\":%d,\"heartRate\":%d,\"spo2\":%d,\"bpHigh\":%d,\"bpLow\":%d,\"bloodGlucose\":%.1f,\"sleep\":%d}",
+                steps, heartRate, spo2, bpHigh, bpLow, bloodGlucose, sleep);
+
+        String conclusion = "测试数据 - " + customDate;
+        String checkupTime = customDate + " 12:00";
+
+        saveCheckupResultCacheWithCustomTime(context, userId, dataJson, conclusion, checkupTime, customDate);
+        Log.d(TAG, "生成测试数据: " + customDate);
+    }
+
+    /**
+     * 批量生成测试数据
+     */
+    public static void generateMultipleTestData(Context context, String userId, int days) {
+        for (int i = 0; i < days; i++) {
+            generateTestCheckupData(context, userId, i);
+        }
+        Log.d(TAG, "已生成 " + days + " 天的测试数据");
+    }
+
 }

@@ -249,6 +249,12 @@ public class SmartwatchCheckupFragment extends Fragment {
         userId = userAccount != null ? userAccount.getUserId() : null;
         log("当前用户ID: " + userId);
 
+        // ===== 临时：生成7天测试数据 =====
+//        if (userId != null) {
+//            UserUtils.generateMultipleTestData(requireContext(), userId, 90);
+//        }
+        // =================================
+
         updateCheckupUI(CheckupStatus.BEFORE, null);
     }
 

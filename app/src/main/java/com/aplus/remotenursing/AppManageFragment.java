@@ -79,11 +79,12 @@ public class AppManageFragment extends Fragment {
         btnLogout.setOnClickListener(v -> logout());
 
         // 健康报告点击事件
+        // 健康报告点击事件
         if (cardHealthReport != null) {
             cardHealthReport.setOnClickListener(v -> {
                 Log.d("AppManageFragment", "点击健康报告");
 
-                // 检查登录状态，但不要强制跳转到登录页面
+                // 检查登录状态
                 if (!isLoggedIn || userAccount == null) {
                     InfoPopup.showError(getContext(), "请先登录后再使用此功能");
                     return;
@@ -95,8 +96,25 @@ public class AppManageFragment extends Fragment {
                     return;
                 }
 
-                // TODO: 跳转到健康报告页面
-                InfoPopup.showInfo(getContext(), "健康报告功能开发中，敬请期待");
+                // 跳转到健康报告页面
+                try {
+                    HealthReportFragment healthReportFragment = new HealthReportFragment();
+                    getParentFragmentManager()
+                            .beginTransaction()
+                            .setCustomAnimations(
+                                    R.anim.slide_in_right,
+                                    R.anim.slide_out_left,
+                                    R.anim.slide_in_left,
+                                    R.anim.slide_out_right
+                            )
+                            .replace(R.id.fragment_container, healthReportFragment)
+                            .addToBackStack("HealthReport")
+                            .commit();
+                    Log.d("AppManageFragment", "成功跳转到健康报告页面");
+                } catch (Exception e) {
+                    Log.e("AppManageFragment", "跳转健康报告失败: " + e.getMessage());
+                    InfoPopup.showError(getContext(), "页面跳转失败，请重试");
+                }
             });
         }
 

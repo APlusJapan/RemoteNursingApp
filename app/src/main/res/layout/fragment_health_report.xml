@@ -1,0 +1,844 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F7FA">
+
+    <!-- 顶部标题栏 -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/white"
+        app:elevation="2dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:layout_width="match_parent"
+            android:layout_height="66dp">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <ImageButton
+                    android:id="@+id/btn_back"
+                    android:layout_width="66dp"
+                    android:layout_height="66dp"
+                    android:padding="16dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_arrow_back_black_24dp"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:contentDescription="返回" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="健康报告"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#2C3E50"
+                    android:layout_centerInParent="true" />
+
+            </RelativeLayout>
+
+        </androidx.appcompat.widget.Toolbar>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- 主内容区域 -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 时间范围选择 -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@android:color/white">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="查看周期"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="#2C3E50"
+                        android:layout_marginBottom="12dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_7days"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="56dp"
+                            android:text="近7天"
+                            android:textSize="18sp"
+                            android:textColor="@android:color/white"
+                            app:backgroundTint="@color/colorPrimary"
+                            app:cornerRadius="8dp"
+                            android:layout_marginEnd="6dp"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_30days"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="56dp"
+                            android:text="近30天"
+                            android:textSize="18sp"
+                            android:textColor="@android:color/white"
+                            app:backgroundTint="@android:color/darker_gray"
+                            app:cornerRadius="8dp"
+                            android:layout_marginHorizontal="3dp"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_all"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="56dp"
+                            android:text="近90天"
+                            android:textSize="18sp"
+                            android:textColor="@android:color/white"
+                            app:backgroundTint="@android:color/darker_gray"
+                            app:cornerRadius="8dp"
+                            android:layout_marginStart="6dp"
+                            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- 内容区域 -->
+            <LinearLayout
+                android:id="@+id/ll_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="visible">
+
+                <!-- 最新数据概览 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:id="@+id/tv_latest_date"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="最新数据"
+                            android:textSize="22sp"
+                            android:textStyle="bold"
+                            android:textColor="#2C3E50"
+                            android:layout_marginBottom="16dp" />
+
+                        <!-- 第一行：心率、血氧 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="12dp">
+
+                            <!-- 心率 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#FFF5F5"
+                                android:padding="14dp"
+                                android:layout_marginEnd="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="心率"
+                                    android:textSize="22sp"
+                                    android:textColor="#E74C3C" />
+
+                                <TextView
+                                    android:id="@+id/tv_latest_heart"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textSize="30sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#E74C3C"
+                                    android:layout_marginTop="6dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="次/分"
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_heart_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="18sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone" />
+
+                            </LinearLayout>
+
+                            <!-- 血氧 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#F0F8FF"
+                                android:padding="14dp"
+                                android:layout_marginStart="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="血氧"
+                                    android:textSize="22sp"
+                                    android:textColor="#3498DB" />
+
+                                <TextView
+                                    android:id="@+id/tv_latest_spo2"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textSize="30sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#3498DB"
+                                    android:layout_marginTop="6dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="%"
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_spo2_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="18sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <!-- 第二行：步数、血压 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="12dp">
+
+                            <!-- 步数 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="190dp"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#F0FFF0"
+                                android:padding="14dp"
+                                android:layout_marginEnd="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="步数"
+                                    android:textSize="22sp"
+                                    android:textColor="#2ECC71" />
+
+                                <TextView
+                                    android:id="@+id/tv_latest_steps"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textSize="30sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#2ECC71"
+                                    android:layout_marginTop="6dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="步"
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_steps_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="18sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone" />
+
+                            </LinearLayout>
+
+                            <!-- 血压 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="190dp"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#F5F0FF"
+                                android:padding="14dp"
+                                android:layout_marginStart="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="血压"
+                                    android:textSize="22sp"
+                                    android:textColor="#9B59B6" />
+
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:layout_marginTop="6dp">
+
+                                    <TextView
+                                        android:id="@+id/tv_latest_bp_high"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textSize="30sp"
+                                        android:textStyle="bold"
+                                        android:textColor="#9B59B6" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="/"
+                                        android:textSize="30sp"
+                                        android:textColor="#9B59B6"
+                                        android:layout_marginHorizontal="2dp" />
+
+                                    <TextView
+                                        android:id="@+id/tv_latest_bp_low"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="-"
+                                        android:textSize="30sp"
+                                        android:textStyle="bold"
+                                        android:textColor="#9B59B6" />
+
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="mmHg"
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_bp_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone"
+                                    android:gravity="center" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <!-- 第三行：血糖、睡眠 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <!-- 血糖 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#FFF8F0"
+                                android:padding="14dp"
+                                android:layout_marginEnd="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="血糖"
+                                    android:textSize="22sp"
+                                    android:textColor="#E67E22" />
+
+                                <TextView
+                                    android:id="@+id/tv_latest_glucose"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textSize="30sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#E67E22"
+                                    android:layout_marginTop="6dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="mmol/L"
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_glucose_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="18sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone" />
+
+                            </LinearLayout>
+
+                            <!-- 睡眠 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="#F0FFFF"
+                                android:padding="14dp"
+                                android:layout_marginStart="6dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="睡眠"
+                                    android:textSize="22sp"
+                                    android:textColor="#1ABC9C" />
+
+                                <TextView
+                                    android:id="@+id/tv_latest_sleep"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="-"
+                                    android:textSize="26sp"
+                                    android:textStyle="bold"
+                                    android:textColor="#1ABC9C"
+                                    android:layout_marginTop="6dp"
+                                    android:maxLines="2"
+                                    android:gravity="center" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="20sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="2dp" />
+
+                                <TextView
+                                    android:id="@+id/tv_sleep_standard"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text=""
+                                    android:textSize="18sp"
+                                    android:textColor="#95A5A6"
+                                    android:layout_marginTop="8dp"
+                                    android:visibility="gone"
+                                    android:gravity="center" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 心率趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_heart_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="心率趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#E74C3C" />
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_heart_rate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 血氧趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_spo2_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="血氧趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#3498DB" />
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_spo2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 血压趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_bp_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="血压趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#9B59B6" />
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_bp"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 血糖趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_glucose_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="血糖趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#E67E22" />
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_glucose"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 步数趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_steps_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="步数趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#2ECC71" />
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_steps"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- 睡眠趋势图 -->
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="12dp">
+
+                            <TextView
+                                android:id="@+id/tv_sleep_title"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="睡眠趋势"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="#1ABC9C" />
+
+                        </LinearLayout>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="horizontal"
+                            android:fillViewport="false">
+                            <com.github.mikephil.charting.charts.LineChart
+                                android:id="@+id/chart_sleep"
+                                android:layout_width="wrap_content"
+                                android:layout_height="220dp"
+                                android:minWidth="800dp" />
+                        </HorizontalScrollView>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+            </LinearLayout>
+
+            <!-- 空状态 -->
+            <LinearLayout
+                android:id="@+id/ll_empty"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone"
+                android:padding="32dp">
+
+                <ImageView
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:src="@drawable/ic_chart_24"
+                    app:tint="#BDC3C7"
+                    android:layout_marginBottom="20dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="暂无体检数据"
+                    android:textSize="24sp"
+                    android:textColor="#7F8C8D"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="完成体检后即可查看健康趋势"
+                    android:textSize="18sp"
+                    android:textColor="#95A5A6" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>
